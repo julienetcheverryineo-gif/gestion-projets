@@ -771,7 +771,7 @@ textarea:focus {
 @media (max-width: 860px) {
   .app-shell {
     flex-direction: column;
-    padding-bottom: 62px; /* laisse la place à la barre d'onglets en bas */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 
   /* La sidebar devient une barre d'onglets fixe en bas de l'écran */
