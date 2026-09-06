@@ -67,6 +67,21 @@ export default function Layout() {
       </aside>
 
       <main className="main-content">
+        <div className="mobile-topbar">
+          <span className="brand-title">Pilotage GTB</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              className="btn-ghost btn-refresh"
+              onClick={() => window.location.reload()}
+              aria-label="Actualiser"
+            >
+              ⟳ Actualiser
+            </button>
+            <button className="btn-ghost" onClick={handleLogout} aria-label="Se déconnecter">
+              Déconnexion
+            </button>
+          </div>
+        </div>
         <Outlet />
       </main>
     </div>

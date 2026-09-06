@@ -17,6 +17,16 @@ const COLONNES = [
   { statut: "termine", titre: "Terminé" },
 ];
 
+function statutPrecedent(statut) {
+  const i = COLONNES.findIndex((c) => c.statut === statut);
+  return i > 0 ? COLONNES[i - 1].statut : null;
+}
+
+function statutSuivant(statut) {
+  const i = COLONNES.findIndex((c) => c.statut === statut);
+  return i < COLONNES.length - 1 ? COLONNES[i + 1].statut : null;
+}
+
 export default function Tasks() {
   const { profile, isAdmin, isChefDeProjet } = useAuth();
   const peutSupprimer = isAdmin || isChefDeProjet;
@@ -107,6 +117,28 @@ export default function Tasks() {
                         ×
                       </button>
                     )}
+                    <div className="kanban-card-move">
+                      <button
+                        className="kanban-move-btn"
+                        disabled={!statutPrecedent(tache.statut ?? "a_faire")}
+                        onClick={() =>
+                          changerStatut(tache.id, statutPrecedent(tache.statut ?? "a_faire"))
+                        }
+                        aria-label="Déplacer vers la colonne précédente"
+                      >
+                        ← Retour
+                      </button>
+                      <button
+                        className="kanban-move-btn"
+                        disabled={!statutSuivant(tache.statut ?? "a_faire")}
+                        onClick={() =>
+                          changerStatut(tache.id, statutSuivant(tache.statut ?? "a_faire"))
+                        }
+                        aria-label="Déplacer vers la colonne suivante"
+                      >
+                        Avancer →
+                      </button>
+                    </div>
                   </div>
                 ))}
               <button

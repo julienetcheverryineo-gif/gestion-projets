@@ -476,6 +476,41 @@ a {
   resize: vertical;
 }
 
+/* ---------- Mobile topbar (avec refresh) ---------- */
+.mobile-topbar {
+  display: none;
+}
+
+.btn-refresh {
+  font-size: 0.82rem;
+}
+
+/* ---------- Kanban move buttons (tap, pour mobile) ---------- */
+.kanban-card-move {
+  display: none;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.kanban-move-btn {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  padding: 8px 6px;
+}
+.kanban-move-btn:disabled {
+  opacity: 0.3;
+}
+.kanban-move-btn:not(:disabled):active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 /* ---------- Kanban ---------- */
 .kanban-board {
   display: grid;
@@ -723,36 +758,130 @@ textarea:focus {
   margin-top: 6px;
 }
 
-/* ---------- Responsive ---------- */
+/* ---------- Responsive (mobile / iPhone) ---------- */
 @media (max-width: 860px) {
   .app-shell {
     flex-direction: column;
+    padding-bottom: 62px; /* laisse la place à la barre d'onglets en bas */
   }
+
+  /* La sidebar devient une barre d'onglets fixe en bas de l'écran */
   .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
     width: 100%;
+    height: auto;
     flex-direction: row;
-    align-items: center;
-    padding: 12px 16px;
-    overflow-x: auto;
+    align-items: stretch;
+    justify-content: space-around;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 1px solid var(--border);
+    z-index: 10;
   }
+
   .sidebar-brand {
-    border-bottom: none;
-    padding: 0;
-    margin: 0 16px 0 0;
+    display: none;
   }
+
   .sidebar-nav {
     flex-direction: row;
+    flex: 1;
+    justify-content: space-around;
   }
+
+  .nav-link {
+    flex: 1;
+    text-align: center;
+    font-size: 0.72rem;
+    padding: 8px 2px 6px;
+    border-left: none;
+    border-top: 2px solid transparent;
+    border-radius: 0;
+  }
+  .nav-link-active {
+    border-left: none;
+    border-top: 2px solid var(--accent);
+    background: none;
+  }
+
+  /* Le profil et la déconnexion passent dans la barre du haut, plus dans la sidebar */
   .sidebar-footer {
     display: none;
   }
-  .main-content {
-    padding: 20px;
+
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
   }
+
+  .main-content {
+    padding: 16px 16px 24px;
+    max-width: none;
+  }
+
+  .page-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .page-header-actions .btn-primary {
+    width: 100%;
+  }
+
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
   .kanban-board {
     grid-template-columns: 1fr;
+  }
+
+  /* Le drag-and-drop natif ne marche pas au doigt : on affiche les boutons de secours */
+  .kanban-card-move {
+    display: flex;
+  }
+  .kanban-card {
+    cursor: default;
+  }
+
+  .form-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .form-inline label {
+    min-width: 0;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal {
+    max-width: none;
+    width: 100%;
+    border-radius: var(--radius) var(--radius) 0 0;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  input,
+  select,
+  textarea,
+  .btn-primary,
+  .btn-ghost {
+    font-size: 16px; /* évite le zoom automatique de Safari au focus */
   }
 }
