@@ -481,6 +481,15 @@ a {
   display: none;
 }
 
+@media (max-width: 860px) {
+  .mobile-topbar {
+    padding-top: max(14px, env(safe-area-inset-top));
+  }
+  .app-shell {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
 .btn-refresh {
   font-size: 0.82rem;
 }
