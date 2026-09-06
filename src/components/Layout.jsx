@@ -3,9 +3,8 @@ import { useAuth } from "../contexts/AuthContext";
 
 const NAV_ITEMS = [
   { to: "/", label: "Vue d'ensemble", end: true },
-  { to: "/projets", label: "Projets" },
+  { to: "/chantiers", label: "Chantiers" },
   { to: "/taches", label: "Tâches" },
-  { to: "/temps", label: "Suivi de temps" },
 ];
 
 export default function Layout() {

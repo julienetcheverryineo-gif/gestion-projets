@@ -4,9 +4,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Projects from "./pages/Projects";
+import Sites from "./pages/Sites";
+import SiteDetail from "./pages/SiteDetail";
 import Tasks from "./pages/Tasks";
-import TimeTracking from "./pages/TimeTracking";
 import Users from "./pages/Users";
 
 export default function App() {
@@ -24,9 +24,9 @@ export default function App() {
             }
           >
             <Route index element={<Dashboard />} />
-            <Route path="projets" element={<Projects />} />
+            <Route path="chantiers" element={<Sites />} />
+            <Route path="chantiers/:chantierId" element={<SiteDetail />} />
             <Route path="taches" element={<Tasks />} />
-            <Route path="temps" element={<TimeTracking />} />
             <Route
               path="utilisateurs"
               element={

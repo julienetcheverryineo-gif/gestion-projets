@@ -21,7 +21,7 @@ export default function Tasks() {
   const { profile, isAdmin, isChefDeProjet } = useAuth();
   const peutSupprimer = isAdmin || isChefDeProjet;
   const { documents: taches } = useCollection("tasks");
-  const { documents: projets } = useCollection("projects");
+  const { documents: chantiers } = useCollection("sites");
   const { documents: utilisateurs } = useCollection("users", "email");
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [colonneCible, setColonneCible] = useState(null);
@@ -88,7 +88,7 @@ export default function Tasks() {
                   >
                     <div className="kanban-card-title">{tache.titre}</div>
                     <div className="kanban-card-meta">
-                      {nomProjet(projets, tache.projetId)}
+                      {nomChantier(chantiers, tache.chantierId)}
                     </div>
                     <div className="kanban-card-footer">
                       <span className="kanban-card-assignee">
@@ -126,9 +126,8 @@ export default function Tasks() {
       {afficherFormulaire && (
         <TaskFormModal
           statutInitial={colonneCible}
-          projets={projets}
+          chantiers={chantiers}
           utilisateurs={utilisateurs}
-          profil={profile}
           onClose={() => setAfficherFormulaire(false)}
         />
       )}
@@ -136,13 +135,13 @@ export default function Tasks() {
   );
 }
 
-function nomProjet(projets, projetId) {
-  return projets.find((p) => p.id === projetId)?.nom ?? "Sans projet";
+function nomChantier(chantiers, chantierId) {
+  return chantiers.find((c) => c.id === chantierId)?.nom ?? "Sans chantier";
 }
 
-function TaskFormModal({ statutInitial, projets, utilisateurs, onClose }) {
+function TaskFormModal({ statutInitial, chantiers, utilisateurs, onClose }) {
   const [titre, setTitre] = useState("");
-  const [projetId, setProjetId] = useState(projets[0]?.id ?? "");
+  const [chantierId, setChantierId] = useState(chantiers[0]?.id ?? "");
   const [assigneA, setAssigneA] = useState("");
   const [echeance, setEcheance] = useState("");
   const [enCours, setEnCours] = useState(false);
@@ -152,7 +151,7 @@ function TaskFormModal({ statutInitial, projets, utilisateurs, onClose }) {
     setEnCours(true);
     await addDoc(collection(db, "tasks"), {
       titre,
-      projetId: projetId || null,
+      chantierId: chantierId || null,
       assigneA: assigneA || null,
       echeance: echeance || null,
       statut: statutInitial,
@@ -172,12 +171,12 @@ function TaskFormModal({ statutInitial, projets, utilisateurs, onClose }) {
             <input value={titre} onChange={(e) => setTitre(e.target.value)} required />
           </label>
           <label>
-            Projet
-            <select value={projetId} onChange={(e) => setProjetId(e.target.value)}>
-              <option value="">Sans projet</option>
-              {projets.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nom}
+            Chantier
+            <select value={chantierId} onChange={(e) => setChantierId(e.target.value)}>
+              <option value="">Sans chantier</option>
+              {chantiers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nom}
                 </option>
               ))}
             </select>

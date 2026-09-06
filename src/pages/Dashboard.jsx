@@ -3,26 +3,38 @@ import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
 
 export default function Dashboard() {
-  const { documents: projets, chargement: chargementProjets } =
-    useCollection("projects");
+  const { documents: chantiers, chargement: chargementChantiers } =
+    useCollection("sites");
   const { documents: taches, chargement: chargementTaches } =
     useCollection("tasks");
+  const { documents: lots } = useCollection("lots");
+  const { documents: equipements } = useCollection("equipments");
 
   const stats = useMemo(() => {
-    const projetsActifs = projets.filter((p) => p.statut !== "termine").length;
+    const chantiersActifs = chantiers.filter((c) => c.statut !== "termine").length;
     const tachesEnRetard = taches.filter((t) => estEnRetard(t)).length;
     const tachesEnCours = taches.filter((t) => t.statut === "en_cours").length;
-    const tachesTerminees = taches.filter((t) => t.statut === "termine").length;
-    return { projetsActifs, tachesEnRetard, tachesEnCours, tachesTerminees };
-  }, [projets, taches]);
+    const equipementsRestants = equipements.filter((e) => e.statut !== "teste").length;
+    return { chantiersActifs, tachesEnRetard, tachesEnCours, equipementsRestants };
+  }, [chantiers, taches, equipements]);
 
-  const chargement = chargementProjets || chargementTaches;
+  const chargement = chargementChantiers || chargementTaches;
+
+  const avancementChantier = (chantierId) => {
+    const lotsDuChantier = lots.filter((l) => l.chantierId === chantierId);
+    const eqs = equipements.filter((e) =>
+      lotsDuChantier.some((l) => l.id === e.lotId)
+    );
+    if (eqs.length === 0) return null;
+    const testes = eqs.filter((e) => e.statut === "teste").length;
+    return Math.round((testes / eqs.length) * 100);
+  };
 
   return (
     <div className="page">
       <header className="page-header">
         <h1>Vue d'ensemble</h1>
-        <p className="page-subtitle">Où en sont vos projets, en un coup d'œil.</p>
+        <p className="page-subtitle">Où en sont vos chantiers, en un coup d'œil.</p>
       </header>
 
       {chargement ? (
@@ -30,41 +42,46 @@ export default function Dashboard() {
       ) : (
         <>
           <div className="stat-grid">
-            <StatCard label="Projets actifs" valeur={stats.projetsActifs} />
+            <StatCard label="Chantiers actifs" valeur={stats.chantiersActifs} />
             <StatCard label="Tâches en cours" valeur={stats.tachesEnCours} />
             <StatCard
               label="Tâches en retard"
               valeur={stats.tachesEnRetard}
               alerte={stats.tachesEnRetard > 0}
             />
-            <StatCard label="Tâches terminées" valeur={stats.tachesTerminees} />
+            <StatCard label="Points restants" valeur={stats.equipementsRestants} />
           </div>
 
           <section className="panel">
             <div className="panel-header">
-              <h2>Projets récents</h2>
-              <Link to="/projets" className="link">
-                Voir tous les projets
+              <h2>Chantiers</h2>
+              <Link to="/chantiers" className="link">
+                Voir tous les chantiers
               </Link>
             </div>
-            {projets.length === 0 ? (
+            {chantiers.length === 0 ? (
               <EmptyState
-                titre="Aucun projet pour l'instant"
-                description="Créez votre premier projet pour commencer à organiser les tâches de l'équipe."
-                lienTexte="Créer un projet"
-                lienVers="/projets"
+                titre="Aucun chantier pour l'instant"
+                description="Créez votre premier chantier pour commencer à suivre les lots techniques."
+                lienTexte="Créer un chantier"
+                lienVers="/chantiers"
               />
             ) : (
               <ul className="simple-list">
-                {projets.slice(0, 5).map((p) => (
-                  <li key={p.id}>
-                    <span className={"status-dot status-" + (p.statut ?? "actif")} />
-                    <span className="simple-list-title">{p.nom}</span>
-                    <span className="simple-list-meta">
-                      {p.echeance ? "Échéance : " + p.echeance : "Sans échéance"}
-                    </span>
-                  </li>
-                ))}
+                {chantiers.slice(0, 6).map((c) => {
+                  const pct = avancementChantier(c.id);
+                  return (
+                    <li key={c.id}>
+                      <span className={"status-dot status-" + (c.statut ?? "actif")} />
+                      <Link to={"/chantiers/" + c.id} className="simple-list-title">
+                        {c.nom}
+                      </Link>
+                      <span className="simple-list-meta">
+                        {pct !== null ? "Avancement : " + pct + "%" : "Sans lot"}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

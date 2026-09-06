@@ -68,14 +68,22 @@ sans barre d'adresse, comme une app native.
 ## Structure des données Firestore
 
 - `users` : `nom`, `email`, `role` (`admin` / `chef_de_projet` / `technicien`)
-- `projects` : `nom`, `description`, `statut`, `echeance`
-- `tasks` : `titre`, `projetId`, `assigneA`, `echeance`, `statut`
+- `sites` (chantiers) : `nom`, `client`, `adresse`, `statut`
+- `lots` (lots techniques, ex CVC/Éclairage/GTB) : `nom`, `chantierId`
+- `equipments` (équipements/points par lot) : `designation`, `remarque`,
+  `lotId`, `statut` (`a_faire` / `installe` / `configure` / `teste`)
+- `tasks` : `titre`, `chantierId`, `assigneA`, `echeance`, `statut`
   (`a_faire` / `en_cours` / `termine`)
-- `timeEntries` : `userId`, `userNom`, `projetId`, `tacheId`, `duree`, `date`
+- `timeEntries` : `userId`, `userNom`, `chantierId`, `lotId`, `duree`, `date`
+
+Le compte-rendu client (bouton "Générer un compte-rendu" sur la page d'un
+chantier) est calculé à la volée à partir des lots et équipements — rien
+n'est stocké séparément pour ça.
 
 ## Prochaines étapes possibles
 
-- Planning type Gantt par projet
+- Planning type Gantt par chantier
+- Coordination des interventions (qui va où, quand)
 - Notifications (échéances proches) via Cloud Functions
-- Export des rapports de temps en PDF/Excel
-- Historique des modifications sur les tâches
+- Export du compte-rendu en PDF
+- Historique des modifications sur les équipements

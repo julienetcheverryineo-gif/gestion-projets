@@ -24,10 +24,24 @@ service cloud.firestore {
       allow delete: if estChefOuAdmin();
     }
 
-    // Projets : lecture pour tous les connectés, écriture réservée aux chefs de projet/admins
-    match /projects/{projectId} {
+    // Chantiers : lecture pour tous les connectés, écriture réservée aux chefs de projet/admins
+    match /sites/{siteId} {
       allow read: if estConnecte();
       allow create, update, delete: if estChefOuAdmin();
+    }
+
+    // Lots techniques : lecture pour tous, gestion réservée aux chefs de projet/admins
+    match /lots/{lotId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estChefOuAdmin();
+    }
+
+    // Équipements/points : lecture pour tous, tout connecté peut mettre à jour le statut
+    // (un technicien doit pouvoir cocher un équipement testé sur le terrain)
+    match /equipments/{equipmentId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
     }
 
     // Tâches : lecture pour tous, création/modification pour tous les connectés
@@ -39,7 +53,7 @@ service cloud.firestore {
       allow delete: if estChefOuAdmin();
     }
 
-    // Suivi de temps : chacun ne peut créer/modifier que ses propres saisies
+    // Temps passé (par chantier) : chacun ne peut créer/modifier que ses propres saisies
     match /timeEntries/{entryId} {
       allow read: if estConnecte();
       allow create: if estConnecte() && request.resource.data.userId == request.auth.uid;
