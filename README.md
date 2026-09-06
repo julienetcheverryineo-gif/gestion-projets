@@ -16,29 +16,14 @@ s'installe comme une app sur iPhone (PWA).
 5. Une fois Firestore créé, aller dans l'onglet **Règles** et coller le
    contenu du fichier `firestore.rules` de ce projet, puis publier.
 
-## 2. Configurer le projet en local
+## 2. Configuration Firebase
 
-```bash
-npm install
-cp .env.example .env
-```
-
-Remplir `.env` avec les valeurs copiées à l'étape 1 :
-
-```
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-```
-
-Lancer en développement :
-
-```bash
-npm run dev
-```
+La configuration Firebase du projet "appli-service" est déjà écrite en dur
+dans `src/firebase.js`. Ce n'est pas un secret à protéger : ces valeurs sont
+conçues pour être publiques (elles sont de toute façon visibles dans le code
+envoyé au navigateur). La sécurité des données est assurée par les règles
+Firestore (`firestore.rules`), pas par cette config. Si un jour vous changez
+de projet Firebase, il suffit de mettre à jour les valeurs dans ce fichier.
 
 ## 3. Créer votre premier compte admin
 
@@ -68,19 +53,11 @@ l'application sur Firebase Hosting à chaque `push` sur `main`.
    ```
    Cette commande crée automatiquement les secrets GitHub nécessaires
    (`FIREBASE_SERVICE_ACCOUNT`) sur votre dépôt.
-3. Ajouter manuellement les autres secrets dans **GitHub > Settings >
-   Secrets and variables > Actions** :
-   - `VITE_FIREBASE_API_KEY`
-   - `VITE_FIREBASE_AUTH_DOMAIN`
-   - `VITE_FIREBASE_PROJECT_ID`
-   - `VITE_FIREBASE_STORAGE_BUCKET`
-   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
-   - `VITE_FIREBASE_APP_ID`
-   (mêmes valeurs que dans votre `.env`)
-4. Modifier `.firebaserc` avec l'identifiant réel de votre projet Firebase
-   (visible dans **Paramètres du projet**).
-5. Prochain `push` sur `main` → déploiement automatique. L'URL est du type
-   `https://VOTRE-PROJET.web.app`.
+   Cette commande crée automatiquement le secret GitHub nécessaire
+   (`FIREBASE_SERVICE_ACCOUNT`) sur votre dépôt. C'est le seul secret requis :
+   il sert uniquement à autoriser le déploiement, pas à configurer l'app.
+3. Prochain `push` sur `main` → déploiement automatique. L'URL est
+   `https://appli-service.web.app`.
 
 ## 5. Installer l'app sur iPhone
 
