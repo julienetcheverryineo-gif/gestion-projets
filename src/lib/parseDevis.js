@@ -11,6 +11,8 @@ const LABELS = {
   nomArticle: ["nom de l'article", "nom de l article"],
   unite: ["unité", "unite"],
   quantite: ["qté", "qte", "quantité", "quantite"],
+  typeFo: ["type de fo"],
+  typeMo: ["type mo", "type de mo"],
 };
 
 function normaliser(texte) {
@@ -39,8 +41,8 @@ function trouverColonne(entete, cles) {
   return -1;
 }
 
-// Lit un classeur Excel (ArrayBuffer) et retourne la liste des postes détectés,
-// chacun avec sa liste de matériel/tâches.
+// Lit un classeur Excel (ArrayBuffer) et retourne la liste des postes détectés
+// ("équipements régulés"), chacun avec son matériel et ses tâches.
 export function parseDevisWorkbook(arrayBuffer) {
   const workbook = XLSX.read(arrayBuffer, { type: "array" });
   const feuille = workbook.Sheets[workbook.SheetNames[0]];
@@ -59,9 +61,12 @@ export function parseDevisWorkbook(arrayBuffer) {
   const cNomArticle = trouverColonne(entete, LABELS.nomArticle);
   const cUnite = trouverColonne(entete, LABELS.unite);
   const cQuantite = trouverColonne(entete, LABELS.quantite);
+  const cTypeFo = trouverColonne(entete, LABELS.typeFo);
+  const cTypeMo = trouverColonne(entete, LABELS.typeMo);
 
   const postes = [];
   let posteCourant = null;
+  let compteur = 0;
 
   for (let i = iEntete + 1; i < rows.length; i++) {
     const ligne = rows[i];
@@ -71,11 +76,13 @@ export function parseDevisWorkbook(arrayBuffer) {
     const reference = cReference >= 0 ? String(ligne[cReference] ?? "").trim() : "";
     const unite = cUnite >= 0 ? String(ligne[cUnite] ?? "").trim() : "";
     const quantite = cQuantite >= 0 ? Number(ligne[cQuantite] ?? 0) || 0 : 0;
+    const typeFo = cTypeFo >= 0 ? String(ligne[cTypeFo] ?? "").trim() : "";
+    const typeMo = cTypeMo >= 0 ? String(ligne[cTypeMo] ?? "").trim() : "";
 
     if (!numero && !description) continue; // ligne vide
 
     if (RE_POSTE.test(numero)) {
-      // Nouveau poste (ex: "A.1  LOCAL RCU")
+      // Nouveau poste = un équipement régulé (ex: "A.1  LOCAL RCU")
       posteCourant = {
         code: numero,
         nom: description || numero,
@@ -98,16 +105,19 @@ export function parseDevisWorkbook(arrayBuffer) {
       .map((l) => l.trim())
       .filter(Boolean);
 
-    const estSousTitre = !reference && !unite && !quantite;
+    const estSousTitre = !reference && !unite && !quantite && !typeFo && !typeMo;
     if (estSousTitre) {
-      // Sous-section informative (ex: "AUTOMATE", "PROGRAMMATION") : on la
-      // garde comme repère mais ce n'est pas un équipement en soi.
-      posteCourant.items.push({ estTitre: true, designation });
-      continue;
+      continue; // sous-section informative (ex: "AUTOMATE") : pas une ligne à importer
     }
 
+    // Règle métier : un code en "Type de FO" signale du matériel ; à défaut,
+    // un code en "Type MO" (main d'œuvre) signale une tâche.
+    const type = typeFo ? "materiel" : typeMo ? "tache" : reference ? "materiel" : "tache";
+
+    compteur += 1;
     posteCourant.items.push({
-      estTitre: false,
+      id: "tmp-" + compteur,
+      type,
       designation,
       reference,
       unite,
@@ -116,5 +126,5 @@ export function parseDevisWorkbook(arrayBuffer) {
     });
   }
 
-  return postes.filter((p) => p.items.some((it) => !it.estTitre));
+  return postes.filter((p) => p.items.length > 0);
 }

@@ -1,10 +1,9 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { parseDevisWorkbook } from "../lib/parseDevis";
 
 export default function ImportDevisModal({ chantierId, onClose }) {
-  const fileInputRef = useRef(null);
   const [postes, setPostes] = useState(null);
   const [nomFichier, setNomFichier] = useState("");
   const [erreur, setErreur] = useState("");
@@ -23,7 +22,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
       const detectes = parseDevisWorkbook(buffer);
       if (detectes.length === 0) {
         setErreur(
-          "Aucun poste détecté dans ce fichier. Vérifiez qu'il suit bien le même modèle de minute de devis (colonnes n°, Référence, Description, Unité, Qté)."
+          "Aucun équipement détecté dans ce fichier. Vérifiez qu'il suit bien le même modèle de minute de devis (colonnes n°, Référence, Description, Unité, Qté, Type de FO, Type MO)."
         );
         setPostes(null);
       } else {
@@ -46,14 +45,56 @@ export default function ImportDevisModal({ chantierId, onClose }) {
   };
 
   const renommerPoste = (index, nom) => {
+    setPostes((prev) => prev.map((p, i) => (i === index ? { ...p, nomEdite: nom } : p)));
+  };
+
+  const modifierItem = (posteIndex, itemId, champ, valeur) => {
     setPostes((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, nomEdite: nom } : p))
+      prev.map((p, i) => {
+        if (i !== posteIndex) return p;
+        return {
+          ...p,
+          items: p.items.map((it) => (it.id === itemId ? { ...it, [champ]: valeur } : it)),
+        };
+      })
     );
   };
 
-  const nbEquipementsSelectionnes = (postes ?? [])
+  const supprimerItem = (posteIndex, itemId) => {
+    setPostes((prev) =>
+      prev.map((p, i) =>
+        i === posteIndex ? { ...p, items: p.items.filter((it) => it.id !== itemId) } : p
+      )
+    );
+  };
+
+  const ajouterItem = (posteIndex, type) => {
+    setPostes((prev) =>
+      prev.map((p, i) =>
+        i === posteIndex
+          ? {
+              ...p,
+              items: [
+                ...p.items,
+                {
+                  id: "manuel-" + Date.now(),
+                  type,
+                  designation: "",
+                  reference: "",
+                  unite: "",
+                  quantite: 0,
+                  detail: "",
+                },
+              ],
+            }
+          : p
+      )
+    );
+  };
+
+  const nbItemsSelectionnes = (postes ?? [])
     .filter((p) => p.selectionne)
-    .reduce((s, p) => s + p.items.filter((it) => !it.estTitre).length, 0);
+    .reduce((s, p) => s + p.items.filter((it) => it.designation.trim()).length, 0);
 
   const importer = async () => {
     const aImporter = postes.filter((p) => p.selectionne);
@@ -61,19 +102,21 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     setEnImport(true);
     try {
       for (const poste of aImporter) {
-        const lotRef = await addDoc(collection(db, "lots"), {
-          nom: poste.code + " — " + poste.nomEdite,
+        const regRef = await addDoc(collection(db, "regequipements"), {
+          nom: poste.nomEdite,
           chantierId,
+          code: poste.code,
           creeLe: serverTimestamp(),
         });
         for (const item of poste.items) {
-          if (item.estTitre) continue;
-          await addDoc(collection(db, "equipments"), {
+          if (!item.designation.trim()) continue;
+          await addDoc(collection(db, "regitems"), {
+            regEquipementId: regRef.id,
+            type: item.type,
             designation: item.designation,
             remarque: [item.reference, item.detail].filter(Boolean).join(" — "),
             unite: item.unite || "",
             quantite: item.quantite || 0,
-            lotId: lotRef.id,
             statut: "a_faire",
             creeLe: serverTimestamp(),
           });
@@ -89,22 +132,17 @@ export default function ImportDevisModal({ chantierId, onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-large modal-xl" onClick={(e) => e.stopPropagation()}>
         <h2>Importer une minute de devis</h2>
 
         {!postes && (
           <div className="import-drop">
             <p className="empty-state-description" style={{ margin: "0 0 12px" }}>
-              Sélectionnez le fichier Excel (.xlsx) de la minute de devis. L'outil
-              détecte automatiquement les postes (ex : A.1, A.2…) et le matériel
-              listé sous chacun.
+              Sélectionnez le fichier Excel (.xlsx) de la minute de devis. Chaque poste
+              détecté (ex : A.1, A.2…) devient un équipement régulé, avec son matériel et
+              ses tâches déjà triés — tout reste modifiable avant import.
             </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFichier}
-            />
+            <input type="file" accept=".xlsx,.xls" onChange={handleFichier} />
             {enLecture && <p className="page-loading">Analyse du fichier…</p>}
             {erreur && <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>}
           </div>
@@ -113,13 +151,14 @@ export default function ImportDevisModal({ chantierId, onClose }) {
         {postes && (
           <>
             <p className="page-subtitle" style={{ margin: "0 0 14px" }}>
-              {nomFichier} — {postes.length} poste(s) détecté(s),{" "}
-              {nbEquipementsSelectionnes} équipement(s)/tâche(s) sélectionné(s)
+              {nomFichier} — {postes.length} équipement(s) détecté(s),{" "}
+              {nbItemsSelectionnes} ligne(s) sélectionnée(s)
             </p>
 
             <div className="import-poste-list">
               {postes.map((poste, index) => {
-                const nbItems = poste.items.filter((it) => !it.estTitre).length;
+                const materiel = poste.items.filter((it) => it.type === "materiel");
+                const taches = poste.items.filter((it) => it.type === "tache");
                 const ouvert = posteOuvert === index;
                 return (
                   <div key={index} className="import-poste-row">
@@ -131,37 +170,44 @@ export default function ImportDevisModal({ chantierId, onClose }) {
                           onChange={() => basculerPoste(index)}
                         />
                       </label>
-                      <span className="import-poste-code">{poste.code}</span>
                       <input
                         className="import-poste-nom"
                         value={poste.nomEdite}
                         onChange={(e) => renommerPoste(index, e.target.value)}
                       />
-                      <span className="simple-list-meta">{nbItems} item(s)</span>
+                      <span className="simple-list-meta">
+                        {materiel.length} matériel · {taches.length} tâche(s)
+                      </span>
                       <button
                         className="linkish"
                         onClick={() => setPosteOuvert(ouvert ? null : index)}
                       >
-                        {ouvert ? "Masquer" : "Détail"}
+                        {ouvert ? "Masquer" : "Modifier le détail"}
                       </button>
                     </div>
+
                     {ouvert && (
-                      <ul className="import-item-list">
-                        {poste.items.map((item, i) =>
-                          item.estTitre ? (
-                            <li key={i} className="import-item-titre">
-                              {item.designation}
-                            </li>
-                          ) : (
-                            <li key={i}>
-                              <span>{item.designation}</span>
-                              <span className="simple-list-meta">
-                                {item.quantite ? item.quantite + " " + item.unite : ""}
-                              </span>
-                            </li>
-                          )
-                        )}
-                      </ul>
+                      <div className="import-item-edit">
+                        <ImportItemGroup
+                          titre="Matériel"
+                          items={materiel}
+                          onChange={(itemId, champ, valeur) =>
+                            modifierItem(index, itemId, champ, valeur)
+                          }
+                          onDelete={(itemId) => supprimerItem(index, itemId)}
+                          onAdd={() => ajouterItem(index, "materiel")}
+                          avecQuantite
+                        />
+                        <ImportItemGroup
+                          titre="Tâches"
+                          items={taches}
+                          onChange={(itemId, champ, valeur) =>
+                            modifierItem(index, itemId, champ, valeur)
+                          }
+                          onDelete={(itemId) => supprimerItem(index, itemId)}
+                          onAdd={() => ajouterItem(index, "tache")}
+                        />
+                      </div>
                     )}
                   </div>
                 );
@@ -180,15 +226,63 @@ export default function ImportDevisModal({ chantierId, onClose }) {
             <button
               className="btn-primary"
               onClick={importer}
-              disabled={enImport || nbEquipementsSelectionnes === 0}
+              disabled={enImport || nbItemsSelectionnes === 0}
             >
               {enImport
                 ? "Import…"
-                : "Importer " + postes.filter((p) => p.selectionne).length + " poste(s)"}
+                : "Importer " + postes.filter((p) => p.selectionne).length + " équipement(s)"}
             </button>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ImportItemGroup({ titre, items, onChange, onDelete, onAdd, avecQuantite }) {
+  return (
+    <div className="import-item-group">
+      <div className="reg-subheading">{titre}</div>
+      {items.length === 0 ? (
+        <p className="empty-state-description" style={{ margin: "4px 0" }}>
+          Aucune ligne.
+        </p>
+      ) : (
+        <div className="import-item-rows">
+          {items.map((item) => (
+            <div key={item.id} className="import-item-row">
+              <input
+                className="import-item-designation"
+                value={item.designation}
+                onChange={(e) => onChange(item.id, "designation", e.target.value)}
+                placeholder="Désignation"
+              />
+              {avecQuantite && (
+                <>
+                  <input
+                    type="number"
+                    className="import-item-qte"
+                    value={item.quantite}
+                    onChange={(e) => onChange(item.id, "quantite", Number(e.target.value))}
+                  />
+                  <input
+                    className="import-item-unite"
+                    value={item.unite}
+                    onChange={(e) => onChange(item.id, "unite", e.target.value)}
+                    placeholder="u"
+                  />
+                </>
+              )}
+              <button className="btn-ghost btn-danger" onClick={() => onDelete(item.id)}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="linkish" style={{ marginTop: 6 }} onClick={onAdd}>
+        + Ajouter une ligne
+      </button>
     </div>
   );
 }

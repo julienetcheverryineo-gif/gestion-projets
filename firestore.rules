@@ -24,6 +24,21 @@ service cloud.firestore {
       allow delete: if estChefOuAdmin();
     }
 
+    // Équipements régulés (notre périmètre) : lecture pour tous, gestion
+    // réservée aux chefs de projet/admins
+    match /regequipements/{regId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estChefOuAdmin();
+    }
+
+    // Matériel/tâches d'un équipement régulé : lecture pour tous, tout
+    // connecté peut mettre à jour le statut (coché sur le terrain)
+    match /regitems/{itemId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
+    }
+
     // Chantiers : lecture pour tous les connectés, écriture réservée aux chefs de projet/admins
     match /sites/{siteId} {
       allow read: if estConnecte();

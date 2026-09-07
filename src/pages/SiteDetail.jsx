@@ -14,11 +14,16 @@ import { useCollection } from "../lib/firestoreHooks";
 import { formatStatut } from "./Sites";
 import ImportDevisModal from "../components/ImportDevisModal";
 
-const STATUTS_EQUIPEMENT = [
+const STATUTS_MATERIEL = [
   { value: "a_faire", label: "À installer" },
   { value: "installe", label: "Installé" },
   { value: "configure", label: "Configuré" },
   { value: "teste", label: "Testé" },
+];
+
+const STATUTS_TACHE = [
+  { value: "a_faire", label: "À faire" },
+  { value: "fait", label: "Fait" },
 ];
 
 export default function SiteDetail() {
@@ -29,14 +34,22 @@ export default function SiteDetail() {
   const { documents: chantiers } = useCollection("sites");
   const chantier = chantiers.find((c) => c.id === chantierId);
 
+  // --- Équipements régulés (notre périmètre) ---
+  const { documents: tousRegEquipements } = useCollection("regequipements");
+  const regEquipements = tousRegEquipements.filter((e) => e.chantierId === chantierId);
+  const { documents: tousRegItems } = useCollection("regitems");
+
+  // --- Autres lots techniques (les autres corps d'état) ---
   const { documents: tousLots } = useCollection("lots");
   const lots = tousLots.filter((l) => l.chantierId === chantierId);
-
   const { documents: tousEquipements } = useCollection("equipments");
+
   const { documents: tousTemps } = useCollection("timeEntries");
   const tempsChantier = tousTemps.filter((t) => t.chantierId === chantierId);
   const totalHeures = tempsChantier.reduce((s, t) => s + Number(t.duree || 0), 0);
 
+  const [afficherRegForm, setAfficherRegForm] = useState(false);
+  const [regSelectionne, setRegSelectionne] = useState(null);
   const [afficherLotForm, setAfficherLotForm] = useState(false);
   const [lotSelectionne, setLotSelectionne] = useState(null);
   const [afficherRapport, setAfficherRapport] = useState(false);
@@ -48,6 +61,13 @@ export default function SiteDetail() {
     const equipementsDuLot = tousEquipements.filter((e) => e.lotId === lotId);
     await Promise.all(equipementsDuLot.map((e) => deleteDoc(doc(db, "equipments", e.id))));
     await deleteDoc(doc(db, "lots", lotId));
+  };
+
+  const supprimerRegEquipement = async (regId) => {
+    if (!confirm("Supprimer cet équipement, son matériel et ses tâches ?")) return;
+    const items = tousRegItems.filter((it) => it.regEquipementId === regId);
+    await Promise.all(items.map((it) => deleteDoc(doc(db, "regitems", it.id))));
+    await deleteDoc(doc(db, "regequipements", regId));
   };
 
   if (!chantier) {
@@ -78,9 +98,10 @@ export default function SiteDetail() {
         </div>
       </header>
 
+      {/* ---------------- Équipements régulés ---------------- */}
       <section className="panel">
         <div className="panel-header">
-          <h2>Lots techniques</h2>
+          <h2>Équipements régulés</h2>
           {peutGerer && (
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn-ghost" onClick={() => setAfficherImport(true)}>
@@ -89,22 +110,70 @@ export default function SiteDetail() {
               <button
                 className="btn-ghost"
                 onClick={() => {
-                  setLotSelectionne(null);
-                  setAfficherLotForm(true);
+                  setRegSelectionne(null);
+                  setAfficherRegForm(true);
                 }}
               >
-                + Ajouter un lot
+                + Ajouter un équipement
               </button>
             </div>
           )}
         </div>
 
+        {regEquipements.length === 0 ? (
+          <div className="empty-state">
+            <p className="empty-state-title">Aucun équipement régulé</p>
+            <p className="empty-state-description">
+              Ajoutez un équipement (ex : LOCAL RCU, CTA RDJ…) manuellement, ou importez
+              une minute de devis pour les créer automatiquement avec leur matériel.
+            </p>
+          </div>
+        ) : (
+          <div className="lot-list">
+            {regEquipements.map((reg) => (
+              <RegEquipmentCard
+                key={reg.id}
+                reg={reg}
+                items={tousRegItems.filter((it) => it.regEquipementId === reg.id)}
+                peutGerer={peutGerer}
+                onEdit={() => {
+                  setRegSelectionne(reg);
+                  setAfficherRegForm(true);
+                }}
+                onDelete={() => supprimerRegEquipement(reg.id)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ---------------- Autres lots techniques ---------------- */}
+      <section className="panel">
+        <div className="panel-header">
+          <h2>Autres lots techniques</h2>
+          {peutGerer && (
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                setLotSelectionne(null);
+                setAfficherLotForm(true);
+              }}
+            >
+              + Ajouter un lot
+            </button>
+          )}
+        </div>
+        <p className="page-subtitle" style={{ margin: "-6px 0 14px" }}>
+          Les corps d'état gérés par d'autres entreprises (CVC, électricité, sécurité
+          incendie…) — pour information, pas notre périmètre de régulation.
+        </p>
+
         {lots.length === 0 ? (
           <div className="empty-state">
-            <p className="empty-state-title">Aucun lot technique</p>
+            <p className="empty-state-title">Aucun lot renseigné</p>
             <p className="empty-state-description">
-              Ajoutez un lot (CVC, Éclairage, Sécurité incendie, GTB…) pour commencer à
-              suivre les équipements.
+              Ajoutez un lot pour suivre l'avancement des autres corps d'état sur ce
+              chantier.
             </p>
           </div>
         ) : (
@@ -133,6 +202,14 @@ export default function SiteDetail() {
         />
       )}
 
+      {afficherRegForm && (
+        <RegEquipmentFormModal
+          chantierId={chantierId}
+          reg={regSelectionne}
+          onClose={() => setAfficherRegForm(false)}
+        />
+      )}
+
       {afficherLotForm && (
         <LotFormModal
           chantierId={chantierId}
@@ -144,6 +221,8 @@ export default function SiteDetail() {
       {afficherRapport && (
         <ReportModal
           chantier={chantier}
+          regEquipements={regEquipements}
+          regItems={tousRegItems}
           lots={lots}
           equipements={tousEquipements}
           onClose={() => setAfficherRapport(false)}
@@ -161,6 +240,328 @@ export default function SiteDetail() {
     </div>
   );
 }
+
+// ============================================================================
+// Équipements régulés (notre périmètre)
+// ============================================================================
+
+function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [afficherItemForm, setAfficherItemForm] = useState(false);
+  const [typePourAjout, setTypePourAjout] = useState("materiel");
+
+  const materiel = items.filter((it) => it.type === "materiel");
+  const taches = items.filter((it) => it.type === "tache");
+  const total = items.length;
+  const faits = items.filter((it) => it.statut === "teste" || it.statut === "fait").length;
+  const pct = total > 0 ? Math.round((faits / total) * 100) : 0;
+
+  const changerStatut = async (itemId, statut) => {
+    await updateDoc(doc(db, "regitems", itemId), { statut });
+  };
+  const supprimerItem = async (itemId) => {
+    await deleteDoc(doc(db, "regitems", itemId));
+  };
+
+  return (
+    <div className="lot-card">
+      <div className="lot-card-header" onClick={() => setOuvert(!ouvert)}>
+        <div>
+          <span className="lot-card-toggle">{ouvert ? "▾" : "▸"}</span>
+          <strong>{reg.nom}</strong>
+          <span className="simple-list-meta" style={{ marginLeft: 10 }}>
+            {materiel.length} matériel · {taches.length} tâche(s)
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="kanban-count">{pct}%</span>
+          {peutGerer && (
+            <>
+              <button
+                className="btn-ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+              >
+                Modifier
+              </button>
+              <button
+                className="btn-ghost btn-danger"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+              >
+                Supprimer
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="progress-bar">
+        <div className="progress-bar-fill" style={{ width: pct + "%" }} />
+      </div>
+
+      {ouvert && (
+        <div className="lot-card-body">
+          <div>
+            <div className="reg-subheading">Matériel</div>
+            {materiel.length === 0 ? (
+              <p className="empty-state-description" style={{ margin: "4px 0" }}>
+                Aucun matériel.
+              </p>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Désignation</th>
+                    <th>Qté</th>
+                    <th>Statut</th>
+                    <th>Remarque</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {materiel.map((it) => (
+                    <tr key={it.id}>
+                      <td style={{ fontFamily: "var(--font-ui)" }}>{it.designation}</td>
+                      <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                        {it.quantite ? it.quantite + " " + (it.unite || "") : "—"}
+                      </td>
+                      <td>
+                        <select
+                          value={it.statut}
+                          onChange={(e) => changerStatut(it.id, e.target.value)}
+                        >
+                          {STATUTS_MATERIEL.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                        {it.remarque || "—"}
+                      </td>
+                      <td>
+                        <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
+                          ×
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {peutGerer && (
+              <button
+                className="kanban-add-inline"
+                onClick={() => {
+                  setTypePourAjout("materiel");
+                  setAfficherItemForm(true);
+                }}
+              >
+                + Ajouter du matériel
+              </button>
+            )}
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <div className="reg-subheading">Tâches</div>
+            {taches.length === 0 ? (
+              <p className="empty-state-description" style={{ margin: "4px 0" }}>
+                Aucune tâche.
+              </p>
+            ) : (
+              <ul className="simple-list">
+                {taches.map((it) => (
+                  <li key={it.id}>
+                    <select
+                      value={it.statut}
+                      onChange={(e) => changerStatut(it.id, e.target.value)}
+                      style={{ flexShrink: 0 }}
+                    >
+                      {STATUTS_TACHE.map((s) => (
+                        <option key={s.value} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="simple-list-title">{it.designation}</span>
+                    <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {peutGerer && (
+              <button
+                className="kanban-add-inline"
+                onClick={() => {
+                  setTypePourAjout("tache");
+                  setAfficherItemForm(true);
+                }}
+              >
+                + Ajouter une tâche
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {afficherItemForm && (
+        <RegItemFormModal
+          regEquipementId={reg.id}
+          typeInitial={typePourAjout}
+          onClose={() => setAfficherItemForm(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RegEquipmentFormModal({ chantierId, reg, onClose }) {
+  const [nom, setNom] = useState(reg?.nom ?? "");
+  const [enCours, setEnCours] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setEnCours(true);
+    if (reg) {
+      await updateDoc(doc(db, "regequipements", reg.id), { nom });
+    } else {
+      await addDoc(collection(db, "regequipements"), {
+        nom,
+        chantierId,
+        creeLe: serverTimestamp(),
+      });
+    }
+    setEnCours(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>{reg ? "Modifier l'équipement" : "Nouvel équipement régulé"}</h2>
+        <form onSubmit={handleSubmit} className="form">
+          <label>
+            Nom de l'équipement
+            <input
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
+              placeholder="ex : LOCAL RCU, CTA RDJ, Local PAC…"
+              required
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={enCours}>
+              {enCours ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RegItemFormModal({ regEquipementId, typeInitial, onClose }) {
+  const [type, setType] = useState(typeInitial);
+  const [designation, setDesignation] = useState("");
+  const [quantite, setQuantite] = useState("");
+  const [unite, setUnite] = useState("");
+  const [remarque, setRemarque] = useState("");
+  const [enCours, setEnCours] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setEnCours(true);
+    await addDoc(collection(db, "regitems"), {
+      regEquipementId,
+      type,
+      designation,
+      remarque,
+      quantite: quantite ? Number(quantite) : 0,
+      unite,
+      statut: "a_faire",
+      creeLe: serverTimestamp(),
+    });
+    setEnCours(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>{type === "materiel" ? "Nouveau matériel" : "Nouvelle tâche"}</h2>
+        <form onSubmit={handleSubmit} className="form">
+          <label>
+            Type
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="materiel">Matériel</option>
+              <option value="tache">Tâche</option>
+            </select>
+          </label>
+          <label>
+            Désignation
+            <input
+              value={designation}
+              onChange={(e) => setDesignation(e.target.value)}
+              placeholder={
+                type === "materiel"
+                  ? "ex : Sonde température CTA1"
+                  : "ex : Programmation automate"
+              }
+              required
+            />
+          </label>
+          {type === "materiel" && (
+            <div className="form-inline">
+              <label>
+                Quantité
+                <input
+                  type="number"
+                  min="0"
+                  value={quantite}
+                  onChange={(e) => setQuantite(e.target.value)}
+                />
+              </label>
+              <label>
+                Unité
+                <input
+                  value={unite}
+                  onChange={(e) => setUnite(e.target.value)}
+                  placeholder="u, Ens…"
+                />
+              </label>
+            </div>
+          )}
+          <label>
+            Remarque
+            <input value={remarque} onChange={(e) => setRemarque(e.target.value)} />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={enCours}>
+              {enCours ? "Ajout…" : "Ajouter"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Autres lots techniques
+// ============================================================================
 
 function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
   const [ouvert, setOuvert] = useState(false);
@@ -247,7 +648,7 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
                         value={equip.statut}
                         onChange={(e) => changerStatutEquip(equip.id, e.target.value)}
                       >
-                        {STATUTS_EQUIPEMENT.map((s) => (
+                        {STATUTS_MATERIEL.map((s) => (
                           <option key={s.value} value={s.value}>
                             {s.label}
                           </option>
@@ -310,7 +711,7 @@ function LotFormModal({ chantierId, lot, onClose }) {
             <input
               value={nom}
               onChange={(e) => setNom(e.target.value)}
-              placeholder="ex : CVC, Éclairage, Sécurité incendie, GTB…"
+              placeholder="ex : CVC, Électricité, Sécurité incendie…"
               required
             />
           </label>
@@ -354,14 +755,13 @@ function EquipmentFormModal({ lotId, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Nouvel équipement / point</h2>
+        <h2>Nouvel équipement</h2>
         <form onSubmit={handleSubmit} className="form">
           <label>
             Désignation
             <input
               value={designation}
               onChange={(e) => setDesignation(e.target.value)}
-              placeholder="ex : Sonde température CTA1, Détecteur DI-04…"
               required
             />
           </label>
@@ -377,11 +777,7 @@ function EquipmentFormModal({ lotId, onClose }) {
             </label>
             <label>
               Unité
-              <input
-                value={unite}
-                onChange={(e) => setUnite(e.target.value)}
-                placeholder="u, Ens…"
-              />
+              <input value={unite} onChange={(e) => setUnite(e.target.value)} placeholder="u, Ens…" />
             </label>
           </div>
           <label>
@@ -402,7 +798,11 @@ function EquipmentFormModal({ lotId, onClose }) {
   );
 }
 
-function ReportModal({ chantier, lots, equipements, onClose }) {
+// ============================================================================
+// Compte-rendu
+// ============================================================================
+
+function ReportModal({ chantier, regEquipements, regItems, lots, equipements, onClose }) {
   const [copie, setCopie] = useState(false);
 
   const texte = useMemo(() => {
@@ -411,30 +811,42 @@ function ReportModal({ chantier, lots, equipements, onClose }) {
     if (chantier.client) lignes.push("Client : " + chantier.client);
     lignes.push("Date : " + new Date().toLocaleDateString("fr-FR"));
     lignes.push("");
-    if (lots.length === 0) {
-      lignes.push("Aucun lot technique renseigné pour ce chantier.");
+
+    lignes.push("== Équipements régulés ==");
+    if (regEquipements.length === 0) {
+      lignes.push("Aucun équipement renseigné.");
     }
-    for (const lot of lots) {
-      const eqs = equipements.filter((e) => e.lotId === lot.id);
-      const testes = eqs.filter((e) => e.statut === "teste").length;
-      const pct = eqs.length > 0 ? Math.round((testes / eqs.length) * 100) : 0;
-      lignes.push("• " + lot.nom + " — avancement : " + pct + "%");
-      const restants = eqs.filter((e) => e.statut !== "teste");
+    for (const reg of regEquipements) {
+      const items = regItems.filter((it) => it.regEquipementId === reg.id);
+      const faits = items.filter((it) => it.statut === "teste" || it.statut === "fait").length;
+      const pct = items.length > 0 ? Math.round((faits / items.length) * 100) : 0;
+      lignes.push("• " + reg.nom + " — avancement : " + pct + "%");
+      const restants = items.filter((it) => it.statut !== "teste" && it.statut !== "fait");
       if (restants.length > 0) {
-        lignes.push("  Points restants :");
-        for (const eq of restants) {
+        lignes.push("  Restant :");
+        for (const it of restants) {
           lignes.push(
-            "    - " + eq.designation + " (" + labelStatutEquip(eq.statut) + ")" +
-              (eq.remarque ? " — " + eq.remarque : "")
+            "    - [" + (it.type === "materiel" ? "Matériel" : "Tâche") + "] " + it.designation
           );
         }
-      } else if (eqs.length > 0) {
-        lignes.push("  Tous les équipements de ce lot sont testés.");
+      } else if (items.length > 0) {
+        lignes.push("  Tout est fait.");
       }
       lignes.push("");
     }
+
+    if (lots.length > 0) {
+      lignes.push("== Autres lots techniques ==");
+      for (const lot of lots) {
+        const eqs = equipements.filter((e) => e.lotId === lot.id);
+        const testes = eqs.filter((e) => e.statut === "teste").length;
+        const pct = eqs.length > 0 ? Math.round((testes / eqs.length) * 100) : 0;
+        lignes.push("• " + lot.nom + " — avancement : " + pct + "%");
+      }
+    }
+
     return lignes.join("\n");
-  }, [chantier, lots, equipements]);
+  }, [chantier, regEquipements, regItems, lots, equipements]);
 
   const copier = async () => {
     await navigator.clipboard.writeText(texte);
@@ -446,7 +858,7 @@ function ReportModal({ chantier, lots, equipements, onClose }) {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
         <h2>Compte-rendu — {chantier.nom}</h2>
-        <textarea className="report-textarea" readOnly value={texte} rows={14} />
+        <textarea className="report-textarea" readOnly value={texte} rows={16} />
         <div className="modal-actions">
           <button className="btn-ghost" onClick={onClose}>
             Fermer
@@ -459,6 +871,10 @@ function ReportModal({ chantier, lots, equipements, onClose }) {
     </div>
   );
 }
+
+// ============================================================================
+// Temps passé
+// ============================================================================
 
 function TimeFormModal({ chantierId, lots, profil, onClose }) {
   const [lotId, setLotId] = useState("");
@@ -489,7 +905,7 @@ function TimeFormModal({ chantierId, lots, profil, onClose }) {
         <h2>Ajouter du temps passé</h2>
         <form onSubmit={handleSubmit} className="form">
           <label>
-            Lot concerné
+            Lot concerné (facultatif)
             <select value={lotId} onChange={(e) => setLotId(e.target.value)}>
               <option value="">Général</option>
               {lots.map((l) => (
@@ -527,8 +943,4 @@ function TimeFormModal({ chantierId, lots, profil, onClose }) {
       </div>
     </div>
   );
-}
-
-function labelStatutEquip(statut) {
-  return STATUTS_EQUIPEMENT.find((s) => s.value === statut)?.label ?? statut;
 }

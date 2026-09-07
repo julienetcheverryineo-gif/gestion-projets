@@ -560,6 +560,55 @@ a {
   border-color: var(--accent);
 }
 
+.reg-subheading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.modal-xl {
+  max-width: 720px;
+}
+
+.import-item-edit {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.import-item-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.import-item-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.import-item-designation {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-item-qte {
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.import-item-unite {
+  width: 60px;
+  flex-shrink: 0;
+}
+
 /* ---------- Import devis ---------- */
 .import-drop {
   border: 1px dashed var(--border);

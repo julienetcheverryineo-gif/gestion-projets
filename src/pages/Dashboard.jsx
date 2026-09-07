@@ -7,27 +7,29 @@ export default function Dashboard() {
     useCollection("sites");
   const { documents: taches, chargement: chargementTaches } =
     useCollection("tasks");
-  const { documents: lots } = useCollection("lots");
-  const { documents: equipements } = useCollection("equipments");
+  const { documents: regEquipements } = useCollection("regequipements");
+  const { documents: regItems } = useCollection("regitems");
 
   const stats = useMemo(() => {
     const chantiersActifs = chantiers.filter((c) => c.statut !== "termine").length;
     const tachesEnRetard = taches.filter((t) => estEnRetard(t)).length;
     const tachesEnCours = taches.filter((t) => t.statut === "en_cours").length;
-    const equipementsRestants = equipements.filter((e) => e.statut !== "teste").length;
-    return { chantiersActifs, tachesEnRetard, tachesEnCours, equipementsRestants };
-  }, [chantiers, taches, equipements]);
+    const pointsRestants = regItems.filter(
+      (it) => it.statut !== "teste" && it.statut !== "fait"
+    ).length;
+    return { chantiersActifs, tachesEnRetard, tachesEnCours, pointsRestants };
+  }, [chantiers, taches, regItems]);
 
   const chargement = chargementChantiers || chargementTaches;
 
   const avancementChantier = (chantierId) => {
-    const lotsDuChantier = lots.filter((l) => l.chantierId === chantierId);
-    const eqs = equipements.filter((e) =>
-      lotsDuChantier.some((l) => l.id === e.lotId)
+    const regsDuChantier = regEquipements.filter((r) => r.chantierId === chantierId);
+    const items = regItems.filter((it) =>
+      regsDuChantier.some((r) => r.id === it.regEquipementId)
     );
-    if (eqs.length === 0) return null;
-    const testes = eqs.filter((e) => e.statut === "teste").length;
-    return Math.round((testes / eqs.length) * 100);
+    if (items.length === 0) return null;
+    const faits = items.filter((it) => it.statut === "teste" || it.statut === "fait").length;
+    return Math.round((faits / items.length) * 100);
   };
 
   return (
@@ -49,7 +51,7 @@ export default function Dashboard() {
               valeur={stats.tachesEnRetard}
               alerte={stats.tachesEnRetard > 0}
             />
-            <StatCard label="Points restants" valeur={stats.equipementsRestants} />
+            <StatCard label="Points restants" valeur={stats.pointsRestants} />
           </div>
 
           <section className="panel">
@@ -62,7 +64,7 @@ export default function Dashboard() {
             {chantiers.length === 0 ? (
               <EmptyState
                 titre="Aucun chantier pour l'instant"
-                description="Créez votre premier chantier pour commencer à suivre les lots techniques."
+                description="Créez votre premier chantier pour commencer à suivre vos équipements régulés."
                 lienTexte="Créer un chantier"
                 lienVers="/chantiers"
               />
@@ -77,7 +79,7 @@ export default function Dashboard() {
                         {c.nom}
                       </Link>
                       <span className="simple-list-meta">
-                        {pct !== null ? "Avancement : " + pct + "%" : "Sans lot"}
+                        {pct !== null ? "Avancement : " + pct + "%" : "Sans équipement"}
                       </span>
                     </li>
                   );

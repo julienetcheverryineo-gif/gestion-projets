@@ -69,41 +69,57 @@ sans barre d'adresse, comme une app native.
 
 - `users` : `nom`, `email`, `role` (`admin` / `chef_de_projet` / `technicien`)
 - `sites` (chantiers) : `nom`, `client`, `adresse`, `statut`
-- `lots` (lots techniques, ex CVC/Éclairage/GTB) : `nom`, `chantierId`
-- `equipments` (équipements/points par lot) : `designation`, `remarque`,
-  `unite`, `quantite`, `lotId`, `statut` (`a_faire` / `installe` / `configure` / `teste`)
+- `regequipements` (équipements régulés — notre périmètre, ex "LOCAL RCU",
+  "CTA RDJ") : `nom`, `chantierId`, `code` (facultatif, code du poste
+  d'origine si importé)
+- `regitems` (matériel ou tâche d'un équipement régulé) : `type`
+  (`materiel` / `tache`), `designation`, `remarque`, `unite`, `quantite`,
+  `regEquipementId`, `statut` (`a_faire` / `installe` / `configure` /
+  `teste` pour du matériel ; `a_faire` / `fait` pour une tâche)
+- `lots` ("Autres lots techniques" — les corps d'état gérés par d'autres
+  entreprises, ex CVC/Électricité, pour information) : `nom`, `chantierId`
+- `equipments` (équipements par lot, même logique que `regitems` mais côté
+  "Autres lots techniques") : `designation`, `remarque`, `unite`,
+  `quantite`, `lotId`, `statut`
 - `tasks` : `titre`, `chantierId`, `assigneA`, `echeance`, `statut`
   (`a_faire` / `en_cours` / `termine`)
 - `timeEntries` : `userId`, `userNom`, `chantierId`, `lotId`, `duree`, `date`
 
 Le compte-rendu client (bouton "Générer un compte-rendu" sur la page d'un
-chantier) est calculé à la volée à partir des lots et équipements — rien
-n'est stocké séparément pour ça.
+chantier) est calculé à la volée à partir des équipements régulés et des
+autres lots — rien n'est stocké séparément pour ça.
 
 ## Import d'une minute de devis
 
-Sur la page d'un chantier, le bouton **"Importer une minute de devis"**
-permet de charger un fichier Excel (.xlsx) et de créer automatiquement les
-lots techniques et leurs équipements.
+Sur la page d'un chantier, section "Équipements régulés", le bouton
+**"Importer une minute de devis"** permet de charger un fichier Excel
+(.xlsx) et de créer automatiquement les équipements régulés avec leur
+matériel et leurs tâches.
 
 Le parseur (`src/lib/parseDevis.js`) reconnaît le modèle de minute de devis
 suivant :
 - une colonne **n°** contenant soit un code de poste (ex : `A.1`, `A.2`),
   soit un numéro de ligne simple
 - une ligne dont le n° matche `LETTRE.CHIFFRE` (ex : `A.1`) démarre un
-  nouveau poste — son intitulé (colonne Description) devient le nom du lot
-- les lignes suivantes, jusqu'au prochain poste, sont son matériel/ses
-  tâches : chaque ligne avec une Référence, une Unité ou une Quantité
-  devient un équipement ; une ligne sans ces trois informations est traitée
-  comme un sous-titre indicatif (ex : "AUTOMATE", "PROGRAMMATION") et n'est
-  pas importée comme équipement
+  nouvel équipement régulé — son intitulé (colonne Description) devient son
+  nom par défaut (sans le code, éditable avant import)
+- les lignes suivantes, jusqu'au prochain poste, sont classées
+  automatiquement :
+  - un code renseigné en colonne **Type de FO** → ligne de **matériel**
+  - à défaut, un code en colonne **Type MO** → ligne de **tâche**
+  - une ligne sans Référence/Unité/Quantité/Type de FO/Type MO est un
+    sous-titre indicatif (ex : "AUTOMATE") et n'est pas importée
 - les lignes "Totaux pour le poste :" sont ignorées
+
+Avant l'import, chaque équipement détecté peut être renommé, désélectionné,
+et chaque ligne de matériel/tâche peut être modifiée, supprimée ou ajoutée
+manuellement dans l'aperçu.
 
 Si un autre modèle de devis est utilisé (colonnes dans un ordre différent),
 le parseur détecte les colonnes par leur intitulé et devrait s'adapter tant
 que les en-têtes gardent des noms proches (n°, Référence, Description,
-Unité, Qté). Si la détection échoue, un message d'erreur explicite s'affiche
-plutôt qu'un import silencieusement faux.
+Unité, Qté, Type de FO, Type MO). Si la détection échoue, un message
+d'erreur explicite s'affiche plutôt qu'un import silencieusement faux.
 
 ## Prochaines étapes possibles
 
