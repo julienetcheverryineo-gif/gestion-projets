@@ -43,8 +43,45 @@ export default function ImportDevisModal({ chantierId, onClose }) {
 
   const genererPostes = (resultat, profondeur) => {
     const detectes = grouperParProfondeur(resultat.sequence, profondeur);
-    setPostes(detectes.map((p) => ({ ...p, selectionne: true, nomEdite: p.nom })));
+    setPostes(
+      detectes.map((p) => ({
+        ...p,
+        selectionne: true,
+        nomEdite: p.nom,
+        qteResolu: (p.facteur || 1) <= 1,
+      }))
+    );
     setPosteOuvert(0);
+  };
+
+  const multiplierQuantites = (index) => {
+    setPostes((prev) =>
+      prev.map((p, i) => {
+        if (i !== index) return p;
+        return {
+          ...p,
+          qteResolu: true,
+          items: p.items.map((it) =>
+            it.type === "materiel" ? { ...it, quantite: (it.quantite || 0) * p.facteur } : it
+          ),
+        };
+      })
+    );
+  };
+
+  const dupliquerPoste = (index) => {
+    setPostes((prev) => {
+      const poste = prev[index];
+      const copies = Array.from({ length: poste.facteur }, (_, n) => ({
+        ...poste,
+        nomEdite: poste.nomEdite + " (" + (n + 1) + "/" + poste.facteur + ")",
+        facteur: 1,
+        qteResolu: true,
+        items: poste.items.map((it) => ({ ...it, id: it.id + "-copie" + n })),
+      }));
+      return [...prev.slice(0, index), ...copies, ...prev.slice(index + 1)];
+    });
+    setPosteOuvert(null);
   };
 
   const basculerPoste = (index) => {
@@ -233,6 +270,26 @@ export default function ImportDevisModal({ chantierId, onClose }) {
                         {ouvert ? " — Masquer" : " — Modifier"}
                       </button>
                     </div>
+
+                    {!poste.qteResolu && (
+                      <div className="qte-poste-banner">
+                        <span>
+                          Ce poste a une quantité de <strong>{poste.facteur}</strong> dans le
+                          devis. Comment l'importer ?
+                        </span>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            className="btn-ghost"
+                            onClick={() => multiplierQuantites(index)}
+                          >
+                            Multiplier le matériel ×{poste.facteur}
+                          </button>
+                          <button className="btn-ghost" onClick={() => dupliquerPoste(index)}>
+                            Créer {poste.facteur} équipements séparés
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {ouvert && (
                       <div className="import-item-edit">

@@ -108,6 +108,13 @@ suivant :
   profonds (sous-groupes comme "Fourniture et programmation") sont alors
   simplement ignorés comme titres, et leur contenu rattaché à l'équipement
   choisi juste au-dessus
+- le nom proposé pour chaque équipement combine tous les niveaux parents
+  jusqu'au niveau choisi (ex : "B3600 - Sous-station" si le niveau choisi est
+  le 2ᵉ) — modifiable avant import
+- si la ligne du poste porte elle-même une quantité supérieure à 1 dans le
+  devis (ex : "CTA" × 4, plusieurs unités identiques), un bandeau propose de
+  **multiplier les quantités du matériel** par ce facteur, ou de **dupliquer
+  le poste** en autant d'équipements séparés (numérotés)
 - sous le niveau choisi, chaque ligne est classée automatiquement :
   - un code renseigné en colonne **Type de FO** → ligne de **matériel**
   - un code en colonne **Type MO** → ligne de **tâche**

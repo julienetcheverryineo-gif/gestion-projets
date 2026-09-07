@@ -632,6 +632,20 @@ a {
   color: var(--text-muted);
 }
 
+.qte-poste-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+
 /* ---------- Grand popup d'import de devis ---------- */
 .import-popup {
   background: var(--panel);

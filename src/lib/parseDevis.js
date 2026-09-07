@@ -85,7 +85,13 @@ export function analyserClasseur(arrayBuffer) {
 
     if (RE_CODE.test(numero)) {
       const profondeur = (numero.match(/\./g) || []).length;
-      sequence.push({ estCode: true, profondeur, code: numero, nom: description || numero });
+      sequence.push({
+        estCode: true,
+        profondeur,
+        code: numero,
+        nom: description || numero,
+        quantite,
+      });
       if (!niveaux.has(profondeur)) {
         niveaux.set(profondeur, { profondeur, exemple: description || numero, count: 0 });
       }
@@ -165,15 +171,27 @@ export function analyserClasseur(arrayBuffer) {
 // Étape 2 : regroupe la séquence en équipements, en utilisant les repères de
 // la profondeur choisie comme limite d'équipement. Les repères plus profonds
 // (sous-groupes comme "Fourniture et programmation") sont ignorés en tant
-// que titres, et leurs lignes rattachées à l'équipement en cours.
+// que titres, et leurs lignes rattachées à l'équipement en cours. Le nom
+// proposé est le fil d'Ariane des niveaux parents (ex: "B3600 - Sous-station"
+// pour un choix au niveau 2). Si le poste lui-même porte une quantité > 1
+// dans le devis (ex: "CTA conservés" x3), elle est remontée en `facteur`.
 export function grouperParProfondeur(sequence, profondeurChoisie) {
   const postes = [];
   let posteCourant = null;
+  const filAriane = [];
 
   for (const item of sequence) {
     if (item.estCode) {
+      if (item.profondeur > profondeurChoisie) continue; // sous-groupe, ignoré
+      filAriane[item.profondeur] = item.nom;
+      filAriane.length = item.profondeur + 1;
       if (item.profondeur === profondeurChoisie) {
-        posteCourant = { code: item.code, nom: item.nom, items: [] };
+        posteCourant = {
+          code: item.code,
+          nom: filAriane.join(" - "),
+          facteur: item.quantite > 1 ? item.quantite : 1,
+          items: [],
+        };
         postes.push(posteCourant);
       }
       continue;
