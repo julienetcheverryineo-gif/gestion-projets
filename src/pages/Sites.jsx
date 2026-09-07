@@ -11,6 +11,7 @@ import {
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
+import { exporterMaterielAchats } from "../lib/exportMateriel";
 
 const STATUTS = [
   { value: "actif", label: "Actif" },
@@ -23,8 +24,11 @@ export default function Sites() {
   const peutGerer = isAdmin || isChefDeProjet;
   const { documents: chantiers, chargement } = useCollection("sites");
   const { documents: lots } = useCollection("lots");
+  const { documents: regEquipements } = useCollection("regequipements");
+  const { documents: regItems } = useCollection("regitems");
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
+  const [seulementNonInstalle, setSeulementNonInstalle] = useState(true);
 
   const supprimer = async (id) => {
     if (!confirm("Supprimer ce chantier ? Les lots et équipements associés resteront orphelins.")) return;
@@ -47,17 +51,46 @@ export default function Sites() {
           <h1>Chantiers</h1>
           <p className="page-subtitle">Vos chantiers automatisme &amp; GTB en cours.</p>
         </div>
-        {peutGerer && (
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setChantierEnEdition(null);
-              setAfficherFormulaire(true);
-            }}
-          >
-            Nouveau chantier
-          </button>
-        )}
+        <div className="header-actions-stack">
+          <div className="header-actions-row">
+            {peutGerer && (
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  exporterMaterielAchats({
+                    chantiers,
+                    regEquipements,
+                    regItems,
+                    seulementNonInstalle,
+                  })
+                }
+              >
+                Exporter le matériel (achats)
+              </button>
+            )}
+            {peutGerer && (
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setChantierEnEdition(null);
+                  setAfficherFormulaire(true);
+                }}
+              >
+                Nouveau chantier
+              </button>
+            )}
+          </div>
+          {peutGerer && (
+            <label className="export-filtre-checkbox">
+              <input
+                type="checkbox"
+                checked={seulementNonInstalle}
+                onChange={(e) => setSeulementNonInstalle(e.target.checked)}
+              />
+              Uniquement le matériel non installé
+            </label>
+          )}
+        </div>
       </header>
 
       {chargement ? (

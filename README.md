@@ -134,6 +134,22 @@ que les en-têtes gardent des noms proches (n°, Référence, Description,
 Unité, Qté, Type de FO, Type MO). Si la détection échoue, un message
 d'erreur explicite s'affiche plutôt qu'un import silencieusement faux.
 
+## Export du matériel pour les achats
+
+Sur la page **Chantiers**, le bouton **"Exporter le matériel (achats)"**
+(visible pour les chefs de projet/admins) télécharge un fichier Excel
+(`materiel-achats-AAAA-MM-JJ.xlsx`) avec deux onglets :
+
+- **Récapitulatif achats** : le matériel de tous les chantiers regroupé par
+  désignation, avec les quantités additionnées et la liste des chantiers
+  concernés — directement utilisable pour commander en une fois.
+- **Détail par chantier** : une ligne par matériel avec le chantier et
+  l'équipement d'origine, pour la traçabilité.
+
+La case à cocher "Uniquement le matériel non installé" (cochée par défaut)
+exclut le matériel déjà configuré/testé, pour ne lister que ce qui reste
+réellement à acheter.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

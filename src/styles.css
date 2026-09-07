@@ -646,6 +646,30 @@ a {
   font-size: 0.85rem;
 }
 
+.export-filtre-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.export-filtre-checkbox input {
+  width: 14px;
+  height: 14px;
+}
+
+.header-actions-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.header-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
 /* ---------- Grand popup d'import de devis ---------- */
 .import-popup {
   background: var(--panel);
@@ -1147,6 +1171,20 @@ textarea:focus {
   }
   .page-header-actions .btn-primary {
     width: 100%;
+  }
+  .header-actions-stack {
+    align-items: stretch;
+    width: 100%;
+  }
+  .header-actions-row {
+    flex-direction: column;
+  }
+  .header-actions-row .btn-ghost,
+  .header-actions-row .btn-primary {
+    width: 100%;
+  }
+  .export-filtre-checkbox {
+    justify-content: flex-end;
   }
 
   .stat-grid {
