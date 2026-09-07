@@ -137,12 +137,19 @@ export default function ImportDevisModal({ chantierId, onClose }) {
 
         {!postes && (
           <div className="import-drop">
-            <p className="empty-state-description" style={{ margin: "0 0 12px" }}>
+            <p className="empty-state-description" style={{ margin: "0 0 16px" }}>
               Sélectionnez le fichier Excel (.xlsx) de la minute de devis. Chaque poste
               détecté (ex : A.1, A.2…) devient un équipement régulé, avec son matériel et
               ses tâches déjà triés — tout reste modifiable avant import.
             </p>
-            <input type="file" accept=".xlsx,.xls" onChange={handleFichier} />
+            <label className="file-picker">
+              <input type="file" accept=".xlsx,.xls" onChange={handleFichier} />
+              <span className="file-picker-icon">⬆</span>
+              <span className="file-picker-text">
+                <strong>Choisir un fichier</strong>
+                <span>{nomFichier || "Aucun fichier sélectionné"}</span>
+              </span>
+            </label>
             {enLecture && <p className="page-loading">Analyse du fichier…</p>}
             {erreur && <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>}
           </div>
@@ -175,14 +182,12 @@ export default function ImportDevisModal({ chantierId, onClose }) {
                         value={poste.nomEdite}
                         onChange={(e) => renommerPoste(index, e.target.value)}
                       />
-                      <span className="simple-list-meta">
-                        {materiel.length} matériel · {taches.length} tâche(s)
-                      </span>
                       <button
-                        className="linkish"
+                        className="btn-ghost import-poste-toggle"
                         onClick={() => setPosteOuvert(ouvert ? null : index)}
                       >
-                        {ouvert ? "Masquer" : "Modifier le détail"}
+                        {materiel.length} matériel · {taches.length} tâche(s)
+                        {ouvert ? " — Masquer" : " — Modifier"}
                       </button>
                     </div>
 
@@ -208,8 +213,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
                           onAdd={() => ajouterItem(index, "tache")}
                         />
                       </div>
-                    )}
-                  </div>
+                    )}                  </div>
                 );
               })}
             </div>

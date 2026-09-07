@@ -110,20 +110,46 @@ export function parseDevisWorkbook(arrayBuffer) {
       continue; // sous-section informative (ex: "AUTOMATE") : pas une ligne à importer
     }
 
-    // Règle métier : un code en "Type de FO" signale du matériel ; à défaut,
-    // un code en "Type MO" (main d'œuvre) signale une tâche.
-    const type = typeFo ? "materiel" : typeMo ? "tache" : reference ? "materiel" : "tache";
-
+    // Règle métier : un code en "Type de FO" signale du matériel ; un code
+    // en "Type MO" (main d'œuvre) signale une tâche. Une ligne qui a les
+    // deux (fourniture + pose/mise en œuvre facturée) génère une ligne de
+    // matériel ET une ligne de tâche distinctes.
     compteur += 1;
-    posteCourant.items.push({
-      id: "tmp-" + compteur,
-      type,
-      designation,
-      reference,
-      unite,
-      quantite,
-      detail: resteDescription.join(" ").slice(0, 200),
-    });
+    if (typeFo) {
+      posteCourant.items.push({
+        id: "tmp-" + compteur,
+        type: "materiel",
+        designation,
+        reference,
+        unite,
+        quantite,
+        detail: resteDescription.join(" ").slice(0, 200),
+      });
+    }
+    if (typeMo || (!typeFo && !reference)) {
+      compteur += 1;
+      posteCourant.items.push({
+        id: "tmp-" + compteur,
+        type: "tache",
+        designation,
+        reference: typeFo ? "" : reference,
+        unite: typeFo ? "" : unite,
+        quantite: typeFo ? 0 : quantite,
+        detail: typeFo ? "" : resteDescription.join(" ").slice(0, 200),
+      });
+    } else if (!typeFo && reference) {
+      // Ni Type de FO ni Type MO, mais une référence : on la traite quand
+      // même comme du matériel plutôt que de la perdre.
+      posteCourant.items.push({
+        id: "tmp-" + compteur,
+        type: "materiel",
+        designation,
+        reference,
+        unite,
+        quantite,
+        detail: resteDescription.join(" ").slice(0, 200),
+      });
+    }
   }
 
   return postes.filter((p) => p.items.length > 0);
