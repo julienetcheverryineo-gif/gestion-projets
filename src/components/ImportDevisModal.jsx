@@ -26,9 +26,8 @@ export default function ImportDevisModal({ chantierId, onClose }) {
         );
         setPostes(null);
       } else {
-        setPostes(
-          detectes.map((p) => ({ ...p, selectionne: true, nomEdite: p.nom }))
-        );
+        setPostes(detectes.map((p) => ({ ...p, selectionne: true, nomEdite: p.nom })));
+        setPosteOuvert(0);
       }
     } catch (err) {
       setErreur("Impossible de lire ce fichier : " + err.message);
@@ -131,10 +130,23 @@ export default function ImportDevisModal({ chantierId, onClose }) {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal-large modal-xl" onClick={(e) => e.stopPropagation()}>
-        <h2>Importer une minute de devis</h2>
+    <div className="import-fullscreen">
+      <header className="import-fullscreen-header">
+        <div>
+          <h2>Importer une minute de devis</h2>
+          {postes && (
+            <p className="page-subtitle">
+              {nomFichier} — {postes.length} équipement(s) détecté(s), {nbItemsSelectionnes}{" "}
+              ligne(s) sélectionnée(s)
+            </p>
+          )}
+        </div>
+        <button className="btn-ghost" onClick={onClose} aria-label="Fermer">
+          Fermer ✕
+        </button>
+      </header>
 
+      <div className="import-fullscreen-body">
         {!postes && (
           <div className="import-drop">
             <p className="empty-state-description" style={{ margin: "0 0 16px" }}>
@@ -156,94 +168,90 @@ export default function ImportDevisModal({ chantierId, onClose }) {
         )}
 
         {postes && (
-          <>
-            <p className="page-subtitle" style={{ margin: "0 0 14px" }}>
-              {nomFichier} — {postes.length} équipement(s) détecté(s),{" "}
-              {nbItemsSelectionnes} ligne(s) sélectionnée(s)
-            </p>
-
-            <div className="import-poste-list">
-              {postes.map((poste, index) => {
-                const materiel = poste.items.filter((it) => it.type === "materiel");
-                const taches = poste.items.filter((it) => it.type === "tache");
-                const ouvert = posteOuvert === index;
-                return (
-                  <div key={index} className="import-poste-row">
-                    <div className="import-poste-header">
-                      <label className="import-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={poste.selectionne}
-                          onChange={() => basculerPoste(index)}
-                        />
-                      </label>
+          <div className="import-poste-list">
+            {postes.map((poste, index) => {
+              const materiel = poste.items.filter((it) => it.type === "materiel");
+              const taches = poste.items.filter((it) => it.type === "tache");
+              const ouvert = posteOuvert === index;
+              return (
+                <div key={index} className="import-poste-row">
+                  <div className="import-poste-header">
+                    <label className="import-checkbox">
                       <input
-                        className="import-poste-nom"
-                        value={poste.nomEdite}
-                        onChange={(e) => renommerPoste(index, e.target.value)}
+                        type="checkbox"
+                        checked={poste.selectionne}
+                        onChange={() => basculerPoste(index)}
                       />
-                      <button
-                        className="btn-ghost import-poste-toggle"
-                        onClick={() => setPosteOuvert(ouvert ? null : index)}
-                      >
-                        {materiel.length} matériel · {taches.length} tâche(s)
-                        {ouvert ? " — Masquer" : " — Modifier"}
-                      </button>
+                    </label>
+                    <input
+                      className="import-poste-nom"
+                      value={poste.nomEdite}
+                      onChange={(e) => renommerPoste(index, e.target.value)}
+                    />
+                    <button
+                      className="btn-ghost import-poste-toggle"
+                      onClick={() => setPosteOuvert(ouvert ? null : index)}
+                    >
+                      {materiel.length} matériel · {taches.length} tâche(s)
+                      {ouvert ? " — Masquer" : " — Modifier"}
+                    </button>
+                  </div>
+
+                  {ouvert && (
+                    <div className="import-item-edit">
+                      <ImportItemTable
+                        titre="Matériel"
+                        items={materiel}
+                        onChange={(itemId, champ, valeur) =>
+                          modifierItem(index, itemId, champ, valeur)
+                        }
+                        onDelete={(itemId) => supprimerItem(index, itemId)}
+                        onAdd={() => ajouterItem(index, "materiel")}
+                        avecQuantite
+                      />
+                      <ImportItemTable
+                        titre="Tâches"
+                        items={taches}
+                        onChange={(itemId, champ, valeur) =>
+                          modifierItem(index, itemId, champ, valeur)
+                        }
+                        onDelete={(itemId) => supprimerItem(index, itemId)}
+                        onAdd={() => ajouterItem(index, "tache")}
+                      />
                     </div>
-
-                    {ouvert && (
-                      <div className="import-item-edit">
-                        <ImportItemGroup
-                          titre="Matériel"
-                          items={materiel}
-                          onChange={(itemId, champ, valeur) =>
-                            modifierItem(index, itemId, champ, valeur)
-                          }
-                          onDelete={(itemId) => supprimerItem(index, itemId)}
-                          onAdd={() => ajouterItem(index, "materiel")}
-                          avecQuantite
-                        />
-                        <ImportItemGroup
-                          titre="Tâches"
-                          items={taches}
-                          onChange={(itemId, champ, valeur) =>
-                            modifierItem(index, itemId, champ, valeur)
-                          }
-                          onDelete={(itemId) => supprimerItem(index, itemId)}
-                          onAdd={() => ajouterItem(index, "tache")}
-                        />
-                      </div>
-                    )}                  </div>
-                );
-              })}
-            </div>
-
-            {erreur && <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>}
-          </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
 
-        <div className="modal-actions">
-          <button type="button" className="btn-ghost" onClick={onClose}>
-            Annuler
-          </button>
-          {postes && (
-            <button
-              className="btn-primary"
-              onClick={importer}
-              disabled={enImport || nbItemsSelectionnes === 0}
-            >
-              {enImport
-                ? "Import…"
-                : "Importer " + postes.filter((p) => p.selectionne).length + " équipement(s)"}
-            </button>
-          )}
-        </div>
+        {erreur && postes && (
+          <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>
+        )}
       </div>
+
+      <footer className="import-fullscreen-footer">
+        <button type="button" className="btn-ghost" onClick={onClose}>
+          Annuler
+        </button>
+        {postes && (
+          <button
+            className="btn-primary"
+            onClick={importer}
+            disabled={enImport || nbItemsSelectionnes === 0}
+          >
+            {enImport
+              ? "Import…"
+              : "Importer " + postes.filter((p) => p.selectionne).length + " équipement(s)"}
+          </button>
+        )}
+      </footer>
     </div>
   );
 }
 
-function ImportItemGroup({ titre, items, onChange, onDelete, onAdd, avecQuantite }) {
+function ImportItemTable({ titre, items, onChange, onDelete, onAdd, avecQuantite }) {
   return (
     <div className="import-item-group">
       <div className="reg-subheading">{titre}</div>
@@ -252,39 +260,60 @@ function ImportItemGroup({ titre, items, onChange, onDelete, onAdd, avecQuantite
           Aucune ligne.
         </p>
       ) : (
-        <div className="import-item-rows">
-          {items.map((item) => (
-            <div key={item.id} className="import-item-row">
-              <input
-                className="import-item-designation"
-                value={item.designation}
-                onChange={(e) => onChange(item.id, "designation", e.target.value)}
-                placeholder="Désignation"
-              />
+        <table className="data-table import-edit-table">
+          <thead>
+            <tr>
+              <th>Désignation</th>
               {avecQuantite && (
                 <>
-                  <input
-                    type="number"
-                    className="import-item-qte"
-                    value={item.quantite}
-                    onChange={(e) => onChange(item.id, "quantite", Number(e.target.value))}
-                  />
-                  <input
-                    className="import-item-unite"
-                    value={item.unite}
-                    onChange={(e) => onChange(item.id, "unite", e.target.value)}
-                    placeholder="u"
-                  />
+                  <th style={{ width: 70 }}>Qté</th>
+                  <th style={{ width: 70 }}>Unité</th>
                 </>
               )}
-              <button className="btn-ghost btn-danger" onClick={() => onDelete(item.id)}>
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
+              <th style={{ width: 32 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>
+                  <input
+                    className="import-edit-input"
+                    value={item.designation}
+                    onChange={(e) => onChange(item.id, "designation", e.target.value)}
+                    placeholder="Désignation"
+                  />
+                </td>
+                {avecQuantite && (
+                  <>
+                    <td>
+                      <input
+                        type="number"
+                        className="import-edit-input"
+                        value={item.quantite}
+                        onChange={(e) => onChange(item.id, "quantite", Number(e.target.value))}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="import-edit-input"
+                        value={item.unite}
+                        onChange={(e) => onChange(item.id, "unite", e.target.value)}
+                      />
+                    </td>
+                  </>
+                )}
+                <td>
+                  <button className="btn-ghost btn-danger" onClick={() => onDelete(item.id)}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
-      <button className="linkish" style={{ marginTop: 6 }} onClick={onAdd}>
+      <button className="linkish" style={{ marginTop: 8 }} onClick={onAdd}>
         + Ajouter une ligne
       </button>
     </div>

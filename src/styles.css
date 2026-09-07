@@ -569,57 +569,89 @@ a {
   margin-bottom: 6px;
 }
 
-.modal-xl {
-  max-width: 920px;
-  width: 94vw;
-  max-height: 88vh;
+/* ---------- Écran plein écran d'import de devis ---------- */
+.import-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
 }
-.modal-xl .import-poste-list {
-  overflow-y: auto;
-  flex: 1;
+
+.import-fullscreen-header {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.import-fullscreen-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
 }
 
-/* Deux colonnes matériel / tâches côte à côte sur grand écran */
+.import-fullscreen-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 32px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.import-fullscreen-footer {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 32px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+/* Deux colonnes matériel / tâches côte à côte, jamais trop étroites */
 .import-item-edit {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 24px;
 }
 
 .import-item-group {
   min-width: 0;
 }
 
-.import-item-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.import-edit-table {
+  table-layout: fixed;
+  width: 100%;
 }
-
-.import-item-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
+.import-edit-table th:first-child,
+.import-edit-table td:first-child {
+  width: auto;
 }
-
-.import-item-designation {
-  flex: 1;
-  min-width: 0;
+.import-edit-input {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 5px 6px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  border-radius: 4px;
 }
-
-.import-item-qte {
-  width: 56px;
-  flex-shrink: 0;
+.import-edit-input:hover {
+  border-color: var(--border);
 }
-
-.import-item-unite {
-  width: 52px;
-  flex-shrink: 0;
+.import-edit-input:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  outline: none;
 }
 
 /* Zone de sélection de fichier stylée (remplace l'input natif) */
@@ -682,13 +714,15 @@ a {
 .import-poste-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .import-poste-row {
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
 }
 
 .import-poste-header {
@@ -1082,9 +1116,12 @@ textarea:focus {
     white-space: nowrap;
   }
 
-  .modal-xl {
-    width: 100%;
-    max-height: 92vh;
+  .import-fullscreen-header,
+  .import-fullscreen-footer {
+    padding: 14px 16px;
+  }
+  .import-fullscreen-body {
+    padding: 16px;
   }
   .import-item-edit {
     grid-template-columns: 1fr;
