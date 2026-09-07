@@ -483,10 +483,17 @@ a {
 
 @media (max-width: 860px) {
   .mobile-topbar {
-    padding-top: max(14px, env(safe-area-inset-top));
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: var(--bg);
+    padding: max(14px, env(safe-area-inset-top)) 16px 12px;
+    margin-bottom: 0;
   }
   .app-shell {
-    padding-top: env(safe-area-inset-top);
+    padding-top: 0;
   }
 }
 
@@ -826,13 +833,11 @@ textarea:focus {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 14px;
-    margin-bottom: 14px;
     border-bottom: 1px solid var(--border);
   }
 
   .main-content {
-    padding: 16px 16px 24px;
+    padding: calc(70px + env(safe-area-inset-top)) 16px 24px;
     max-width: none;
   }
 
