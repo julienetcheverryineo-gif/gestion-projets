@@ -150,6 +150,38 @@ La case à cocher "Uniquement le matériel non installé" (cochée par défaut)
 exclut le matériel déjà configuré/testé, pour ne lister que ce qui reste
 réellement à acheter.
 
+## Équipe par chantier
+
+Sur la page d'un chantier, bouton **"Modifier l'équipe"** : vous assignez un
+RA (responsable d'affaire, "Julien ETCHEVERRY" par défaut), un responsable
+de chantier, une liste d'automaticiens et une liste d'électriciens (cases à
+cocher parmi les utilisateurs de l'application). Champs stockés sur le
+document `sites` : `ra`, `responsableChantier`, `automaticiens` (tableau de
+noms), `electriciens` (tableau de noms).
+
+## Création d'utilisateurs et mots de passe
+
+Sur la page **Utilisateurs** (admin), le bouton **"+ Ajouter un
+utilisateur"** crée le compte (e-mail + rôle) et envoie automatiquement un
+e-mail à la personne pour qu'elle définisse elle-même son mot de passe —
+plus besoin de passer par la console Firebase pour chaque nouvel arrivant.
+
+Techniquement, la création utilise une **instance Firebase secondaire**
+(`getSecondaryAuth()` dans `src/firebase.js`) : sans ça,
+`createUserWithEmailAndPassword` connecterait automatiquement le nouveau
+compte à la place de la session de l'admin en cours. Le compte est créé sur
+cette instance isolée, un e-mail de définition de mot de passe est envoyé,
+puis l'instance secondaire se déconnecte — la session de l'admin n'est
+jamais affectée.
+
+Chaque utilisateur a aussi un bouton **"Réinitialiser le mot de passe"** qui
+renvoie ce même e-mail à tout moment (utile si la personne l'a perdu ou n'a
+jamais fini de créer son compte).
+
+**Note** : la langue de l'e-mail envoyé dépend de la configuration du
+projet Firebase (Authentication > Templates > langue), pas de
+l'application elle-même.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

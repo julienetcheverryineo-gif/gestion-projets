@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
@@ -26,3 +26,14 @@ export const db = getFirestore(app);
 isSupported().then((supported) => {
   if (supported) getAnalytics(app);
 });
+
+// Instance Firebase secondaire, utilisée uniquement pour créer un nouveau
+// compte utilisateur (Authentication) sans déconnecter la session de la
+// personne qui fait la création (un admin par exemple). Sans ça,
+// createUserWithEmailAndPassword connecterait automatiquement le nouveau
+// compte à la place du compte courant.
+export function getSecondaryAuth() {
+  const nom = "secondaire";
+  const appSecondaire = getApps().find((a) => a.name === nom) ?? initializeApp(firebaseConfig, nom);
+  return getAuth(appSecondaire);
+}

@@ -19,7 +19,7 @@ service cloud.firestore {
     // Seuls les chefs de projet / admins peuvent changer un rôle.
     match /users/{userId} {
       allow read: if estConnecte();
-      allow create: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId || estChefOuAdmin();
       allow update: if request.auth.uid == userId || estChefOuAdmin();
       allow delete: if estChefOuAdmin();
     }

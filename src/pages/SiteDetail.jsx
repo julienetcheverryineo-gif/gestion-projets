@@ -13,6 +13,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import { formatStatut } from "./Sites";
 import ImportDevisModal from "../components/ImportDevisModal";
+import TeamFormModal from "../components/TeamFormModal";
 
 const STATUTS_MATERIEL = [
   { value: "a_faire", label: "À installer" },
@@ -48,6 +49,8 @@ export default function SiteDetail() {
   const tempsChantier = tousTemps.filter((t) => t.chantierId === chantierId);
   const totalHeures = tempsChantier.reduce((s, t) => s + Number(t.duree || 0), 0);
 
+  const { documents: utilisateurs } = useCollection("users", "email");
+
   const [afficherRegForm, setAfficherRegForm] = useState(false);
   const [regSelectionne, setRegSelectionne] = useState(null);
   const [afficherLotForm, setAfficherLotForm] = useState(false);
@@ -55,6 +58,7 @@ export default function SiteDetail() {
   const [afficherRapport, setAfficherRapport] = useState(false);
   const [afficherTempsForm, setAfficherTempsForm] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
+  const [afficherEquipeForm, setAfficherEquipeForm] = useState(false);
 
   const supprimerLot = async (lotId) => {
     if (!confirm("Supprimer ce lot et ses équipements ?")) return;
@@ -87,6 +91,29 @@ export default function SiteDetail() {
             {formatStatut(chantier.statut)}
             {totalHeures > 0 && " · " + totalHeures + " h passées"}
           </p>
+          <div className="team-summary">
+            <span>
+              <strong>RA :</strong> {chantier.ra || "Julien ETCHEVERRY"}
+            </span>
+            {chantier.responsableChantier && (
+              <span>
+                <strong>Responsable :</strong> {chantier.responsableChantier}
+              </span>
+            )}
+            {chantier.automaticiens?.length > 0 && (
+              <span>
+                <strong>Automaticiens :</strong> {chantier.automaticiens.join(", ")}
+              </span>
+            )}
+            {chantier.electriciens?.length > 0 && (
+              <span>
+                <strong>Électriciens :</strong> {chantier.electriciens.join(", ")}
+              </span>
+            )}
+            <button className="linkish" onClick={() => setAfficherEquipeForm(true)}>
+              Modifier l'équipe
+            </button>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn-ghost" onClick={() => setAfficherTempsForm(true)}>
@@ -194,6 +221,14 @@ export default function SiteDetail() {
           </div>
         )}
       </section>
+
+      {afficherEquipeForm && (
+        <TeamFormModal
+          chantier={chantier}
+          utilisateurs={utilisateurs}
+          onClose={() => setAfficherEquipeForm(false)}
+        />
+      )}
 
       {afficherImport && (
         <ImportDevisModal
@@ -304,7 +339,7 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
       </div>
 
       {ouvert && (
-        <div className="lot-card-body">
+        <div className="lot-card-body reg-item-columns">
           <div className="item-section-materiel">
             <div className="reg-subheading reg-subheading-materiel">
               <span className="reg-subheading-icon">🔧</span>
@@ -370,7 +405,7 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
             )}
           </div>
 
-          <div className="item-section-tache" style={{ marginTop: 14 }}>
+          <div className="item-section-tache">
             <div className="reg-subheading reg-subheading-tache">
               <span className="reg-subheading-icon">☑</span>
               Tâches
