@@ -39,6 +39,16 @@ service cloud.firestore {
       allow delete: if estChefOuAdmin();
     }
 
+    // Messages du chat par chantier : lecture pour tous les connectés,
+    // chacun ne peut créer que ses propres messages (usurpation impossible),
+    // suppression par l'auteur ou un chef de projet/admin (modération)
+    match /messages/{messageId} {
+      allow read: if estConnecte();
+      allow create: if estConnecte() && request.resource.data.userId == request.auth.uid;
+      allow delete: if estConnecte() &&
+        (resource.data.userId == request.auth.uid || estChefOuAdmin());
+    }
+
     // Chantiers : lecture pour tous les connectés, écriture réservée aux chefs de projet/admins
     match /sites/{siteId} {
       allow read: if estConnecte();

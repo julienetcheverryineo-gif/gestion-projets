@@ -213,6 +213,29 @@ servir — dans les faits, l'effet recherché par une suppression. Le bouton
 "Réactiver" annule cette restriction. Champ Firestore concerné :
 `users/{id}.actif` (`true` par défaut, `false` = bloqué).
 
+## Chat par chantier
+
+Sur la page d'un chantier, l'onglet **"Chat"** (à côté de "Équipements")
+ouvre une messagerie façon WhatsApp partagée par toute l'équipe du
+chantier : texte en temps réel et envoi de photos (bouton 📷).
+
+- `messages` (Firestore) : `chantierId`, `userId`, `userNom`, `texte`,
+  `imageUrl`, `creeLe`
+- Les photos sont stockées dans **Firebase Storage**, sous
+  `chantiers/{chantierId}/chat/...`
+
+**Important — étape supplémentaire à faire dans la console Firebase :**
+1. Si ce n'est pas déjà fait, activez **Storage** (menu de gauche, "Get
+   started"/"Commencer") — un bucket est créé automatiquement.
+2. Publiez les règles de sécurité du fichier `storage.rules` de ce projet :
+   Storage → onglet "Rules" → copier-coller le contenu → Publier.
+3. Republiez aussi `firestore.rules` (nouvelle règle pour la collection
+   `messages`) si ce n'est pas encore fait.
+
+Sans ces deux étapes, l'onglet Chat affichera une erreur de permissions,
+comme pour les autres fonctionnalités qui ont nécessité une mise à jour des
+règles jusqu'ici.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
