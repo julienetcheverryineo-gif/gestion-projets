@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import logoIneo from "../assets/logo-ineo.png";
 
 export default function Login() {
   const { login } = useAuth();
@@ -27,7 +28,9 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="brand-mark" aria-hidden="true" />
+        <div className="logo-chip logo-chip-lg">
+          <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
+        </div>
         <h1>Pilotage de projets</h1>
         <p className="login-subtitle">Automatisme &amp; GTB</p>
 

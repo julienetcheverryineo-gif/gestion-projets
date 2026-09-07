@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import logoIneo from "../assets/logo-ineo.png";
 
 const NAV_ITEMS = [
   { to: "/", label: "Vue d'ensemble", end: true },
@@ -20,7 +21,9 @@ export default function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark" aria-hidden="true" />
+          <div className="logo-chip">
+            <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
+          </div>
           <div>
             <div className="brand-title">Pilotage</div>
             <div className="brand-subtitle">Automatisme &amp; GTB</div>
@@ -68,7 +71,9 @@ export default function Layout() {
 
       <main className="main-content">
         <div className="mobile-topbar">
-          <span className="brand-title">Pilotage GTB</span>
+          <div className="logo-chip logo-chip-sm">
+            <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
+          </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               className="btn-ghost btn-refresh"

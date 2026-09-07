@@ -1,18 +1,22 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 :root {
-  --bg: #12161c;
-  --panel: #1a2029;
-  --panel-raised: #202834;
-  --border: #2a3341;
-  --text: #e6eaef;
-  --text-muted: #8b96a5;
-  --accent: #3fb0c2;
-  --accent-dim: #2a3f45;
-  --warn: #e0973f;
-  --danger: #d9534f;
-  --ok: #4caf7d;
-  --radius: 3px;
+  --bg: #08121a;
+  --panel: #101d24;
+  --panel-raised: #182831;
+  --border: #1d2e37;
+  --ring: rgba(255, 255, 255, 0.1);
+  --text: #ffffff;
+  --text-muted: #83959f;
+  --accent: #6dbf93;
+  --accent-ink: #06231a;
+  --accent-dim: #23423a;
+  --warn: #eda100;
+  --danger: #e34948;
+  --ok: #1baf7a;
+  --radius: 13px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.3);
   --font-ui: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -73,13 +77,28 @@ a {
   margin-bottom: 16px;
 }
 
-.brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius);
-  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-  border: 1px solid var(--accent);
+.logo-chip {
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+}
+.logo-chip img {
+  display: block;
+  height: 20px;
+  width: auto;
+}
+.logo-chip-sm img {
+  height: 16px;
+}
+.logo-chip-lg {
+  padding: 10px 16px;
+  margin-bottom: 18px;
+}
+.logo-chip-lg img {
+  height: 30px;
 }
 
 .brand-title {
@@ -181,7 +200,7 @@ a {
 
 .btn-primary {
   background: var(--accent);
-  color: #0c1216;
+  color: var(--accent-ink);
   border-color: var(--accent);
 }
 .btn-primary:hover {
@@ -246,10 +265,11 @@ a {
 
 .stat-card {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--ring);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 16px;
+  box-shadow: var(--shadow);
 }
 
 .stat-card-alerte {
@@ -271,9 +291,10 @@ a {
 /* ---------- Panels ---------- */
 .panel {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--ring);
   border-radius: var(--radius);
   padding: 20px;
+  box-shadow: var(--shadow);
 }
 
 .panel-alert {
@@ -290,6 +311,16 @@ a {
 .panel-header h2 {
   font-size: 1rem;
   margin: 0;
+}
+.panel-header h2::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+  margin-right: 9px;
+  vertical-align: -1px;
 }
 
 /* ---------- Simple list ---------- */
@@ -370,9 +401,10 @@ a {
 
 .project-card {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--ring);
   border-radius: var(--radius);
   padding: 16px;
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -431,9 +463,10 @@ a {
 
 .lot-card {
   background: var(--panel-raised);
-  border: 1px solid var(--border);
+  border: 1px solid var(--ring);
   border-radius: var(--radius);
   padding: 12px 14px;
+  box-shadow: var(--shadow);
 }
 
 .lot-card-header {
@@ -536,9 +569,10 @@ a {
 
 .kanban-column {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--ring);
   border-radius: var(--radius);
   padding: 12px;
+  box-shadow: var(--shadow);
   min-height: 200px;
 }
 
@@ -694,9 +728,10 @@ textarea:focus {
 
 .modal {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--ring);
   border-radius: var(--radius);
   padding: 24px;
+  box-shadow: var(--shadow);
   width: 100%;
   max-width: 420px;
 }
@@ -744,17 +779,14 @@ textarea:focus {
 
 .login-card {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--ring);
   border-radius: var(--radius);
   padding: 36px;
+  box-shadow: var(--shadow);
   width: 100%;
   max-width: 360px;
 }
-.login-card .brand-mark {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 16px;
-}
+
 .login-card h1 {
   font-size: 1.25rem;
   margin: 0 0 2px;
