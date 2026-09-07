@@ -11,6 +11,8 @@
   --accent: #2f9e6b;
   --accent-ink: #06231a;
   --accent-dim: #d8ede2;
+  --tache: #2f6fb0;
+  --tache-dim: #dbe7f4;
   --warn: #b9720a;
   --danger: #c8433f;
   --ok: #1baf7a;
@@ -561,12 +563,73 @@ a {
 }
 
 .reg-subheading {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.reg-subheading-icon {
+  font-size: 0.85rem;
+}
+.reg-subheading-materiel {
+  color: var(--accent);
+}
+.reg-subheading-tache {
+  color: var(--tache);
+}
+
+.item-section-materiel {
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent-dim) 55%, transparent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 12px;
+}
+.item-section-tache {
+  border-left: 3px solid var(--tache);
+  background: color-mix(in srgb, var(--tache-dim) 55%, transparent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 12px;
+}
+.item-section-materiel .data-table th,
+.item-section-materiel .data-table td,
+.item-section-tache .data-table th,
+.item-section-tache .data-table td {
+  border-bottom-color: var(--ring);
+}
+.item-section-materiel select,
+.item-section-tache select {
+  background: var(--panel);
+}
+
+/* ---------- Choix du niveau de regroupement (import multi-niveaux) ---------- */
+.niveau-choix-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.niveau-choix-card {
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.niveau-choix-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+.niveau-choix-titre {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.niveau-choix-exemple {
+  font-size: 0.85rem;
   color: var(--text-muted);
-  margin-bottom: 6px;
 }
 
 /* ---------- Grand popup d'import de devis ---------- */

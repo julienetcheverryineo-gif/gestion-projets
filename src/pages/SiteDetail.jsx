@@ -305,8 +305,11 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
 
       {ouvert && (
         <div className="lot-card-body">
-          <div>
-            <div className="reg-subheading">Matériel</div>
+          <div className="item-section-materiel">
+            <div className="reg-subheading reg-subheading-materiel">
+              <span className="reg-subheading-icon">🔧</span>
+              Matériel
+            </div>
             {materiel.length === 0 ? (
               <p className="empty-state-description" style={{ margin: "4px 0" }}>
                 Aucun matériel.
@@ -367,8 +370,11 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
             )}
           </div>
 
-          <div style={{ marginTop: 14 }}>
-            <div className="reg-subheading">Tâches</div>
+          <div className="item-section-tache" style={{ marginTop: 14 }}>
+            <div className="reg-subheading reg-subheading-tache">
+              <span className="reg-subheading-icon">☑</span>
+              Tâches
+            </div>
             {taches.length === 0 ? (
               <p className="empty-state-description" style={{ margin: "4px 0" }}>
                 Aucune tâche.

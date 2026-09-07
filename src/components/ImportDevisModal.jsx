@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
-import { parseDevisWorkbook } from "../lib/parseDevis";
+import { analyserClasseur, grouperParProfondeur } from "../lib/parseDevis";
 
 export default function ImportDevisModal({ chantierId, onClose }) {
+  const [analyse, setAnalyse] = useState(null); // { sequence, niveaux }
   const [postes, setPostes] = useState(null);
   const [nomFichier, setNomFichier] = useState("");
   const [erreur, setErreur] = useState("");
@@ -19,22 +20,31 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     setNomFichier(fichier.name);
     try {
       const buffer = await fichier.arrayBuffer();
-      const detectes = parseDevisWorkbook(buffer);
-      if (detectes.length === 0) {
+      const resultat = analyserClasseur(buffer);
+      if (resultat.niveaux.length === 0) {
         setErreur(
           "Aucun équipement détecté dans ce fichier. Vérifiez qu'il suit bien le même modèle de minute de devis (colonnes n°, Référence, Description, Unité, Qté, Type de FO, Type MO)."
         );
-        setPostes(null);
+        setAnalyse(null);
+      } else if (resultat.niveaux.length === 1) {
+        // Un seul niveau de regroupement possible : on saute directement à l'aperçu
+        genererPostes(resultat, resultat.niveaux[0].profondeur);
+        setAnalyse(resultat);
       } else {
-        setPostes(detectes.map((p) => ({ ...p, selectionne: true, nomEdite: p.nom })));
-        setPosteOuvert(0);
+        setAnalyse(resultat);
       }
     } catch (err) {
       setErreur("Impossible de lire ce fichier : " + err.message);
-      setPostes(null);
+      setAnalyse(null);
     } finally {
       setEnLecture(false);
     }
+  };
+
+  const genererPostes = (resultat, profondeur) => {
+    const detectes = grouperParProfondeur(resultat.sequence, profondeur);
+    setPostes(detectes.map((p) => ({ ...p, selectionne: true, nomEdite: p.nom })));
+    setPosteOuvert(0);
   };
 
   const basculerPoste = (index) => {
@@ -129,6 +139,8 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     }
   };
 
+  const etapeChoixNiveau = analyse && !postes;
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="import-popup" onClick={(e) => e.stopPropagation()}>
@@ -147,116 +159,145 @@ export default function ImportDevisModal({ chantierId, onClose }) {
           </button>
         </header>
 
-      <div className="import-fullscreen-body">
-        {!postes && (
-          <div className="import-drop">
-            <p className="empty-state-description" style={{ margin: "0 0 16px" }}>
-              Sélectionnez le fichier Excel (.xlsx) de la minute de devis. Chaque poste
-              détecté (ex : A.1, A.2…) devient un équipement régulé, avec son matériel et
-              ses tâches déjà triés — tout reste modifiable avant import.
-            </p>
-            <label className="file-picker">
-              <input type="file" accept=".xlsx,.xls" onChange={handleFichier} />
-              <span className="file-picker-icon">⬆</span>
-              <span className="file-picker-text">
-                <strong>Choisir un fichier</strong>
-                <span>{nomFichier || "Aucun fichier sélectionné"}</span>
-              </span>
-            </label>
-            {enLecture && <p className="page-loading">Analyse du fichier…</p>}
-            {erreur && <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>}
-          </div>
-        )}
+        <div className="import-fullscreen-body">
+          {!analyse && (
+            <div className="import-drop">
+              <p className="empty-state-description" style={{ margin: "0 0 16px" }}>
+                Sélectionnez le fichier Excel (.xlsx) de la minute de devis. Chaque poste
+                détecté devient un équipement régulé, avec son matériel et ses tâches déjà
+                triés — tout reste modifiable avant import.
+              </p>
+              <label className="file-picker">
+                <input type="file" accept=".xlsx,.xls" onChange={handleFichier} />
+                <span className="file-picker-icon">⬆</span>
+                <span className="file-picker-text">
+                  <strong>Choisir un fichier</strong>
+                  <span>{nomFichier || "Aucun fichier sélectionné"}</span>
+                </span>
+              </label>
+              {enLecture && <p className="page-loading">Analyse du fichier…</p>}
+              {erreur && <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>}
+            </div>
+          )}
 
-        {postes && (
-          <div className="import-poste-list">
-            {postes.map((poste, index) => {
-              const materiel = poste.items.filter((it) => it.type === "materiel");
-              const taches = poste.items.filter((it) => it.type === "tache");
-              const ouvert = posteOuvert === index;
-              return (
-                <div key={index} className="import-poste-row">
-                  <div className="import-poste-header">
-                    <label className="import-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={poste.selectionne}
-                        onChange={() => basculerPoste(index)}
-                      />
-                    </label>
-                    <input
-                      className="import-poste-nom"
-                      value={poste.nomEdite}
-                      onChange={(e) => renommerPoste(index, e.target.value)}
-                    />
-                    <button
-                      className="btn-ghost import-poste-toggle"
-                      onClick={() => setPosteOuvert(ouvert ? null : index)}
-                    >
-                      {materiel.length} matériel · {taches.length} tâche(s)
-                      {ouvert ? " — Masquer" : " — Modifier"}
-                    </button>
-                  </div>
-
-                  {ouvert && (
-                    <div className="import-item-edit">
-                      <ImportItemTable
-                        titre="Matériel"
-                        items={materiel}
-                        onChange={(itemId, champ, valeur) =>
-                          modifierItem(index, itemId, champ, valeur)
-                        }
-                        onDelete={(itemId) => supprimerItem(index, itemId)}
-                        onAdd={() => ajouterItem(index, "materiel")}
-                        avecQuantite
-                      />
-                      <ImportItemTable
-                        titre="Tâches"
-                        items={taches}
-                        onChange={(itemId, champ, valeur) =>
-                          modifierItem(index, itemId, champ, valeur)
-                        }
-                        onDelete={(itemId) => supprimerItem(index, itemId)}
-                        onAdd={() => ajouterItem(index, "tache")}
-                      />
+          {etapeChoixNiveau && (
+            <div>
+              <p className="empty-state-description" style={{ margin: "0 0 16px" }}>
+                Ce fichier a plusieurs niveaux de regroupement. À quel niveau se trouve le nom
+                de vos équipements ? Tout ce qui est en dessous (sous-groupes, matériel,
+                tâches) sera rattaché à l'équipement choisi.
+              </p>
+              <div className="niveau-choix-list">
+                {analyse.niveaux.map((n) => (
+                  <button
+                    key={n.profondeur}
+                    className="niveau-choix-card"
+                    onClick={() => genererPostes(analyse, n.profondeur)}
+                  >
+                    <div className="niveau-choix-titre">
+                      Niveau {n.profondeur + 1} — {n.count} équipement(s)
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    <div className="niveau-choix-exemple">Exemple : « {n.exemple} »</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-        {erreur && postes && (
-          <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>
-        )}
-      </div>
+          {postes && (
+            <div className="import-poste-list">
+              {postes.map((poste, index) => {
+                const materiel = poste.items.filter((it) => it.type === "materiel");
+                const taches = poste.items.filter((it) => it.type === "tache");
+                const ouvert = posteOuvert === index;
+                return (
+                  <div key={index} className="import-poste-row">
+                    <div className="import-poste-header">
+                      <label className="import-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={poste.selectionne}
+                          onChange={() => basculerPoste(index)}
+                        />
+                      </label>
+                      <input
+                        className="import-poste-nom"
+                        value={poste.nomEdite}
+                        onChange={(e) => renommerPoste(index, e.target.value)}
+                      />
+                      <button
+                        className="btn-ghost import-poste-toggle"
+                        onClick={() => setPosteOuvert(ouvert ? null : index)}
+                      >
+                        {materiel.length} matériel · {taches.length} tâche(s)
+                        {ouvert ? " — Masquer" : " — Modifier"}
+                      </button>
+                    </div>
 
-      <footer className="import-fullscreen-footer">
-        <button type="button" className="btn-ghost" onClick={onClose}>
-          Annuler
-        </button>
-        {postes && (
-          <button
-            className="btn-primary"
-            onClick={importer}
-            disabled={enImport || nbItemsSelectionnes === 0}
-          >
-            {enImport
-              ? "Import…"
-              : "Importer " + postes.filter((p) => p.selectionne).length + " équipement(s)"}
+                    {ouvert && (
+                      <div className="import-item-edit">
+                        <ImportItemTable
+                          titre="Matériel"
+                          type="materiel"
+                          items={materiel}
+                          onChange={(itemId, champ, valeur) =>
+                            modifierItem(index, itemId, champ, valeur)
+                          }
+                          onDelete={(itemId) => supprimerItem(index, itemId)}
+                          onAdd={() => ajouterItem(index, "materiel")}
+                          avecQuantite
+                        />
+                        <ImportItemTable
+                          titre="Tâches"
+                          type="tache"
+                          items={taches}
+                          onChange={(itemId, champ, valeur) =>
+                            modifierItem(index, itemId, champ, valeur)
+                          }
+                          onDelete={(itemId) => supprimerItem(index, itemId)}
+                          onAdd={() => ajouterItem(index, "tache")}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {erreur && postes && (
+            <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>
+          )}
+        </div>
+
+        <footer className="import-fullscreen-footer">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Annuler
           </button>
-        )}
-      </footer>
+          {postes && (
+            <button
+              className="btn-primary"
+              onClick={importer}
+              disabled={enImport || nbItemsSelectionnes === 0}
+            >
+              {enImport
+                ? "Import…"
+                : "Importer " + postes.filter((p) => p.selectionne).length + " équipement(s)"}
+            </button>
+          )}
+        </footer>
       </div>
     </div>
   );
 }
 
-function ImportItemTable({ titre, items, onChange, onDelete, onAdd, avecQuantite }) {
+function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQuantite }) {
   return (
-    <div className="import-item-group">
-      <div className="reg-subheading">{titre}</div>
+    <div className={"import-item-group item-section-" + type}>
+      <div className={"reg-subheading reg-subheading-" + type}>
+        <span className="reg-subheading-icon">{type === "materiel" ? "🔧" : "☑"}</span>
+        {titre}
+      </div>
       {items.length === 0 ? (
         <p className="empty-state-description" style={{ margin: "4px 0" }}>
           Aucune ligne.

@@ -98,17 +98,23 @@ matériel et leurs tâches.
 
 Le parseur (`src/lib/parseDevis.js`) reconnaît le modèle de minute de devis
 suivant :
-- une colonne **n°** contenant soit un code de poste (ex : `A.1`, `A.2`),
-  soit un numéro de ligne simple
-- une ligne dont le n° matche `LETTRE.CHIFFRE` (ex : `A.1`) démarre un
-  nouvel équipement régulé — son intitulé (colonne Description) devient son
-  nom par défaut (sans le code, éditable avant import)
-- les lignes suivantes, jusqu'au prochain poste, sont classées
-  automatiquement :
+- une colonne **n°** contenant soit un code hiérarchique (ex : `A`, `A.1`,
+  `A.1.1`), soit un numéro de ligne simple
+- si le fichier n'a qu'un seul niveau de code (ex : uniquement `A.1`, `A.2`…),
+  l'import passe directement à l'aperçu
+- si le fichier a plusieurs niveaux (ex : `A` → `A.1` → `A.1.1`, comme un
+  devis avec bâtiment / équipement / sous-groupe), un écran demande de
+  choisir le niveau qui correspond au nom de l'équipement — les niveaux plus
+  profonds (sous-groupes comme "Fourniture et programmation") sont alors
+  simplement ignorés comme titres, et leur contenu rattaché à l'équipement
+  choisi juste au-dessus
+- sous le niveau choisi, chaque ligne est classée automatiquement :
   - un code renseigné en colonne **Type de FO** → ligne de **matériel**
-  - à défaut, un code en colonne **Type MO** → ligne de **tâche**
+  - un code en colonne **Type MO** → ligne de **tâche**
+  - les deux codes présents sur une même ligne → une ligne de matériel ET
+    une ligne de tâche sont créées
   - une ligne sans Référence/Unité/Quantité/Type de FO/Type MO est un
-    sous-titre indicatif (ex : "AUTOMATE") et n'est pas importée
+    sous-titre indicatif et n'est pas importée
 - les lignes "Totaux pour le poste :" sont ignorées
 
 Avant l'import, chaque équipement détecté peut être renommé, désélectionné,
