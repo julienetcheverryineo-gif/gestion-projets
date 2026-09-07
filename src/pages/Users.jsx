@@ -9,7 +9,8 @@ import { db, auth, getSecondaryAuth } from "../firebase";
 import { useCollection } from "../lib/firestoreHooks";
 
 const ROLES = [
-  { value: "technicien", label: "Technicien" },
+  { value: "automaticien", label: "Automaticien" },
+  { value: "electricien", label: "Électricien" },
   { value: "chef_de_projet", label: "Chef de projet" },
   { value: "admin", label: "Administrateur" },
 ];
@@ -17,17 +18,26 @@ const ROLES = [
 function motDePasseTemporaire() {
   // Jamais communiqué : le compte est créé puis un e-mail de définition de
   // mot de passe est envoyé immédiatement après.
-  return crypto.randomUUID() + "Aa1!";
+  const alea =
+    (typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36)) + "Aa1!";
+  return alea;
 }
 
-function messageErreurFirebase(code) {
+function messageErreurFirebase(err) {
+  const code = err?.code || "inconnu";
   switch (code) {
     case "auth/email-already-in-use":
-      return "Un compte existe déjà avec cet e-mail.";
+      return "Un compte existe déjà avec cet e-mail. (" + code + ")";
     case "auth/invalid-email":
-      return "Adresse e-mail invalide.";
+      return "Adresse e-mail invalide. (" + code + ")";
+    case "auth/operation-not-allowed":
+      return "La connexion par e-mail/mot de passe n'est pas activée dans Firebase Authentication. (" + code + ")";
+    case "auth/network-request-failed":
+      return "Problème réseau, réessayez. (" + code + ")";
     default:
-      return "Une erreur est survenue (" + code + ").";
+      return "Erreur : " + (err?.message || code) + " (" + code + ")";
   }
 }
 
@@ -45,14 +55,15 @@ export default function Users() {
       await sendPasswordResetEmail(auth, u.email);
       setMessageParUtilisateur((m) => ({ ...m, [u.id]: "E-mail envoyé ✓" }));
     } catch (err) {
+      console.error("Erreur réinitialisation mot de passe:", err);
       setMessageParUtilisateur((m) => ({
         ...m,
-        [u.id]: messageErreurFirebase(err.code),
+        [u.id]: messageErreurFirebase(err),
       }));
     }
     setTimeout(() => {
       setMessageParUtilisateur((m) => ({ ...m, [u.id]: undefined }));
-    }, 4000);
+    }, 6000);
   };
 
   return (
@@ -119,7 +130,7 @@ export default function Users() {
 function AddUserModal({ onClose }) {
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("technicien");
+  const [role, setRole] = useState("automaticien");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -128,28 +139,57 @@ function AddUserModal({ onClose }) {
     setErreur("");
     setEnCours(true);
     const secondaryAuth = getSecondaryAuth();
+    let identifiants;
     try {
-      const identifiants = await createUserWithEmailAndPassword(
+      identifiants = await createUserWithEmailAndPassword(
         secondaryAuth,
         email,
         motDePasseTemporaire()
       );
-      await sendPasswordResetEmail(secondaryAuth, email);
-      await signOut(secondaryAuth);
+    } catch (err) {
+      console.error("Erreur création du compte Auth:", err);
+      setErreur(messageErreurFirebase(err));
+      setEnCours(false);
+      return;
+    }
 
+    let avertissement = "";
+    try {
+      await sendPasswordResetEmail(secondaryAuth, email);
+    } catch (err) {
+      console.error("Erreur envoi de l'e-mail d'invitation:", err);
+      avertissement =
+        "Le compte a été créé mais l'e-mail n'a pas pu être envoyé : " +
+        messageErreurFirebase(err) +
+        " — utilisez \"Réinitialiser le mot de passe\" une fois fermé pour réessayer.";
+      setErreur(avertissement);
+    }
+
+    try {
+      await signOut(secondaryAuth);
+    } catch (err) {
+      console.error("Erreur déconnexion instance secondaire:", err);
+    }
+
+    try {
       await setDoc(doc(db, "users", identifiants.user.uid), {
         nom,
         email,
         role,
         creeLe: serverTimestamp(),
       });
-
-      onClose();
     } catch (err) {
-      setErreur(messageErreurFirebase(err.code));
-    } finally {
+      console.error("Erreur création du profil Firestore:", err);
+      setErreur(
+        "Le compte de connexion a été créé, mais le profil n'a pas pu être enregistré : " +
+          messageErreurFirebase(err)
+      );
       setEnCours(false);
+      return;
     }
+
+    setEnCours(false);
+    if (!avertissement) onClose();
   };
 
   return (

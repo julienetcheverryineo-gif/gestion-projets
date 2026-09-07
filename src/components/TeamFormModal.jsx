@@ -8,16 +8,24 @@ export default function TeamFormModal({ chantier, utilisateurs, onClose }) {
     chantier.responsableChantier ?? ""
   );
   const [automaticiens, setAutomaticiens] = useState(chantier.automaticiens ?? []);
-  const [electriciens, setElectriciens] = useState(chantier.electriciens ?? []);
+  const [electriciensTexte, setElectriciensTexte] = useState(
+    (chantier.electriciens ?? []).join(", ")
+  );
   const [enCours, setEnCours] = useState(false);
 
-  const basculer = (liste, setListe, nom) => {
-    setListe(liste.includes(nom) ? liste.filter((n) => n !== nom) : [...liste, nom]);
+  const basculerAutomaticien = (nom) => {
+    setAutomaticiens((liste) =>
+      liste.includes(nom) ? liste.filter((n) => n !== nom) : [...liste, nom]
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setEnCours(true);
+    const electriciens = electriciensTexte
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
     await updateDoc(doc(db, "sites", chantier.id), {
       ra,
       responsableChantier,
@@ -54,7 +62,7 @@ export default function TeamFormModal({ chantier, utilisateurs, onClose }) {
 
           <div>
             <div className="reg-subheading" style={{ marginBottom: 8 }}>
-              Automaticiens
+              Automaticiens (utilisateurs de l'application)
             </div>
             <div className="team-checklist">
               {utilisateurs.map((u) => (
@@ -62,7 +70,7 @@ export default function TeamFormModal({ chantier, utilisateurs, onClose }) {
                   <input
                     type="checkbox"
                     checked={automaticiens.includes(u.nom)}
-                    onChange={() => basculer(automaticiens, setAutomaticiens, u.nom)}
+                    onChange={() => basculerAutomaticien(u.nom)}
                   />
                   {u.nom}
                 </label>
@@ -70,23 +78,15 @@ export default function TeamFormModal({ chantier, utilisateurs, onClose }) {
             </div>
           </div>
 
-          <div>
-            <div className="reg-subheading" style={{ marginBottom: 8 }}>
-              Électriciens
-            </div>
-            <div className="team-checklist">
-              {utilisateurs.map((u) => (
-                <label key={u.id} className="team-checklist-item">
-                  <input
-                    type="checkbox"
-                    checked={electriciens.includes(u.nom)}
-                    onChange={() => basculer(electriciens, setElectriciens, u.nom)}
-                  />
-                  {u.nom}
-                </label>
-              ))}
-            </div>
-          </div>
+          <label>
+            Électriciens (souvent externes, sans compte — noms libres séparés par une
+            virgule)
+            <input
+              value={electriciensTexte}
+              onChange={(e) => setElectriciensTexte(e.target.value)}
+              placeholder="ex : Jean Dupont, Marc Petit"
+            />
+          </label>
 
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>

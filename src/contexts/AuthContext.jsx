@@ -23,11 +23,11 @@ export function AuthProvider({ children }) {
         if (snap.exists()) {
           setProfile({ id: snap.id, ...snap.data() });
         } else {
-          // Premier login : on crée un profil par défaut avec le rôle "technicien"
+          // Premier login : on crée un profil par défaut avec le rôle "automaticien"
           const defaultProfile = {
             email: firebaseUser.email,
             nom: firebaseUser.email.split("@")[0],
-            role: "technicien",
+            role: "automaticien",
             creeLe: serverTimestamp(),
           };
           await setDoc(ref, defaultProfile);

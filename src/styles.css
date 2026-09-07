@@ -169,8 +169,11 @@ a {
 .user-role-dot[data-role="chef_de_projet"] {
   background: var(--accent);
 }
-.user-role-dot[data-role="technicien"] {
+.user-role-dot[data-role="automaticien"] {
   background: var(--ok);
+}
+.user-role-dot[data-role="electricien"] {
+  background: var(--tache);
 }
 
 .user-name {

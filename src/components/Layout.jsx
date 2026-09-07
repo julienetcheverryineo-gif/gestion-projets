@@ -99,8 +99,10 @@ function formatRole(role) {
       return "Administrateur";
     case "chef_de_projet":
       return "Chef de projet";
-    case "technicien":
-      return "Technicien";
+    case "automaticien":
+      return "Automaticien";
+    case "electricien":
+      return "Électricien";
     default:
       return role ?? "";
   }
