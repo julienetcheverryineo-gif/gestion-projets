@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import logoIneo from "../assets/logo-ineo.png";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, compteDesactive } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,6 +56,11 @@ export default function Login() {
           </label>
 
           {erreur && <div className="form-error">{erreur}</div>}
+          {compteDesactive && (
+            <div className="form-error">
+              Ce compte a été désactivé. Contactez votre administrateur.
+            </div>
+          )}
 
           <button type="submit" className="btn-primary" disabled={enCours}>
             {enCours ? "Connexion…" : "Se connecter"}

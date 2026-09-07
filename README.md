@@ -182,6 +182,37 @@ jamais fini de créer son compte).
 projet Firebase (Authentication > Templates > langue), pas de
 l'application elle-même.
 
+## Création d'utilisateurs et gestion des accès
+
+Le service d'e-mail intégré de Firebase (forfait Spark) s'est révélé peu
+fiable (aucune erreur, mais e-mails jamais reçus, y compris avec un serveur
+SMTP externe dont l'IP s'est retrouvée bloquée). L'application ne dépend
+donc plus de l'e-mail pour créer un compte :
+
+- **"+ Ajouter un utilisateur"** (page Utilisateurs) : vous choisissez
+  vous-même le mot de passe (un bouton "Générer" propose un mot de passe
+  simple à dicter à l'oral, du type `Chantier482!`), ou vous le tapez
+  manuellement. Une fois le compte créé, l'écran affiche l'e-mail et le mot
+  de passe à communiquer à la personne (bouton "Copier" disponible).
+- Le bouton **"Envoyer un e-mail de reset"** reste disponible sur chaque
+  utilisateur si vous parvenez à fiabiliser l'envoi d'e-mail plus tard
+  (SMTP personnalisé fonctionnel), mais ce n'est plus le chemin principal.
+
+**Limite technique à connaître** : sans backend (Cloud Functions +
+Admin SDK), l'application ne peut pas changer le mot de passe d'un compte
+*existant* autrement que par e-mail, ni supprimer définitivement un compte
+Firebase Authentication. C'est une limite de Firebase côté client, pas un
+choix arbitraire.
+
+À la place, le bouton **"Désactiver"** sur un utilisateur bloque
+immédiatement son accès : au prochain essai de connexion (ou immédiatement
+s'il est déjà connecté), la personne est déconnectée avec le message
+"Ce compte a été désactivé. Contactez votre administrateur." Le compte
+Firebase existe toujours techniquement, mais personne ne peut plus s'en
+servir — dans les faits, l'effet recherché par une suppression. Le bouton
+"Réactiver" annule cette restriction. Champ Firestore concerné :
+`users/{id}.actif` (`true` par défaut, `false` = bloqué).
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

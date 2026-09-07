@@ -693,6 +693,16 @@ a {
   height: 15px;
 }
 
+.credentials-box {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .export-filtre-checkbox {
   display: flex;
   align-items: center;

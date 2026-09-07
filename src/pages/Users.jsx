@@ -15,14 +15,21 @@ const ROLES = [
   { value: "admin", label: "Administrateur" },
 ];
 
-function motDePasseTemporaire() {
-  // Jamais communiqué : le compte est créé puis un e-mail de définition de
-  // mot de passe est envoyé immédiatement après.
-  const alea =
-    (typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2) + Date.now().toString(36)) + "Aa1!";
-  return alea;
+const MOTS_SIMPLES = [
+  "chantier",
+  "bordeaux",
+  "regulation",
+  "capteur",
+  "gtb",
+  "automate",
+  "sonde",
+  "reseau",
+];
+
+function motDePasseFacileADicter() {
+  const mot = MOTS_SIMPLES[Math.floor(Math.random() * MOTS_SIMPLES.length)];
+  const chiffres = Math.floor(100 + Math.random() * 900);
+  return mot.charAt(0).toUpperCase() + mot.slice(1) + chiffres + "!";
 }
 
 function messageErreurFirebase(err) {
@@ -32,6 +39,8 @@ function messageErreurFirebase(err) {
       return "Un compte existe déjà avec cet e-mail. (" + code + ")";
     case "auth/invalid-email":
       return "Adresse e-mail invalide. (" + code + ")";
+    case "auth/weak-password":
+      return "Mot de passe trop court (6 caractères minimum). (" + code + ")";
     case "auth/operation-not-allowed":
       return "La connexion par e-mail/mot de passe n'est pas activée dans Firebase Authentication. (" + code + ")";
     case "auth/network-request-failed":
@@ -50,16 +59,26 @@ export default function Users() {
     await updateDoc(doc(db, "users", userId), { role });
   };
 
+  const basculerActif = async (u) => {
+    const nouveauStatut = u.actif === false ? true : false;
+    if (
+      !nouveauStatut &&
+      !confirm(
+        u.nom + " sera immédiatement déconnecté(e) et ne pourra plus se connecter. Continuer ?"
+      )
+    ) {
+      return;
+    }
+    await updateDoc(doc(db, "users", u.id), { actif: nouveauStatut });
+  };
+
   const reinitialiserMotDePasse = async (u) => {
     try {
       await sendPasswordResetEmail(auth, u.email);
       setMessageParUtilisateur((m) => ({ ...m, [u.id]: "E-mail envoyé ✓" }));
     } catch (err) {
       console.error("Erreur réinitialisation mot de passe:", err);
-      setMessageParUtilisateur((m) => ({
-        ...m,
-        [u.id]: messageErreurFirebase(err),
-      }));
+      setMessageParUtilisateur((m) => ({ ...m, [u.id]: messageErreurFirebase(err) }));
     }
     setTimeout(() => {
       setMessageParUtilisateur((m) => ({ ...m, [u.id]: undefined }));
@@ -71,7 +90,7 @@ export default function Users() {
       <header className="page-header page-header-actions">
         <div>
           <h1>Utilisateurs</h1>
-          <p className="page-subtitle">Gérez les rôles de l'équipe.</p>
+          <p className="page-subtitle">Gérez les rôles et l'accès de l'équipe.</p>
         </div>
         <button className="btn-primary" onClick={() => setAfficherAjout(true)}>
           + Ajouter un utilisateur
@@ -87,12 +106,13 @@ export default function Users() {
               <th>Nom</th>
               <th>E-mail</th>
               <th>Rôle</th>
+              <th>Statut</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {utilisateurs.map((u) => (
-              <tr key={u.id}>
+              <tr key={u.id} style={{ opacity: u.actif === false ? 0.5 : 1 }}>
                 <td>{u.nom}</td>
                 <td>{u.email}</td>
                 <td>
@@ -108,11 +128,19 @@ export default function Users() {
                   </select>
                 </td>
                 <td>
+                  <button
+                    className={"btn-ghost" + (u.actif === false ? "" : " btn-danger")}
+                    onClick={() => basculerActif(u)}
+                  >
+                    {u.actif === false ? "Réactiver" : "Désactiver"}
+                  </button>
+                </td>
+                <td>
                   {messageParUtilisateur[u.id] ? (
                     <span className="simple-list-meta">{messageParUtilisateur[u.id]}</span>
                   ) : (
                     <button className="btn-ghost" onClick={() => reinitialiserMotDePasse(u)}>
-                      Réinitialiser le mot de passe
+                      Envoyer un e-mail de reset
                     </button>
                   )}
                 </td>
@@ -130,9 +158,18 @@ export default function Users() {
 function AddUserModal({ onClose }) {
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState(motDePasseFacileADicter());
   const [role, setRole] = useState("automaticien");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [succes, setSucces] = useState(false);
+  const [copie, setCopie] = useState(false);
+
+  const copierMotDePasse = async () => {
+    await navigator.clipboard.writeText(password);
+    setCopie(true);
+    setTimeout(() => setCopie(false), 2000);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -141,28 +178,12 @@ function AddUserModal({ onClose }) {
     const secondaryAuth = getSecondaryAuth();
     let identifiants;
     try {
-      identifiants = await createUserWithEmailAndPassword(
-        secondaryAuth,
-        email,
-        motDePasseTemporaire()
-      );
+      identifiants = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     } catch (err) {
       console.error("Erreur création du compte Auth:", err);
       setErreur(messageErreurFirebase(err));
       setEnCours(false);
       return;
-    }
-
-    let avertissement = "";
-    try {
-      await sendPasswordResetEmail(secondaryAuth, email);
-    } catch (err) {
-      console.error("Erreur envoi de l'e-mail d'invitation:", err);
-      avertissement =
-        "Le compte a été créé mais l'e-mail n'a pas pu être envoyé : " +
-        messageErreurFirebase(err) +
-        " — utilisez \"Réinitialiser le mot de passe\" une fois fermé pour réessayer.";
-      setErreur(avertissement);
     }
 
     try {
@@ -176,6 +197,7 @@ function AddUserModal({ onClose }) {
         nom,
         email,
         role,
+        actif: true,
         creeLe: serverTimestamp(),
       });
     } catch (err) {
@@ -189,16 +211,52 @@ function AddUserModal({ onClose }) {
     }
 
     setEnCours(false);
-    if (!avertissement) onClose();
+    setSucces(true);
   };
+
+  if (succes) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <h2>Compte créé ✓</h2>
+          <p className="empty-state-description" style={{ margin: "0 0 14px" }}>
+            Communiquez ces identifiants à {nom} à l'oral ou par un canal de votre choix.
+          </p>
+          <div className="credentials-box">
+            <div>
+              <span className="simple-list-meta">E-mail</span>
+              <div>{email}</div>
+            </div>
+            <div>
+              <span className="simple-list-meta">Mot de passe</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <strong style={{ fontFamily: "var(--font-mono)" }}>{password}</strong>
+                <button type="button" className="btn-ghost" onClick={copierMotDePasse}>
+                  {copie ? "Copié !" : "Copier"}
+                </button>
+              </div>
+            </div>
+          </div>
+          <p className="empty-state-description" style={{ margin: "14px 0 0" }}>
+            La personne pourra changer ce mot de passe elle-même plus tard si besoin.
+          </p>
+          <div className="modal-actions">
+            <button className="btn-primary" onClick={onClose}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Nouvel utilisateur</h2>
         <p className="empty-state-description" style={{ margin: "0 0 14px" }}>
-          Un e-mail sera envoyé à la personne pour qu'elle définisse elle-même son mot de
-          passe.
+          Vous définissez le mot de passe et le communiquez vous-même à la personne
+          (oralement, par exemple) — plus fiable que l'envoi automatique par e-mail.
         </p>
         <form onSubmit={handleSubmit} className="form">
           <label>
@@ -213,6 +271,25 @@ function AddUserModal({ onClose }) {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+          </label>
+          <label>
+            Mot de passe
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+                required
+                style={{ flex: 1, fontFamily: "var(--font-mono)" }}
+              />
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setPassword(motDePasseFacileADicter())}
+              >
+                Générer
+              </button>
+            </div>
           </label>
           <label>
             Rôle
@@ -230,7 +307,7 @@ function AddUserModal({ onClose }) {
               Annuler
             </button>
             <button type="submit" className="btn-primary" disabled={enCours}>
-              {enCours ? "Création…" : "Créer et envoyer l'invitation"}
+              {enCours ? "Création…" : "Créer le compte"}
             </button>
           </div>
         </form>
