@@ -185,7 +185,8 @@ a {
 .main-content {
   flex: 1;
   padding: 32px 40px;
-  max-width: 1320px;
+  max-width: none;
+  width: 100%;
 }
 
 /* ---------- Buttons ---------- */
