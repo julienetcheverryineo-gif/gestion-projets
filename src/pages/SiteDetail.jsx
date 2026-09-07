@@ -12,6 +12,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import { formatStatut } from "./Sites";
+import ImportDevisModal from "../components/ImportDevisModal";
 
 const STATUTS_EQUIPEMENT = [
   { value: "a_faire", label: "À installer" },
@@ -40,6 +41,7 @@ export default function SiteDetail() {
   const [lotSelectionne, setLotSelectionne] = useState(null);
   const [afficherRapport, setAfficherRapport] = useState(false);
   const [afficherTempsForm, setAfficherTempsForm] = useState(false);
+  const [afficherImport, setAfficherImport] = useState(false);
 
   const supprimerLot = async (lotId) => {
     if (!confirm("Supprimer ce lot et ses équipements ?")) return;
@@ -80,15 +82,20 @@ export default function SiteDetail() {
         <div className="panel-header">
           <h2>Lots techniques</h2>
           {peutGerer && (
-            <button
-              className="btn-ghost"
-              onClick={() => {
-                setLotSelectionne(null);
-                setAfficherLotForm(true);
-              }}
-            >
-              + Ajouter un lot
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-ghost" onClick={() => setAfficherImport(true)}>
+                Importer une minute de devis
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  setLotSelectionne(null);
+                  setAfficherLotForm(true);
+                }}
+              >
+                + Ajouter un lot
+              </button>
+            </div>
           )}
         </div>
 
@@ -118,6 +125,13 @@ export default function SiteDetail() {
           </div>
         )}
       </section>
+
+      {afficherImport && (
+        <ImportDevisModal
+          chantierId={chantierId}
+          onClose={() => setAfficherImport(false)}
+        />
+      )}
 
       {afficherLotForm && (
         <LotFormModal
@@ -215,6 +229,7 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
               <thead>
                 <tr>
                   <th>Désignation</th>
+                  <th>Qté</th>
                   <th>Statut</th>
                   <th>Remarque</th>
                   <th></th>
@@ -224,6 +239,9 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
                 {equipements.map((equip) => (
                   <tr key={equip.id}>
                     <td style={{ fontFamily: "var(--font-ui)" }}>{equip.designation}</td>
+                    <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                      {equip.quantite ? equip.quantite + " " + (equip.unite || "") : "—"}
+                    </td>
                     <td>
                       <select
                         value={equip.statut}
@@ -312,6 +330,8 @@ function LotFormModal({ chantierId, lot, onClose }) {
 
 function EquipmentFormModal({ lotId, onClose }) {
   const [designation, setDesignation] = useState("");
+  const [quantite, setQuantite] = useState("");
+  const [unite, setUnite] = useState("");
   const [remarque, setRemarque] = useState("");
   const [enCours, setEnCours] = useState(false);
 
@@ -321,6 +341,8 @@ function EquipmentFormModal({ lotId, onClose }) {
     await addDoc(collection(db, "equipments"), {
       designation,
       remarque,
+      quantite: quantite ? Number(quantite) : 0,
+      unite,
       lotId,
       statut: "a_faire",
       creeLe: serverTimestamp(),
@@ -343,6 +365,25 @@ function EquipmentFormModal({ lotId, onClose }) {
               required
             />
           </label>
+          <div className="form-inline">
+            <label>
+              Quantité
+              <input
+                type="number"
+                min="0"
+                value={quantite}
+                onChange={(e) => setQuantite(e.target.value)}
+              />
+            </label>
+            <label>
+              Unité
+              <input
+                value={unite}
+                onChange={(e) => setUnite(e.target.value)}
+                placeholder="u, Ens…"
+              />
+            </label>
+          </div>
           <label>
             Remarque
             <input value={remarque} onChange={(e) => setRemarque(e.target.value)} />

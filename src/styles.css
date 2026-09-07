@@ -560,6 +560,73 @@ a {
   border-color: var(--accent);
 }
 
+/* ---------- Import devis ---------- */
+.import-drop {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.import-poste-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.import-poste-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.import-poste-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.import-checkbox input {
+  width: 16px;
+  height: 16px;
+}
+
+.import-poste-code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.import-poste-nom {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-item-list {
+  list-style: none;
+  margin: 10px 0 2px;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+.import-item-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.import-item-titre {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+}
+
 /* ---------- Kanban ---------- */
 .kanban-board {
   display: grid;

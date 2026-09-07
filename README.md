@@ -71,7 +71,7 @@ sans barre d'adresse, comme une app native.
 - `sites` (chantiers) : `nom`, `client`, `adresse`, `statut`
 - `lots` (lots techniques, ex CVC/Éclairage/GTB) : `nom`, `chantierId`
 - `equipments` (équipements/points par lot) : `designation`, `remarque`,
-  `lotId`, `statut` (`a_faire` / `installe` / `configure` / `teste`)
+  `unite`, `quantite`, `lotId`, `statut` (`a_faire` / `installe` / `configure` / `teste`)
 - `tasks` : `titre`, `chantierId`, `assigneA`, `echeance`, `statut`
   (`a_faire` / `en_cours` / `termine`)
 - `timeEntries` : `userId`, `userNom`, `chantierId`, `lotId`, `duree`, `date`
@@ -79,6 +79,31 @@ sans barre d'adresse, comme une app native.
 Le compte-rendu client (bouton "Générer un compte-rendu" sur la page d'un
 chantier) est calculé à la volée à partir des lots et équipements — rien
 n'est stocké séparément pour ça.
+
+## Import d'une minute de devis
+
+Sur la page d'un chantier, le bouton **"Importer une minute de devis"**
+permet de charger un fichier Excel (.xlsx) et de créer automatiquement les
+lots techniques et leurs équipements.
+
+Le parseur (`src/lib/parseDevis.js`) reconnaît le modèle de minute de devis
+suivant :
+- une colonne **n°** contenant soit un code de poste (ex : `A.1`, `A.2`),
+  soit un numéro de ligne simple
+- une ligne dont le n° matche `LETTRE.CHIFFRE` (ex : `A.1`) démarre un
+  nouveau poste — son intitulé (colonne Description) devient le nom du lot
+- les lignes suivantes, jusqu'au prochain poste, sont son matériel/ses
+  tâches : chaque ligne avec une Référence, une Unité ou une Quantité
+  devient un équipement ; une ligne sans ces trois informations est traitée
+  comme un sous-titre indicatif (ex : "AUTOMATE", "PROGRAMMATION") et n'est
+  pas importée comme équipement
+- les lignes "Totaux pour le poste :" sont ignorées
+
+Si un autre modèle de devis est utilisé (colonnes dans un ordre différent),
+le parseur détecte les colonnes par leur intitulé et devrait s'adapter tant
+que les en-têtes gardent des noms proches (n°, Référence, Description,
+Unité, Qté). Si la détection échoue, un message d'erreur explicite s'affiche
+plutôt qu'un import silencieusement faux.
 
 ## Prochaines étapes possibles
 
