@@ -130,21 +130,22 @@ export default function ImportDevisModal({ chantierId, onClose }) {
   };
 
   return (
-    <div className="import-fullscreen">
-      <header className="import-fullscreen-header">
-        <div>
-          <h2>Importer une minute de devis</h2>
-          {postes && (
-            <p className="page-subtitle">
-              {nomFichier} — {postes.length} équipement(s) détecté(s), {nbItemsSelectionnes}{" "}
-              ligne(s) sélectionnée(s)
-            </p>
-          )}
-        </div>
-        <button className="btn-ghost" onClick={onClose} aria-label="Fermer">
-          Fermer ✕
-        </button>
-      </header>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="import-popup" onClick={(e) => e.stopPropagation()}>
+        <header className="import-fullscreen-header">
+          <div>
+            <h2>Importer une minute de devis</h2>
+            {postes && (
+              <p className="page-subtitle">
+                {nomFichier} — {postes.length} équipement(s) détecté(s), {nbItemsSelectionnes}{" "}
+                ligne(s) sélectionnée(s)
+              </p>
+            )}
+          </div>
+          <button className="btn-ghost" onClick={onClose} aria-label="Fermer">
+            Fermer ✕
+          </button>
+        </header>
 
       <div className="import-fullscreen-body">
         {!postes && (
@@ -247,6 +248,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
           </button>
         )}
       </footer>
+      </div>
     </div>
   );
 }
