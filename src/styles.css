@@ -730,6 +730,18 @@ a {
   overflow: hidden;
 }
 
+.chat-notif-banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--accent-dim);
+  border-bottom: 1px solid var(--accent);
+  font-size: 0.82rem;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -781,11 +793,31 @@ a {
   margin-bottom: 4px;
 }
 
+.chat-bubble-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .chat-bubble-heure {
   font-size: 0.68rem;
   color: var(--text-muted);
-  text-align: right;
-  margin-top: 2px;
+}
+
+.chat-bubble-delete {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.68rem;
+  color: var(--danger);
+  cursor: pointer;
+  opacity: 0.7;
+}
+.chat-bubble-delete:hover {
+  opacity: 1;
+  text-decoration: underline;
 }
 
 .chat-input-bar {

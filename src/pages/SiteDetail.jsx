@@ -14,7 +14,6 @@ import { useCollection } from "../lib/firestoreHooks";
 import { formatStatut } from "./Sites";
 import ImportDevisModal from "../components/ImportDevisModal";
 import TeamFormModal from "../components/TeamFormModal";
-import ChatPanel from "../components/ChatPanel";
 
 const STATUTS_MATERIEL = [
   { value: "a_faire", label: "À installer" },
@@ -60,7 +59,6 @@ export default function SiteDetail() {
   const [afficherTempsForm, setAfficherTempsForm] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
   const [afficherEquipeForm, setAfficherEquipeForm] = useState(false);
-  const [ongletActif, setOngletActif] = useState("equipements");
 
   const supprimerLot = async (lotId) => {
     if (!confirm("Supprimer ce lot et ses équipements ?")) return;
@@ -127,25 +125,6 @@ export default function SiteDetail() {
         </div>
       </header>
 
-      <div className="page-tabs">
-        <button
-          className={"page-tab" + (ongletActif === "equipements" ? " page-tab-active" : "")}
-          onClick={() => setOngletActif("equipements")}
-        >
-          Équipements
-        </button>
-        <button
-          className={"page-tab" + (ongletActif === "chat" ? " page-tab-active" : "")}
-          onClick={() => setOngletActif("chat")}
-        >
-          Chat
-        </button>
-      </div>
-
-      {ongletActif === "chat" && <ChatPanel chantierId={chantierId} />}
-
-      {ongletActif === "equipements" && (
-        <>
       {/* ---------------- Équipements régulés ---------------- */}
       <section className="panel">
         <div className="panel-header">
@@ -242,8 +221,6 @@ export default function SiteDetail() {
           </div>
         )}
       </section>
-        </>
-      )}
 
       {afficherEquipeForm && (
         <TeamFormModal

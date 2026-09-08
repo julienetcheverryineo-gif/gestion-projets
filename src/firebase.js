@@ -2,6 +2,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 // Config du projet Firebase "appli-service".
@@ -39,3 +40,17 @@ export function getSecondaryAuth() {
   const appSecondaire = getApps().find((a) => a.name === nom) ?? initializeApp(firebaseConfig, nom);
   return getAuth(appSecondaire);
 }
+
+// Notifications push (Firebase Cloud Messaging) : pas supporté partout
+// (ex: anciens Safari), donc toujours vérifier avant utilisation.
+export async function getMessagingSafe() {
+  if (await isMessagingSupported()) {
+    return getMessaging(app);
+  }
+  return null;
+}
+
+// À remplacer par la vraie clé, disponible dans la console Firebase :
+// Paramètres du projet > Cloud Messaging > Certificats Web Push >
+// "Générer une paire de clés".
+export const VAPID_KEY = "REMPLACER_PAR_VOTRE_CLE_VAPID";

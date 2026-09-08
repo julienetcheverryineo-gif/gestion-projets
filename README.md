@@ -236,6 +236,43 @@ Sans ces deux étapes, l'onglet Chat affichera une erreur de permissions,
 comme pour les autres fonctionnalités qui ont nécessité une mise à jour des
 règles jusqu'ici.
 
+## Notifications push (nouveaux messages de chat)
+
+Quand un nouveau message est posté dans le chat d'un chantier, une
+notification push est envoyée aux membres de l'équipe de ce chantier (RA,
+responsable, automaticiens — ceux qui ont un compte dans l'application),
+sauf à l'auteur du message. Fonctionne aussi app fermée (notification
+système), à condition que l'app soit installée sur l'écran d'accueil.
+
+**Architecture** : Cloud Function (`functions/index.js`) déclenchée à
+chaque création de document dans `messages`, qui envoie le push via Firebase
+Cloud Messaging (FCM) aux jetons enregistrés des personnes concernées.
+Côté navigateur, `src/lib/notifications.js` gère la demande de permission et
+l'enregistrement du jeton (`users/{id}.fcmTokens`), et
+`public/firebase-messaging-sw.js` reçoit les notifications quand l'app n'est
+pas au premier plan.
+
+**Réglages obligatoires côté Firebase avant que ça fonctionne :**
+
+1. **Passer le projet en forfait Blaze** (paiement à l'usage) : Console
+   Firebase → roue crantée → "Modifier le forfait" → Blaze. Les Cloud
+   Functions ne fonctionnent pas sur le forfait gratuit Spark. Le quota
+   gratuit inclus dans Blaze est largement suffisant pour ce volume d'usage
+   (coût réel proche de zéro).
+2. **Générer la clé VAPID** : Console Firebase → roue crantée → Paramètres
+   du projet → onglet "Cloud Messaging" → section "Certificats Web Push" →
+   "Générer une paire de clés". Copiez la clé générée dans
+   `src/firebase.js`, à la place de `REMPLACER_PAR_VOTRE_CLE_VAPID`
+   (constante `VAPID_KEY`), puis redéployez.
+3. Le déploiement de la Cloud Function se fait automatiquement via le
+   workflow GitHub Actions (nouvelle étape ajoutée), en même temps que
+   l'hébergement — pas d'action manuelle supplémentaire une fois Blaze
+   activé.
+
+**Utilisation** : dans l'onglet Chat d'un chantier, une bannière "🔔
+Activer" propose d'activer les notifications sur l'appareil en cours —
+chaque utilisateur doit le faire une fois par appareil (PC, iPhone…).
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
