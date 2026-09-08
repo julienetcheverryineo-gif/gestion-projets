@@ -27,9 +27,23 @@ export default function ChatPanel({ chantierId }) {
       where("chantierId", "==", chantierId),
       orderBy("creeLe", "asc")
     );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setErreur("");
+      },
+      (err) => {
+        console.error("Erreur chargement des messages:", err);
+        setErreur(
+          "Impossible de charger les messages : " +
+            err.message +
+            (err.code === "failed-precondition"
+              ? " — un index Firestore doit être créé (voir la console développeur F12 pour le lien direct)."
+              : "")
+        );
+      }
+    );
     return unsubscribe;
   }, [chantierId]);
 
