@@ -21,7 +21,20 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     try {
       const buffer = await fichier.arrayBuffer();
       const resultat = analyserClasseur(buffer);
-      if (resultat.niveaux.length === 0) {
+      if (resultat.postesDirects) {
+        // Format sans codes lettrés : chaque poste est déjà déterminé sans
+        // ambiguïté par les lignes "Totaux pour le poste :", pas besoin de
+        // choisir un niveau.
+        if (resultat.postesDirects.length === 0) {
+          setErreur(
+            "Aucun équipement détecté dans ce fichier. Vérifiez qu'il suit bien le même modèle de minute de devis (colonnes n°, Référence, Description, Unité, Qté, Type de FO, Type MO)."
+          );
+          setAnalyse(null);
+        } else {
+          afficherPostes(resultat.postesDirects);
+          setAnalyse(resultat);
+        }
+      } else if (resultat.niveaux.length === 0) {
         setErreur(
           "Aucun équipement détecté dans ce fichier. Vérifiez qu'il suit bien le même modèle de minute de devis (colonnes n°, Référence, Description, Unité, Qté, Type de FO, Type MO)."
         );
@@ -41,8 +54,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     }
   };
 
-  const genererPostes = (resultat, profondeur) => {
-    const detectes = grouperParProfondeur(resultat.sequence, profondeur);
+  const afficherPostes = (detectes) => {
     setPostes(
       detectes.map((p) => ({
         ...p,
@@ -52,6 +64,10 @@ export default function ImportDevisModal({ chantierId, onClose }) {
       }))
     );
     setPosteOuvert(0);
+  };
+
+  const genererPostes = (resultat, profondeur) => {
+    afficherPostes(grouperParProfondeur(resultat.sequence, profondeur));
   };
 
   const multiplierQuantites = (index) => {

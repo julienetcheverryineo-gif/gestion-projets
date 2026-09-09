@@ -108,6 +108,16 @@ suivant :
   profonds (sous-groupes comme "Fourniture et programmation") sont alors
   simplement ignorés comme titres, et leur contenu rattaché à l'équipement
   choisi juste au-dessus
+- **si le fichier n'a aucun code lettré du tout** (juste des numéros de
+  ligne simples), les équipements sont détectés autrement : chaque poste est
+  délimité par une ligne "Totaux pour le poste :", et nommé par la ou les
+  lignes-titres (sans numéro) qui le précèdent directement. Comme le nombre
+  de niveaux de titre peut varier d'un poste à l'autre dans un même fichier
+  (parfois 1, parfois 2), chaque poste est construit directement à partir de
+  ses propres titres plutôt que par un niveau unique choisi globalement —
+  ça évite de mélanger le matériel de deux postes voisins de profondeurs
+  différentes. Dans ce cas, l'écran de choix de niveau est sauté
+  automatiquement.
 - le nom proposé pour chaque équipement combine tous les niveaux parents
   jusqu'au niveau choisi (ex : "B3600 - Sous-station" si le niveau choisi est
   le 2ᵉ) — modifiable avant import
