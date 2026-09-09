@@ -132,6 +132,11 @@ suivant :
     une ligne de tâche sont créées
   - une ligne sans Référence/Unité/Quantité/Type de FO/Type MO est un
     sous-titre indicatif et n'est pas importée
+  - pour le matériel, si une **Référence** est renseignée dans le devis,
+    elle devient la désignation principale (plus lisible/exploitable qu'une
+    description générique, ex : "ECY-16DI") — la description d'origine du
+    devis part alors en remarque. Sans référence, la description reste la
+    désignation.
 - les lignes "Totaux pour le poste :" sont ignorées
 
 Avant l'import, chaque équipement détecté peut être renommé, désélectionné,

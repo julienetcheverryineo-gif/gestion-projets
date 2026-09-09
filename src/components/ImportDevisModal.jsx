@@ -176,7 +176,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
             regEquipementId: regRef.id,
             type: item.type,
             designation: item.designation,
-            remarque: [item.reference, item.detail].filter(Boolean).join(" — "),
+            remarque: item.detail || "",
             unite: item.unite || "",
             quantite: item.quantite || 0,
             statut: "a_faire",

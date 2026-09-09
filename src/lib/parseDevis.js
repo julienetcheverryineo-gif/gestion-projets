@@ -49,7 +49,7 @@ function construireLignesArticle(donnees, compteurRef) {
 
   const designationBrute = description || nomArticle;
   if (!designationBrute) return [];
-  const [designation, ...resteDescription] = designationBrute
+  const [designationOrigine, ...resteDescription] = designationBrute
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
@@ -57,8 +57,20 @@ function construireLignesArticle(donnees, compteurRef) {
   const estSousTitre = !reference && !unite && !quantite && !typeFo && !typeMo;
   if (estSousTitre) return []; // sous-section informative (ex: "AUTOMATE")
 
-  const detail = resteDescription.join(" ").slice(0, 200);
+  const detailOrigine = resteDescription.join(" ").slice(0, 200);
   const resultats = [];
+
+  // Pour du matériel : la référence (ex: "ECY-16DI") est plus utile comme
+  // désignation principale que la description générique du devis. Quand
+  // elle existe, on l'utilise comme désignation et on relègue la
+  // description d'origine en remarque (detail).
+  const champsMateriel = () =>
+    reference
+      ? {
+          designation: reference,
+          detail: [designationOrigine, detailOrigine].filter(Boolean).join(" — "),
+        }
+      : { designation: designationOrigine, detail: detailOrigine };
 
   if (typeFo) {
     compteurRef.n += 1;
@@ -66,11 +78,10 @@ function construireLignesArticle(donnees, compteurRef) {
       estCode: false,
       id: "tmp-" + compteurRef.n,
       type: "materiel",
-      designation,
+      ...champsMateriel(),
       reference,
       unite,
       quantite,
-      detail,
     });
   }
   if (typeMo) {
@@ -79,7 +90,7 @@ function construireLignesArticle(donnees, compteurRef) {
       estCode: false,
       id: "tmp-" + compteurRef.n,
       type: "tache",
-      designation,
+      designation: designationOrigine,
       reference: "",
       unite: "",
       quantite: 0,
@@ -87,15 +98,17 @@ function construireLignesArticle(donnees, compteurRef) {
     });
   } else if (!typeFo) {
     compteurRef.n += 1;
+    const estMateriel = Boolean(reference);
     resultats.push({
       estCode: false,
       id: "tmp-" + compteurRef.n,
-      type: reference ? "materiel" : "tache",
-      designation,
+      type: estMateriel ? "materiel" : "tache",
+      ...(estMateriel
+        ? champsMateriel()
+        : { designation: designationOrigine, detail: detailOrigine }),
       reference,
       unite,
       quantite,
-      detail,
     });
   }
 
