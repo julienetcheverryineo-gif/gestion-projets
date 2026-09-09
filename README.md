@@ -288,6 +288,20 @@ pas au premier plan.
 Activer" propose d'activer les notifications sur l'appareil en cours —
 chaque utilisateur doit le faire une fois par appareil (PC, iPhone…).
 
+## Suppression de chantier et données orphelines
+
+Supprimer un chantier (page Chantiers) supprime maintenant aussi tout ce qui
+lui est rattaché : équipements régulés et leur matériel/tâches, autres lots
+techniques et leurs équipements, tâches Kanban, temps passé. Avant cette
+correction, seul le chantier était supprimé et le reste restait orphelin en
+base — ce qui le faisait par exemple réapparaître dans l'export matériel
+achats.
+
+Le bouton **"Nettoyer les données orphelines"** (page Chantiers) répare les
+suppressions faites avant ce correctif : il recherche tout matériel, lot,
+tâche ou temps passé rattaché à un chantier qui n'existe plus, et propose de
+les supprimer définitivement après confirmation.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

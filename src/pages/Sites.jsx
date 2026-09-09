@@ -24,15 +24,107 @@ export default function Sites() {
   const peutGerer = isAdmin || isChefDeProjet;
   const { documents: chantiers, chargement } = useCollection("sites");
   const { documents: lots } = useCollection("lots");
+  const { documents: equipements } = useCollection("equipments");
   const { documents: regEquipements } = useCollection("regequipements");
   const { documents: regItems } = useCollection("regitems");
+  const { documents: taches } = useCollection("tasks");
+  const { documents: tempsEntries } = useCollection("timeEntries");
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [seulementNonInstalle, setSeulementNonInstalle] = useState(true);
+  const [nettoyageEnCours, setNettoyageEnCours] = useState(false);
+  const [messageNettoyage, setMessageNettoyage] = useState("");
 
   const supprimer = async (id) => {
-    if (!confirm("Supprimer ce chantier ? Les lots et équipements associés resteront orphelins.")) return;
+    if (
+      !confirm(
+        "Supprimer ce chantier ? Son matériel, ses équipements, ses tâches et son temps passé seront aussi supprimés définitivement."
+      )
+    )
+      return;
+
+    const regEquipementsDuChantier = regEquipements.filter((r) => r.chantierId === id);
+    const regEquipementIds = regEquipementsDuChantier.map((r) => r.id);
+    const regItemsDuChantier = regItems.filter((it) =>
+      regEquipementIds.includes(it.regEquipementId)
+    );
+
+    const lotsDuChantier = lots.filter((l) => l.chantierId === id);
+    const lotIds = lotsDuChantier.map((l) => l.id);
+    const equipementsDuChantier = equipements.filter((e) => lotIds.includes(e.lotId));
+
+    const tachesDuChantier = taches.filter((t) => t.chantierId === id);
+    const tempsDuChantier = tempsEntries.filter((t) => t.chantierId === id);
+
+    await Promise.all([
+      ...regItemsDuChantier.map((it) => deleteDoc(doc(db, "regitems", it.id))),
+      ...regEquipementsDuChantier.map((r) => deleteDoc(doc(db, "regequipements", r.id))),
+      ...equipementsDuChantier.map((e) => deleteDoc(doc(db, "equipments", e.id))),
+      ...lotsDuChantier.map((l) => deleteDoc(doc(db, "lots", l.id))),
+      ...tachesDuChantier.map((t) => deleteDoc(doc(db, "tasks", t.id))),
+      ...tempsDuChantier.map((t) => deleteDoc(doc(db, "timeEntries", t.id))),
+    ]);
     await deleteDoc(doc(db, "sites", id));
+  };
+
+  const nettoyerDonneesOrphelines = async () => {
+    const idsChantiers = new Set(chantiers.map((c) => c.id));
+
+    const regEquipementsOrphelins = regEquipements.filter(
+      (r) => !idsChantiers.has(r.chantierId)
+    );
+    const idsRegEquipementsOrphelins = new Set(regEquipementsOrphelins.map((r) => r.id));
+    const regItemsOrphelins = regItems.filter(
+      (it) =>
+        idsRegEquipementsOrphelins.has(it.regEquipementId) ||
+        !regEquipements.some((r) => r.id === it.regEquipementId)
+    );
+
+    const lotsOrphelins = lots.filter((l) => !idsChantiers.has(l.chantierId));
+    const idsLotsOrphelins = new Set(lotsOrphelins.map((l) => l.id));
+    const equipementsOrphelins = equipements.filter(
+      (e) => idsLotsOrphelins.has(e.lotId) || !lots.some((l) => l.id === e.lotId)
+    );
+
+    const tachesOrphelines = taches.filter((t) => t.chantierId && !idsChantiers.has(t.chantierId));
+    const tempsOrphelins = tempsEntries.filter(
+      (t) => t.chantierId && !idsChantiers.has(t.chantierId)
+    );
+
+    const total =
+      regEquipementsOrphelins.length +
+      regItemsOrphelins.length +
+      lotsOrphelins.length +
+      equipementsOrphelins.length +
+      tachesOrphelines.length +
+      tempsOrphelins.length;
+
+    if (total === 0) {
+      setMessageNettoyage("Aucune donnée orpheline trouvée — tout est déjà propre.");
+      setTimeout(() => setMessageNettoyage(""), 4000);
+      return;
+    }
+
+    if (
+      !confirm(
+        total +
+          " élément(s) orphelin(s) trouvé(s) (matériel/tâches/temps liés à des chantiers déjà supprimés). Les supprimer définitivement ?"
+      )
+    )
+      return;
+
+    setNettoyageEnCours(true);
+    await Promise.all([
+      ...regItemsOrphelins.map((it) => deleteDoc(doc(db, "regitems", it.id))),
+      ...regEquipementsOrphelins.map((r) => deleteDoc(doc(db, "regequipements", r.id))),
+      ...equipementsOrphelins.map((e) => deleteDoc(doc(db, "equipments", e.id))),
+      ...lotsOrphelins.map((l) => deleteDoc(doc(db, "lots", l.id))),
+      ...tachesOrphelines.map((t) => deleteDoc(doc(db, "tasks", t.id))),
+      ...tempsOrphelins.map((t) => deleteDoc(doc(db, "timeEntries", t.id))),
+    ]);
+    setNettoyageEnCours(false);
+    setMessageNettoyage(total + " élément(s) orphelin(s) supprimé(s).");
+    setTimeout(() => setMessageNettoyage(""), 5000);
   };
 
   const avancement = (chantierId) => {
@@ -53,6 +145,15 @@ export default function Sites() {
         </div>
         <div className="header-actions-stack">
           <div className="header-actions-row">
+            {peutGerer && (
+              <button
+                className="btn-ghost"
+                onClick={nettoyerDonneesOrphelines}
+                disabled={nettoyageEnCours}
+              >
+                {nettoyageEnCours ? "Nettoyage…" : "Nettoyer les données orphelines"}
+              </button>
+            )}
             {peutGerer && (
               <button
                 className="btn-ghost"
@@ -80,6 +181,11 @@ export default function Sites() {
               </button>
             )}
           </div>
+          {messageNettoyage && (
+            <div className="simple-list-meta" style={{ textAlign: "right" }}>
+              {messageNettoyage}
+            </div>
+          )}
           {peutGerer && (
             <label className="export-filtre-checkbox">
               <input
