@@ -5,15 +5,41 @@ import { useCollection } from "../lib/firestoreHooks";
 export default function Workload() {
   const { documents: taches, chargement } = useCollection("tasks");
   const { documents: chantiers } = useCollection("sites");
+  const { documents: regItems } = useCollection("regitems");
+  const { documents: regEquipements } = useCollection("regequipements");
   const [inclureTerminees, setInclureTerminees] = useState(false);
   const [personneOuverte, setPersonneOuverte] = useState(null);
 
   const nomChantier = (id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter";
   const compteChantier = (id) => chantiers.find((c) => c.id === id)?.compte ?? "";
 
+  const tachesRegitems = useMemo(
+    () =>
+      regItems
+        .filter((it) => it.type === "tache")
+        .map((it) => {
+          const equip = regEquipements.find((r) => r.id === it.regEquipementId);
+          return {
+            id: it.id,
+            titre: it.designation + " (" + (equip?.nom ?? "?") + ")",
+            chantierId: equip?.chantierId ?? null,
+            assigneA: it.assigneA || null,
+            heuresPrevues: null,
+            echeance: null,
+            statut: it.statut === "fait" ? "termine" : "a_faire",
+          };
+        }),
+    [regItems, regEquipements]
+  );
+
+  const toutesLesTaches = useMemo(
+    () => [...taches, ...tachesRegitems],
+    [taches, tachesRegitems]
+  );
+
   const tachesRetenues = useMemo(
-    () => taches.filter((t) => inclureTerminees || t.statut !== "termine"),
-    [taches, inclureTerminees]
+    () => toutesLesTaches.filter((t) => inclureTerminees || t.statut !== "termine"),
+    [toutesLesTaches, inclureTerminees]
   );
 
   const parPersonne = useMemo(() => {

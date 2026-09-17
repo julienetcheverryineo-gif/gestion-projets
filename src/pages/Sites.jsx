@@ -30,6 +30,7 @@ export default function Sites() {
   const { documents: regItems } = useCollection("regitems");
   const { documents: taches } = useCollection("tasks");
   const { documents: tempsEntries } = useCollection("timeEntries");
+  const { documents: utilisateurs } = useCollection("users", "email");
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [seulementNonInstalle, setSeulementNonInstalle] = useState(true);
@@ -259,6 +260,7 @@ export default function Sites() {
       {afficherImportSuivi && (
         <ImportSuiviModal
           chantiersExistants={chantiers}
+          utilisateurs={utilisateurs}
           onClose={() => setAfficherImportSuivi(false)}
         />
       )}

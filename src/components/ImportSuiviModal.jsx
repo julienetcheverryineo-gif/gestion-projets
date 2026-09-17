@@ -3,8 +3,9 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { parseSuiviChantiers } from "../lib/parseSuiviChantiers";
 
-export default function ImportSuiviModal({ chantiersExistants, onClose }) {
+export default function ImportSuiviModal({ chantiersExistants, utilisateurs, onClose }) {
   const [chantiers, setChantiers] = useState(null);
+  const [nonApparies, setNonApparies] = useState([]);
   const [nomFichier, setNomFichier] = useState("");
   const [erreur, setErreur] = useState("");
   const [enLecture, setEnLecture] = useState(false);
@@ -22,12 +23,16 @@ export default function ImportSuiviModal({ chantiersExistants, onClose }) {
     setNomFichier(fichier.name);
     try {
       const buffer = await fichier.arrayBuffer();
-      const detectes = parseSuiviChantiers(buffer);
+      const { chantiers: detectes, nonApparies: manquants } = parseSuiviChantiers(
+        buffer,
+        utilisateurs
+      );
       if (detectes.length === 0) {
         setErreur("Aucun chantier avec des tâches détecté dans ce fichier.");
         setChantiers(null);
       } else {
         setChantiers(detectes);
+        setNonApparies(manquants);
       }
     } catch (err) {
       setErreur("Impossible de lire ce fichier : " + err.message);
@@ -153,6 +158,13 @@ export default function ImportSuiviModal({ chantiersExistants, onClose }) {
               </label>
               {enLecture && <p className="page-loading">Analyse du fichier…</p>}
               {erreur && <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>}
+            </div>
+          )}
+
+          {chantiers && nonApparies.length > 0 && (
+            <div className="form-error" style={{ marginBottom: 16 }}>
+              Ces noms du fichier ne correspondent à aucun compte de l'application (repris
+              tels quels, à corriger manuellement après import) : {nonApparies.join(", ")}
             </div>
           )}
 

@@ -16,10 +16,50 @@ function formaterDate(valeur) {
   return null; // dates textuelles ("31/12/2026") ignorées : trop peu fiables à parser
 }
 
+// Lit la feuille "Referentiel" (Nom court utilisé dans les onglets client +
+// Mail) et construit une correspondance nom court -> e-mail.
+function extraireReferentiel(workbook) {
+  const map = new Map();
+  const nomFeuille = workbook.SheetNames.find((n) => normaliser(n) === "referentiel");
+  if (!nomFeuille) return map;
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[nomFeuille], {
+    header: 1,
+    defval: "",
+  });
+  for (const row of rows) {
+    const [nomCourt, mail] = row;
+    if (!nomCourt || !mail || !String(mail).includes("@")) continue;
+    map.set(normaliser(nomCourt), String(mail).trim().toLowerCase());
+  }
+  return map;
+}
+
 // Lit le classeur "Chantiers en cours" (un onglet par client) et retourne un
-// chantier par onglet avec la liste de ses tâches, prêts à importer.
-export function parseSuiviChantiers(arrayBuffer) {
+// chantier par onglet avec la liste de ses tâches, prêts à importer. Le nom
+// du responsable de chaque tâche (ex: "Anan N.") est fait correspondre, via
+// la feuille Referentiel et son e-mail, au nom exact utilisé par un compte
+// existant de l'application (ex: "Anan NAMMA") quand c'est possible.
+export function parseSuiviChantiers(arrayBuffer, utilisateursApp = []) {
   const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
+  const referentiel = extraireReferentiel(workbook);
+
+  const emailVersNomApp = new Map(
+    utilisateursApp
+      .filter((u) => u.email)
+      .map((u) => [String(u.email).trim().toLowerCase(), u.nom])
+  );
+
+  const nonApparies = new Set();
+
+  const resoudreResponsable = (texteBrut) => {
+    const texte = String(texteBrut ?? "").trim();
+    if (!texte || /^a\s*attr/i.test(texte)) return null; // "A attriibuer"
+    const email = referentiel.get(normaliser(texte));
+    const nomApp = email ? emailVersNomApp.get(email) : null;
+    if (nomApp) return nomApp;
+    nonApparies.add(texte);
+    return texte; // on garde le nom du fichier tel quel, à corriger manuellement
+  };
 
   const chantiers = [];
 
@@ -41,16 +81,13 @@ export function parseSuiviChantiers(arrayBuffer) {
 
       if (compteLigne && !compte) compte = String(compteLigne).trim();
 
-      const responsableTexte = String(responsable ?? "").trim();
-      const estAAffecter = /^a\s*attr/i.test(responsableTexte); // "A attriibuer" (avec la coquille du fichier)
-
       const titre = [nomZone, descriptif].filter(Boolean).join(" — ") || descriptif || nomZone;
       if (!titre) continue;
 
       taches.push({
         titre,
         heuresPrevues: typeof heures === "number" && heures > 0 ? heures : null,
-        assigneA: estAAffecter || !responsableTexte ? null : responsableTexte,
+        assigneA: resoudreResponsable(responsable),
         dateDebut: formaterDate(dateDebut),
         echeance: formaterDate(dateFin),
         lienDevis: lienDevis ? String(lienDevis).trim() : null,
@@ -62,5 +99,5 @@ export function parseSuiviChantiers(arrayBuffer) {
     chantiers.push({ nom: nomFeuille.trim(), compte, taches, selectionne: true });
   }
 
-  return chantiers;
+  return { chantiers, nonApparies: [...nonApparies] };
 }

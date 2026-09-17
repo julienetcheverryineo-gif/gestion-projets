@@ -33,7 +33,7 @@ export default function Tasks() {
             _equipementNom: equip?.nom ?? "?",
             titre: it.designation,
             chantierId: equip?.chantierId ?? null,
-            assigneA: null,
+            assigneA: it.assigneA || null,
             heuresPrevues: null,
             dateDebut: null,
             echeance: null,

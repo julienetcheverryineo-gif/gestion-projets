@@ -369,6 +369,32 @@ déjà existant est réutilisé plutôt que dupliqué ; en revanche, **relancer
 l'import réimporte les tâches en double** (prévu pour un usage ponctuel, pas
 un import récurrent — une bannière le rappelle dans l'écran d'import).
 
+## Responsable sur les tâches d'équipement régulé
+
+Les tâches d'un équipement régulé (liste "Tâches" dans un équipement) ont
+maintenant un responsable assignable (champ `assigneA` sur `regitems`),
+comme les tâches classiques — indispensable pour qu'elles comptent dans le
+Plan de charge, qui les intègre désormais lui aussi.
+
+## Affecter toutes les tâches d'un chantier en une fois
+
+Sur la page d'un chantier, le lien **"Assigner toutes les tâches à…"**
+(à côté de "Modifier l'équipe") affecte en une fois toutes les tâches du
+chantier — Kanban et tâches d'équipements régulés confondues — à
+l'automaticien choisi. Pratique au lancement d'un chantier pour tout
+attribuer par défaut à une personne, à répartir plus finement ensuite.
+
+## Correspondance des noms à l'import du fichier de suivi
+
+L'import du fichier de suivi (page Chantiers) fait maintenant correspondre
+le nom court utilisé dans les onglets clients (ex : "Anan N.") au nom exact
+d'un compte de l'application (ex : "Anan NAMMA"), via la feuille
+"Referentiel" du fichier (colonnes Nom/Mail) recoupée avec l'e-mail des
+comptes existants — plus fiable qu'un rapprochement direct des noms.
+Les noms qui ne trouvent pas de correspondance (mail absent du référentiel,
+ou aucun compte avec cet e-mail) sont repris tels quels et signalés dans
+l'aperçu avant import, à corriger manuellement ensuite si besoin.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

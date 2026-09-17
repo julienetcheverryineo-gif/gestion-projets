@@ -65,6 +65,7 @@ export default function SiteDetail() {
   const [afficherEquipeForm, setAfficherEquipeForm] = useState(false);
   const [afficherTacheForm, setAfficherTacheForm] = useState(false);
   const [tacheEnEdition, setTacheEnEdition] = useState(null);
+  const [afficherAffectationMasse, setAfficherAffectationMasse] = useState(false);
   const [ongletActif, setOngletActif] = useState("equipements");
 
   const supprimerLot = async (lotId) => {
@@ -120,6 +121,11 @@ export default function SiteDetail() {
             <button className="linkish" onClick={() => setAfficherEquipeForm(true)}>
               Modifier l'équipe
             </button>
+            {peutGerer && (
+              <button className="linkish" onClick={() => setAfficherAffectationMasse(true)}>
+                Assigner toutes les tâches à…
+              </button>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -197,6 +203,7 @@ export default function SiteDetail() {
                 reg={reg}
                 items={tousRegItems.filter((it) => it.regEquipementId === reg.id)}
                 peutGerer={peutGerer}
+                utilisateurs={utilisateurs}
                 onEdit={() => {
                   setRegSelectionne(reg);
                   setAfficherRegForm(true);
@@ -305,6 +312,29 @@ export default function SiteDetail() {
         />
       )}
 
+      {afficherAffectationMasse && (
+        <AssignAllModal
+          utilisateurs={utilisateurs}
+          onClose={() => setAfficherAffectationMasse(false)}
+          onConfirm={async (nom) => {
+            const idsRegEquip = regEquipements.map((r) => r.id);
+            const tachesDuChantier = tousTaches.filter((t) => t.chantierId === chantierId);
+            const regTachesDuChantier = tousRegItems.filter(
+              (it) => it.type === "tache" && idsRegEquip.includes(it.regEquipementId)
+            );
+            await Promise.all([
+              ...tachesDuChantier.map((t) =>
+                updateDoc(doc(db, "tasks", t.id), { assigneA: nom })
+              ),
+              ...regTachesDuChantier.map((it) =>
+                updateDoc(doc(db, "regitems", it.id), { assigneA: nom })
+              ),
+            ]);
+            setAfficherAffectationMasse(false);
+          }}
+        />
+      )}
+
       {afficherEquipeForm && (
         <TeamFormModal
           chantier={chantier}
@@ -363,7 +393,7 @@ export default function SiteDetail() {
 // Équipements régulés (notre périmètre)
 // ============================================================================
 
-function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
+function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelete }) {
   const [ouvert, setOuvert] = useState(false);
   const [afficherItemForm, setAfficherItemForm] = useState(false);
   const [typePourAjout, setTypePourAjout] = useState("materiel");
@@ -376,6 +406,9 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
 
   const changerStatut = async (itemId, statut) => {
     await updateDoc(doc(db, "regitems", itemId), { statut });
+  };
+  const changerResponsable = async (itemId, assigneA) => {
+    await updateDoc(doc(db, "regitems", itemId), { assigneA: assigneA || null });
   };
   const supprimerItem = async (itemId) => {
     await deleteDoc(doc(db, "regitems", itemId));
@@ -513,6 +546,18 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
                       ))}
                     </select>
                     <span className="simple-list-title">{it.designation}</span>
+                    <select
+                      value={it.assigneA || ""}
+                      onChange={(e) => changerResponsable(it.id, e.target.value)}
+                      style={{ flexShrink: 0 }}
+                    >
+                      <option value="">À affecter</option>
+                      {utilisateurs.map((u) => (
+                        <option key={u.id} value={u.nom}>
+                          {u.nom}
+                        </option>
+                      ))}
+                    </select>
                     <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
                       ×
                     </button>
@@ -539,6 +584,7 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
         <RegItemFormModal
           regEquipementId={reg.id}
           typeInitial={typePourAjout}
+          utilisateurs={utilisateurs}
           onClose={() => setAfficherItemForm(false)}
         />
       )}
@@ -594,12 +640,13 @@ function RegEquipmentFormModal({ chantierId, reg, onClose }) {
   );
 }
 
-function RegItemFormModal({ regEquipementId, typeInitial, onClose }) {
+function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose }) {
   const [type, setType] = useState(typeInitial);
   const [designation, setDesignation] = useState("");
   const [quantite, setQuantite] = useState("");
   const [unite, setUnite] = useState("");
   const [remarque, setRemarque] = useState("");
+  const [assigneA, setAssigneA] = useState("");
   const [enCours, setEnCours] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -612,6 +659,7 @@ function RegItemFormModal({ regEquipementId, typeInitial, onClose }) {
       remarque,
       quantite: quantite ? Number(quantite) : 0,
       unite,
+      assigneA: type === "tache" ? assigneA || null : null,
       statut: "a_faire",
       creeLe: serverTimestamp(),
     });
@@ -644,6 +692,19 @@ function RegItemFormModal({ regEquipementId, typeInitial, onClose }) {
               required
             />
           </label>
+          {type === "tache" && (
+            <label>
+              Responsable
+              <select value={assigneA} onChange={(e) => setAssigneA(e.target.value)}>
+                <option value="">À affecter</option>
+                {utilisateurs.map((u) => (
+                  <option key={u.id} value={u.nom}>
+                    {u.nom}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {type === "materiel" && (
             <div className="form-inline">
               <label>
@@ -1061,6 +1122,53 @@ function TimeFormModal({ chantierId, lots, profil, onClose }) {
             </button>
             <button type="submit" className="btn-primary" disabled={enCours}>
               {enCours ? "Ajout…" : "Ajouter"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AssignAllModal({ utilisateurs, onClose, onConfirm }) {
+  const [nom, setNom] = useState("");
+  const [enCours, setEnCours] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!nom) return;
+    setEnCours(true);
+    await onConfirm(nom);
+    setEnCours(false);
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Assigner toutes les tâches</h2>
+        <p className="empty-state-description" style={{ margin: "0 0 14px" }}>
+          Toutes les tâches de ce chantier (Kanban et tâches d'équipements régulés) seront
+          affectées à la personne choisie, y compris celles déjà attribuées à quelqu'un
+          d'autre.
+        </p>
+        <form onSubmit={handleSubmit} className="form">
+          <label>
+            Assigner à
+            <select value={nom} onChange={(e) => setNom(e.target.value)} required>
+              <option value="">— Choisir —</option>
+              {utilisateurs.map((u) => (
+                <option key={u.id} value={u.nom}>
+                  {u.nom}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={enCours || !nom}>
+              {enCours ? "Affectation…" : "Assigner"}
             </button>
           </div>
         </form>
