@@ -12,12 +12,42 @@ export default function Tasks() {
   const { documents: taches } = useCollection("tasks");
   const { documents: chantiers } = useCollection("sites");
   const { documents: utilisateurs } = useCollection("users", "email");
+  const { documents: regItems } = useCollection("regitems");
+  const { documents: regEquipements } = useCollection("regequipements");
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [tacheEnEdition, setTacheEnEdition] = useState(null);
   const [chantierPourAjout, setChantierPourAjout] = useState(undefined);
   const [groupeOuvert, setGroupeOuvert] = useState(null);
 
   const nomChantier = (id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter";
+
+  const tachesRegitems = useMemo(
+    () =>
+      regItems
+        .filter((it) => it.type === "tache")
+        .map((it) => {
+          const equip = regEquipements.find((r) => r.id === it.regEquipementId);
+          return {
+            id: it.id,
+            _source: "regitem",
+            _equipementNom: equip?.nom ?? "?",
+            titre: it.designation,
+            chantierId: equip?.chantierId ?? null,
+            assigneA: null,
+            heuresPrevues: null,
+            dateDebut: null,
+            echeance: null,
+            commentaires: it.remarque || null,
+            statut: it.statut,
+          };
+        }),
+    [regItems, regEquipements]
+  );
+
+  const toutesLesTaches = useMemo(
+    () => [...taches, ...tachesRegitems],
+    [taches, tachesRegitems]
+  );
 
   const groupes = useMemo(() => {
     const map = new Map();
@@ -26,12 +56,12 @@ export default function Tasks() {
       map.set(c.id, { id: c.id, nom: c.nom, taches: [] });
     }
     map.set("aaffecter", { id: null, nom: "À affecter", taches: [] });
-    for (const t of taches) {
+    for (const t of toutesLesTaches) {
       const cle = t.chantierId && map.has(t.chantierId) ? t.chantierId : "aaffecter";
       map.get(cle).taches.push(t);
     }
     return [...map.values()].filter((g) => g.id === null ? g.taches.length > 0 : true);
-  }, [taches, chantiers]);
+  }, [toutesLesTaches, chantiers]);
 
   const supprimer = async (id) => {
     if (!confirm("Supprimer cette tâche ?")) return;

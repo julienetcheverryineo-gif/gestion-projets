@@ -12,6 +12,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import { exporterMaterielAchats } from "../lib/exportMateriel";
+import ImportSuiviModal from "../components/ImportSuiviModal";
 
 const STATUTS = [
   { value: "actif", label: "Actif" },
@@ -34,6 +35,7 @@ export default function Sites() {
   const [seulementNonInstalle, setSeulementNonInstalle] = useState(true);
   const [nettoyageEnCours, setNettoyageEnCours] = useState(false);
   const [messageNettoyage, setMessageNettoyage] = useState("");
+  const [afficherImportSuivi, setAfficherImportSuivi] = useState(false);
 
   const supprimer = async (id) => {
     if (
@@ -146,6 +148,11 @@ export default function Sites() {
         <div className="header-actions-stack">
           <div className="header-actions-row">
             {peutGerer && (
+              <button className="btn-ghost" onClick={() => setAfficherImportSuivi(true)}>
+                Importer le fichier de suivi
+              </button>
+            )}
+            {peutGerer && (
               <button
                 className="btn-ghost"
                 onClick={nettoyerDonneesOrphelines}
@@ -247,6 +254,13 @@ export default function Sites() {
             );
           })}
         </div>
+      )}
+
+      {afficherImportSuivi && (
+        <ImportSuiviModal
+          chantiersExistants={chantiers}
+          onClose={() => setAfficherImportSuivi(false)}
+        />
       )}
 
       {afficherFormulaire && (

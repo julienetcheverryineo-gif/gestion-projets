@@ -1,15 +1,30 @@
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
-const STATUTS = [
+const STATUTS_TASK = [
   { value: "a_faire", label: "À faire" },
   { value: "en_cours", label: "En cours" },
   { value: "termine", label: "Terminé" },
 ];
 
+const STATUTS_REGITEM = [
+  { value: "a_faire", label: "À faire" },
+  { value: "fait", label: "Fait" },
+];
+
+// Affiche indifféremment des tâches "projet" (collection `tasks`) et des
+// tâches issues d'un équipement régulé (`regitems` de type "tache") dans un
+// seul tableau. `t._source` vaut "regitem" pour ces dernières ; leur
+// désignation/statut ne peuvent être modifiés que depuis la fiche de
+// l'équipement (pas de bouton Modifier/Supprimer ici), mais le statut reste
+// modifiable directement, comme sur les tâches normales.
 export default function TaskTable({ taches, peutGerer, onEdit, onDelete, afficherChantier, nomChantier }) {
-  const changerStatut = async (id, statut) => {
-    await updateDoc(doc(db, "tasks", id), { statut });
+  const changerStatut = async (t, statut) => {
+    if (t._source === "regitem") {
+      await updateDoc(doc(db, "regitems", t.id), { statut });
+    } else {
+      await updateDoc(doc(db, "tasks", t.id), { statut });
+    }
   };
 
   if (taches.length === 0) {
@@ -36,47 +51,62 @@ export default function TaskTable({ taches, peutGerer, onEdit, onDelete, affiche
         </tr>
       </thead>
       <tbody>
-        {taches.map((t) => (
-          <tr key={t.id}>
-            {afficherChantier && (
+        {taches.map((t) => {
+          const estRegitem = t._source === "regitem";
+          const options = estRegitem ? STATUTS_REGITEM : STATUTS_TASK;
+          return (
+            <tr key={(t._source || "task") + "-" + t.id}>
+              {afficherChantier && (
+                <td style={{ fontFamily: "var(--font-ui)" }}>
+                  {t.chantierId ? nomChantier(t.chantierId) : "À affecter"}
+                </td>
+              )}
               <td style={{ fontFamily: "var(--font-ui)" }}>
-                {t.chantierId ? nomChantier(t.chantierId) : "À affecter"}
-              </td>
-            )}
-            <td style={{ fontFamily: "var(--font-ui)" }}>{t.titre}</td>
-            <td style={{ fontFamily: "var(--font-ui)" }}>{t.assigneA || "À affecter"}</td>
-            <td>{t.heuresPrevues || "—"}</td>
-            <td>{t.dateDebut || "—"}</td>
-            <td>{t.echeance || "—"}</td>
-            <td>
-              <select
-                value={t.statut ?? "a_faire"}
-                onChange={(e) => changerStatut(t.id, e.target.value)}
-              >
-                {STATUTS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </td>
-            <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
-              {t.commentaires || "—"}
-            </td>
-            <td>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button className="btn-ghost" onClick={() => onEdit(t)}>
-                  Modifier
-                </button>
-                {peutGerer && (
-                  <button className="btn-ghost btn-danger" onClick={() => onDelete(t.id)}>
-                    ×
-                  </button>
+                {t.titre}
+                {estRegitem && (
+                  <span className="simple-list-meta" style={{ marginLeft: 6 }}>
+                    (équipement : {t._equipementNom})
+                  </span>
                 )}
-              </div>
-            </td>
-          </tr>
-        ))}
+              </td>
+              <td style={{ fontFamily: "var(--font-ui)" }}>{t.assigneA || "À affecter"}</td>
+              <td>{t.heuresPrevues || "—"}</td>
+              <td>{t.dateDebut || "—"}</td>
+              <td>{t.echeance || "—"}</td>
+              <td>
+                <select
+                  value={t.statut ?? "a_faire"}
+                  onChange={(e) => changerStatut(t, e.target.value)}
+                >
+                  {options.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                {t.commentaires || "—"}
+              </td>
+              <td>
+                {estRegitem ? (
+                  <span className="simple-list-meta">Depuis équipement</span>
+                ) : (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn-ghost" onClick={() => onEdit(t)}>
+                      Modifier
+                    </button>
+                    {peutGerer && (
+                      <button className="btn-ghost btn-danger" onClick={() => onDelete(t.id)}>
+                        ×
+                      </button>
+                    )}
+                  </div>
+                )}
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );

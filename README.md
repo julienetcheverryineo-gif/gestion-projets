@@ -349,6 +349,26 @@ affecter"** (plutôt que "Sans chantier"/vide) — elle apparaît alors dans son
 propre groupe sur la page Tâches, et dans son propre groupe sur la page
 Plan de charge, pour ne pas la perdre de vue.
 
+## Tâches d'équipement visibles dans les tâches globales
+
+Les tâches saisies dans un équipement régulé ("Équipements régulés" →
+matériel/tâches d'un équipement) apparaissent désormais aussi dans la page
+Tâches globale, dans le groupe de leur chantier — avec la mention "(depuis
+équipement : Nom)" pour les distinguer. Leur statut reste modifiable
+directement depuis ce tableau global, mais pas leur désignation
+(modification réservée à la fiche de l'équipement, pour éviter d'avoir deux
+façons différentes de faire la même chose).
+
+## Import ponctuel du fichier de suivi Excel
+
+Sur la page Chantiers, le bouton **"Importer le fichier de suivi"** lit un
+fichier au même format que "Chantiers en cours.xlsm" (un onglet par
+client/chantier, lignes = tâches) et crée automatiquement les chantiers et
+leurs tâches. Un chantier dont le nom correspond exactement à un chantier
+déjà existant est réutilisé plutôt que dupliqué ; en revanche, **relancer
+l'import réimporte les tâches en double** (prévu pour un usage ponctuel, pas
+un import récurrent — une bannière le rappelle dans l'écran d'import).
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
