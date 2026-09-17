@@ -328,6 +328,27 @@ Nouvelles collections Firestore : `reserves` (`chantierId`, `designation`,
 `tasks` gagne les champs `heuresPrevues`, `dateDebut`, `lienDevis`,
 `commentaires`. `sites` gagne le champ `compte`.
 
+## Onglets sur la page chantier
+
+La page d'un chantier est maintenant organisée en 4 onglets : **Équipements
+régulés**, **Autres lots**, **Réserves**, **Tâches** — au lieu de tout
+empiler verticalement.
+
+## Tâches repensées façon Excel
+
+Le Kanban a été remplacé par une vue tableau, plus proche de votre fichier
+de suivi : les tâches sont groupées par chantier (cartes dépliables, comme
+les équipements), chaque ligne affichant responsable, heures prévues, dates
+début/fin, statut (menu déroulant direct dans le tableau) et commentaires.
+Cette même vue tableau apparaît aussi dans l'onglet "Tâches" de chaque
+chantier (filtrée sur lui), donc on retrouve les tâches d'un chantier à
+deux endroits cohérents : sa propre page, et la page Tâches globale.
+
+Une tâche sans chantier ni responsable assigné est étiquetée **"À
+affecter"** (plutôt que "Sans chantier"/vide) — elle apparaît alors dans son
+propre groupe sur la page Tâches, et dans son propre groupe sur la page
+Plan de charge, pour ne pas la perdre de vue.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

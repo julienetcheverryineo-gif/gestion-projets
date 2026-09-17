@@ -8,7 +8,7 @@ export default function Workload() {
   const [inclureTerminees, setInclureTerminees] = useState(false);
   const [personneOuverte, setPersonneOuverte] = useState(null);
 
-  const nomChantier = (id) => chantiers.find((c) => c.id === id)?.nom ?? "Sans chantier";
+  const nomChantier = (id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter";
   const compteChantier = (id) => chantiers.find((c) => c.id === id)?.compte ?? "";
 
   const tachesRetenues = useMemo(
@@ -19,7 +19,7 @@ export default function Workload() {
   const parPersonne = useMemo(() => {
     const map = new Map();
     for (const t of tachesRetenues) {
-      const nom = t.assigneA || "Non attribué";
+      const nom = t.assigneA || "À affecter";
       if (!map.has(nom)) map.set(nom, { nom, taches: [], totalHeures: 0, chantiers: new Set() });
       const entree = map.get(nom);
       entree.taches.push(t);
@@ -123,7 +123,7 @@ export default function Workload() {
                                         {nomChantier(t.chantierId)}
                                       </Link>
                                     ) : (
-                                      "—"
+                                      "À affecter"
                                     )}
                                   </td>
                                   <td style={{ fontFamily: "var(--font-ui)" }}>{t.titre}</td>

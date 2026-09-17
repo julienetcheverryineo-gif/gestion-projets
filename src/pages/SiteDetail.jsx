@@ -15,6 +15,8 @@ import { formatStatut } from "./Sites";
 import ImportDevisModal from "../components/ImportDevisModal";
 import TeamFormModal from "../components/TeamFormModal";
 import ReservesPanel from "../components/ReservesPanel";
+import TaskFormModal from "../components/TaskFormModal";
+import TaskTable from "../components/TaskTable";
 
 const STATUTS_MATERIEL = [
   { value: "a_faire", label: "À installer" },
@@ -51,6 +53,7 @@ export default function SiteDetail() {
   const totalHeures = tempsChantier.reduce((s, t) => s + Number(t.duree || 0), 0);
 
   const { documents: utilisateurs } = useCollection("users", "email");
+  const { documents: tousTaches } = useCollection("tasks");
 
   const [afficherRegForm, setAfficherRegForm] = useState(false);
   const [regSelectionne, setRegSelectionne] = useState(null);
@@ -60,6 +63,9 @@ export default function SiteDetail() {
   const [afficherTempsForm, setAfficherTempsForm] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
   const [afficherEquipeForm, setAfficherEquipeForm] = useState(false);
+  const [afficherTacheForm, setAfficherTacheForm] = useState(false);
+  const [tacheEnEdition, setTacheEnEdition] = useState(null);
+  const [ongletActif, setOngletActif] = useState("equipements");
 
   const supprimerLot = async (lotId) => {
     if (!confirm("Supprimer ce lot et ses équipements ?")) return;
@@ -126,7 +132,34 @@ export default function SiteDetail() {
         </div>
       </header>
 
-      {/* ---------------- Équipements régulés ---------------- */}
+      <div className="page-tabs">
+        <button
+          className={"page-tab" + (ongletActif === "equipements" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("equipements")}
+        >
+          Équipements régulés
+        </button>
+        <button
+          className={"page-tab" + (ongletActif === "autres-lots" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("autres-lots")}
+        >
+          Autres lots
+        </button>
+        <button
+          className={"page-tab" + (ongletActif === "reserves" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("reserves")}
+        >
+          Réserves
+        </button>
+        <button
+          className={"page-tab" + (ongletActif === "taches" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("taches")}
+        >
+          Tâches
+        </button>
+      </div>
+
+      {ongletActif === "equipements" && (
       <section className="panel">
         <div className="panel-header">
           <h2>Équipements régulés</h2>
@@ -174,8 +207,9 @@ export default function SiteDetail() {
           </div>
         )}
       </section>
+      )}
 
-      {/* ---------------- Autres lots techniques ---------------- */}
+      {ongletActif === "autres-lots" && (
       <section className="panel">
         <div className="panel-header">
           <h2>Autres lots techniques</h2>
@@ -222,12 +256,54 @@ export default function SiteDetail() {
           </div>
         )}
       </section>
+      )}
 
-      <ReservesPanel
-        chantierId={chantierId}
-        peutGerer={peutGerer}
-        utilisateurs={utilisateurs}
-      />
+      {ongletActif === "reserves" && (
+        <ReservesPanel
+          chantierId={chantierId}
+          peutGerer={peutGerer}
+          utilisateurs={utilisateurs}
+        />
+      )}
+
+      {ongletActif === "taches" && (
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Tâches</h2>
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                setTacheEnEdition(null);
+                setAfficherTacheForm(true);
+              }}
+            >
+              + Ajouter une tâche
+            </button>
+          </div>
+          <TaskTable
+            taches={tousTaches.filter((t) => t.chantierId === chantierId)}
+            peutGerer={peutGerer}
+            onEdit={(t) => {
+              setTacheEnEdition(t);
+              setAfficherTacheForm(true);
+            }}
+            onDelete={async (id) => {
+              if (!confirm("Supprimer cette tâche ?")) return;
+              await deleteDoc(doc(db, "tasks", id));
+            }}
+          />
+        </section>
+      )}
+
+      {afficherTacheForm && (
+        <TaskFormModal
+          tache={tacheEnEdition}
+          chantiers={chantiers}
+          chantierIdFixe={tacheEnEdition ? undefined : chantierId}
+          utilisateurs={utilisateurs}
+          onClose={() => setAfficherTacheForm(false)}
+        />
+      )}
 
       {afficherEquipeForm && (
         <TeamFormModal
