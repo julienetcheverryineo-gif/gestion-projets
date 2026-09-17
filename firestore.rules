@@ -49,6 +49,15 @@ service cloud.firestore {
         (resource.data.userId == request.auth.uid || estChefOuAdmin());
     }
 
+    // Levées de réserves : lecture pour tous, tout connecté peut créer/mettre
+    // à jour (cocher une réserve levée sur le terrain), suppression réservée
+    // aux chefs de projet/admins
+    match /reserves/{reserveId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
+    }
+
     // Chantiers : lecture pour tous les connectés, écriture réservée aux chefs de projet/admins
     match /sites/{siteId} {
       allow read: if estConnecte();

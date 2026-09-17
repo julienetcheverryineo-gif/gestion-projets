@@ -265,7 +265,7 @@ a {
 /* ---------- Stats ---------- */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
 
@@ -691,6 +691,16 @@ a {
 .team-checklist-item input {
   width: 15px;
   height: 15px;
+}
+
+.reserves-filtres {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.reserves-filtres .page-tab {
+  padding: 6px 12px;
+  font-size: 0.82rem;
 }
 
 /* ---------- Onglets de page (ex: Équipements / Chat) ---------- */

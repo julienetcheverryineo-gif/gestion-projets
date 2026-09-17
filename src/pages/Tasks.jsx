@@ -35,6 +35,7 @@ export default function Tasks() {
   const { documents: utilisateurs } = useCollection("users", "email");
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [colonneCible, setColonneCible] = useState(null);
+  const [tacheEnEdition, setTacheEnEdition] = useState(null);
 
   const changerStatut = async (tacheId, nouveauStatut) => {
     await updateDoc(doc(db, "tasks", tacheId), { statut: nouveauStatut });
@@ -62,6 +63,7 @@ export default function Tasks() {
           className="btn-primary"
           onClick={() => {
             setColonneCible("a_faire");
+            setTacheEnEdition(null);
             setAfficherFormulaire(true);
           }}
         >
@@ -95,10 +97,16 @@ export default function Tasks() {
                     onDragStart={(e) =>
                       e.dataTransfer.setData("text/tache-id", tache.id)
                     }
+                    onClick={() => {
+                      setTacheEnEdition(tache);
+                      setColonneCible(tache.statut ?? "a_faire");
+                      setAfficherFormulaire(true);
+                    }}
                   >
                     <div className="kanban-card-title">{tache.titre}</div>
                     <div className="kanban-card-meta">
                       {nomChantier(chantiers, tache.chantierId)}
+                      {tache.heuresPrevues ? " · " + tache.heuresPrevues + " h" : ""}
                     </div>
                     <div className="kanban-card-footer">
                       <span className="kanban-card-assignee">
@@ -111,7 +119,10 @@ export default function Tasks() {
                     {peutSupprimer && (
                       <button
                         className="kanban-card-delete"
-                        onClick={() => supprimer(tache.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          supprimer(tache.id);
+                        }}
                         aria-label="Supprimer la tâche"
                       >
                         ×
@@ -121,9 +132,10 @@ export default function Tasks() {
                       <button
                         className="kanban-move-btn"
                         disabled={!statutPrecedent(tache.statut ?? "a_faire")}
-                        onClick={() =>
-                          changerStatut(tache.id, statutPrecedent(tache.statut ?? "a_faire"))
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          changerStatut(tache.id, statutPrecedent(tache.statut ?? "a_faire"));
+                        }}
                         aria-label="Déplacer vers la colonne précédente"
                       >
                         ← Retour
@@ -131,9 +143,10 @@ export default function Tasks() {
                       <button
                         className="kanban-move-btn"
                         disabled={!statutSuivant(tache.statut ?? "a_faire")}
-                        onClick={() =>
-                          changerStatut(tache.id, statutSuivant(tache.statut ?? "a_faire"))
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          changerStatut(tache.id, statutSuivant(tache.statut ?? "a_faire"));
+                        }}
                         aria-label="Déplacer vers la colonne suivante"
                       >
                         Avancer →
@@ -145,6 +158,7 @@ export default function Tasks() {
                 className="kanban-add-inline"
                 onClick={() => {
                   setColonneCible(colonne.statut);
+                  setTacheEnEdition(null);
                   setAfficherFormulaire(true);
                 }}
               >
@@ -158,6 +172,7 @@ export default function Tasks() {
       {afficherFormulaire && (
         <TaskFormModal
           statutInitial={colonneCible}
+          tache={tacheEnEdition}
           chantiers={chantiers}
           utilisateurs={utilisateurs}
           onClose={() => setAfficherFormulaire(false)}
@@ -171,24 +186,41 @@ function nomChantier(chantiers, chantierId) {
   return chantiers.find((c) => c.id === chantierId)?.nom ?? "Sans chantier";
 }
 
-function TaskFormModal({ statutInitial, chantiers, utilisateurs, onClose }) {
-  const [titre, setTitre] = useState("");
-  const [chantierId, setChantierId] = useState(chantiers[0]?.id ?? "");
-  const [assigneA, setAssigneA] = useState("");
-  const [echeance, setEcheance] = useState("");
+function TaskFormModal({ statutInitial, tache, chantiers, utilisateurs, onClose }) {
+  const [titre, setTitre] = useState(tache?.titre ?? "");
+  const [chantierId, setChantierId] = useState(tache?.chantierId ?? chantiers[0]?.id ?? "");
+  const [assigneA, setAssigneA] = useState(tache?.assigneA ?? "");
+  const [heuresPrevues, setHeuresPrevues] = useState(tache?.heuresPrevues ?? "");
+  const [dateDebut, setDateDebut] = useState(tache?.dateDebut ?? "");
+  const [echeance, setEcheance] = useState(tache?.echeance ?? "");
+  const [lienDevis, setLienDevis] = useState(tache?.lienDevis ?? "");
+  const [commentaires, setCommentaires] = useState(tache?.commentaires ?? "");
   const [enCours, setEnCours] = useState(false);
+
+  const compteChantier = chantiers.find((c) => c.id === chantierId)?.compte;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setEnCours(true);
-    await addDoc(collection(db, "tasks"), {
+    const donnees = {
       titre,
       chantierId: chantierId || null,
       assigneA: assigneA || null,
+      heuresPrevues: heuresPrevues ? Number(heuresPrevues) : null,
+      dateDebut: dateDebut || null,
       echeance: echeance || null,
-      statut: statutInitial,
-      creeLe: serverTimestamp(),
-    });
+      lienDevis: lienDevis || null,
+      commentaires: commentaires || null,
+    };
+    if (tache) {
+      await updateDoc(doc(db, "tasks", tache.id), donnees);
+    } else {
+      await addDoc(collection(db, "tasks"), {
+        ...donnees,
+        statut: statutInitial,
+        creeLe: serverTimestamp(),
+      });
+    }
     setEnCours(false);
     onClose();
   };
@@ -196,7 +228,7 @@ function TaskFormModal({ statutInitial, chantiers, utilisateurs, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Nouvelle tâche</h2>
+        <h2>{tache ? "Modifier la tâche" : "Nouvelle tâche"}</h2>
         <form onSubmit={handleSubmit} className="form">
           <label>
             Titre
@@ -213,6 +245,11 @@ function TaskFormModal({ statutInitial, chantiers, utilisateurs, onClose }) {
               ))}
             </select>
           </label>
+          {compteChantier && (
+            <p className="simple-list-meta" style={{ margin: "-6px 0 0" }}>
+              Compte : {compteChantier}
+            </p>
+          )}
           <label>
             Assigné à
             <select value={assigneA} onChange={(e) => setAssigneA(e.target.value)}>
@@ -224,12 +261,43 @@ function TaskFormModal({ statutInitial, chantiers, utilisateurs, onClose }) {
               ))}
             </select>
           </label>
+          <div className="form-inline">
+            <label>
+              Heures prévues
+              <input
+                type="number"
+                min="0"
+                value={heuresPrevues}
+                onChange={(e) => setHeuresPrevues(e.target.value)}
+              />
+            </label>
+            <label>
+              Date début
+              <input
+                type="date"
+                value={dateDebut}
+                onChange={(e) => setDateDebut(e.target.value)}
+              />
+            </label>
+            <label>
+              Date fin
+              <input
+                type="date"
+                value={echeance}
+                onChange={(e) => setEcheance(e.target.value)}
+              />
+            </label>
+          </div>
           <label>
-            Échéance
-            <input
-              type="date"
-              value={echeance}
-              onChange={(e) => setEcheance(e.target.value)}
+            Lien devis
+            <input value={lienDevis} onChange={(e) => setLienDevis(e.target.value)} />
+          </label>
+          <label>
+            Commentaires
+            <textarea
+              value={commentaires}
+              onChange={(e) => setCommentaires(e.target.value)}
+              rows={2}
             />
           </label>
           <div className="modal-actions">
@@ -237,7 +305,7 @@ function TaskFormModal({ statutInitial, chantiers, utilisateurs, onClose }) {
               Annuler
             </button>
             <button type="submit" className="btn-primary" disabled={enCours}>
-              {enCours ? "Création…" : "Créer la tâche"}
+              {enCours ? "Enregistrement…" : tache ? "Enregistrer" : "Créer la tâche"}
             </button>
           </div>
         </form>

@@ -14,6 +14,7 @@ import { useCollection } from "../lib/firestoreHooks";
 import { formatStatut } from "./Sites";
 import ImportDevisModal from "../components/ImportDevisModal";
 import TeamFormModal from "../components/TeamFormModal";
+import ReservesPanel from "../components/ReservesPanel";
 
 const STATUTS_MATERIEL = [
   { value: "a_faire", label: "À installer" },
@@ -221,6 +222,12 @@ export default function SiteDetail() {
           </div>
         )}
       </section>
+
+      <ReservesPanel
+        chantierId={chantierId}
+        peutGerer={peutGerer}
+        utilisateurs={utilisateurs}
+      />
 
       {afficherEquipeForm && (
         <TeamFormModal

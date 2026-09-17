@@ -264,12 +264,13 @@ function SiteFormModal({ chantier, onClose }) {
   const [client, setClient] = useState(chantier?.client ?? "");
   const [adresse, setAdresse] = useState(chantier?.adresse ?? "");
   const [statut, setStatut] = useState(chantier?.statut ?? "actif");
+  const [compte, setCompte] = useState(chantier?.compte ?? "");
   const [enCours, setEnCours] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setEnCours(true);
-    const donnees = { nom, client, adresse, statut };
+    const donnees = { nom, client, adresse, statut, compte };
     if (chantier) {
       await updateDoc(doc(db, "sites", chantier.id), donnees);
     } else {
@@ -296,16 +297,26 @@ function SiteFormModal({ chantier, onClose }) {
             Adresse
             <input value={adresse} onChange={(e) => setAdresse(e.target.value)} />
           </label>
-          <label>
-            Statut
-            <select value={statut} onChange={(e) => setStatut(e.target.value)}>
-              {STATUTS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="form-inline">
+            <label>
+              Statut
+              <select value={statut} onChange={(e) => setStatut(e.target.value)}>
+                {STATUTS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Compte
+              <input
+                value={compte}
+                onChange={(e) => setCompte(e.target.value)}
+                placeholder="ex : JE602"
+              />
+            </label>
+          </div>
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>
               Annuler

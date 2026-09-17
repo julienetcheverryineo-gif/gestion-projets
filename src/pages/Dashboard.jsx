@@ -9,6 +9,7 @@ export default function Dashboard() {
     useCollection("tasks");
   const { documents: regEquipements } = useCollection("regequipements");
   const { documents: regItems } = useCollection("regitems");
+  const { documents: reserves } = useCollection("reserves");
 
   const stats = useMemo(() => {
     const chantiersActifs = chantiers.filter((c) => c.statut !== "termine").length;
@@ -17,8 +18,9 @@ export default function Dashboard() {
     const pointsRestants = regItems.filter(
       (it) => it.statut !== "teste" && it.statut !== "fait"
     ).length;
-    return { chantiersActifs, tachesEnRetard, tachesEnCours, pointsRestants };
-  }, [chantiers, taches, regItems]);
+    const reservesOuvertes = reserves.filter((r) => r.statut !== "levee").length;
+    return { chantiersActifs, tachesEnRetard, tachesEnCours, pointsRestants, reservesOuvertes };
+  }, [chantiers, taches, regItems, reserves]);
 
   const chargement = chargementChantiers || chargementTaches;
 
@@ -52,6 +54,11 @@ export default function Dashboard() {
               alerte={stats.tachesEnRetard > 0}
             />
             <StatCard label="Points restants" valeur={stats.pointsRestants} />
+            <StatCard
+              label="Réserves ouvertes"
+              valeur={stats.reservesOuvertes}
+              alerte={stats.reservesOuvertes > 0}
+            />
           </div>
 
           <section className="panel">

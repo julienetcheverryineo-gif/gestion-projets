@@ -302,6 +302,32 @@ suppressions faites avant ce correctif : il recherche tout matériel, lot,
 tâche ou temps passé rattaché à un chantier qui n'existe plus, et propose de
 les supprimer définitivement après confirmation.
 
+## Petites tâches, plan de charge et levées de réserves
+
+En complément du suivi des chantiers, trois ajouts reprennent la logique de
+votre fichier Excel de suivi :
+
+- **Compte par chantier** : champ `compte` sur le chantier (ex : "JE602"),
+  saisi une fois à la création/modification. Il s'affiche automatiquement
+  sur les tâches de ce chantier, pas besoin de le ressaisir à chaque fois.
+- **Tâches enrichies** : en plus du Kanban existant, chaque tâche peut
+  porter des heures prévues, une date de début, une date de fin, un lien
+  devis et des commentaires — cliquer sur une carte l'ouvre en modification.
+- **Page "Plan de charge"** (nouvelle entrée de menu) : synthèse par
+  automaticien — nombre de tâches, total d'heures prévues, chantiers
+  concernés, et détail dépliable de chaque tâche. Case à cocher pour inclure
+  ou non les tâches déjà terminées. Reprend la logique de l'onglet BILAN de
+  votre fichier.
+- **Levées de réserves** (nouvelle section sur la page de chaque chantier) :
+  désignation, responsable, date de signalement, échéance, statut
+  ouverte/levée, avec filtres. Le nombre de réserves ouvertes apparaît aussi
+  sur la vue d'ensemble.
+
+Nouvelles collections Firestore : `reserves` (`chantierId`, `designation`,
+`responsable`, `dateSignalement`, `dateEcheance`, `statut`, `remarque`).
+`tasks` gagne les champs `heuresPrevues`, `dateDebut`, `lienDevis`,
+`commentaires`. `sites` gagne le champ `compte`.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
