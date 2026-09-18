@@ -310,10 +310,7 @@ export default function SiteDetail() {
           <TaskTable
             taches={tousTaches.filter((t) => t.chantierId === chantierId)}
             peutGerer={peutGerer}
-            onEdit={(t) => {
-              setTacheEnEdition(t);
-              setAfficherTacheForm(true);
-            }}
+            utilisateurs={utilisateurs}
             onDelete={async (id) => {
               if (!confirm("Supprimer cette tâche ?")) return;
               await deleteDoc(doc(db, "tasks", id));

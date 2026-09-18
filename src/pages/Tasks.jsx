@@ -126,10 +126,7 @@ export default function Tasks() {
                     <TaskTable
                       taches={g.taches}
                       peutGerer={peutGerer}
-                      onEdit={(t) => {
-                        setTacheEnEdition(t);
-                        setAfficherFormulaire(true);
-                      }}
+                      utilisateurs={utilisateurs}
                       onDelete={supprimer}
                     />
                   </div>

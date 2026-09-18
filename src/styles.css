@@ -860,6 +860,13 @@ a {
   gap: 12px;
 }
 
+.task-table-editable input[type="date"] {
+  min-width: 130px;
+}
+.task-cell-heures {
+  width: 60px;
+}
+
 .reg-equip-draggable {
   cursor: grab;
 }

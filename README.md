@@ -433,6 +433,17 @@ n'ont pas ce champ `ordre` — leur ordre d'affichage actuel ne changera pas
 tout seul. Un glisser-déposer suffit à les ranger comme vous le souhaitez,
 une fois fait c'est acquis.
 
+## Tâches éditables directement dans le tableau
+
+Titre, responsable, heures, dates début/fin et commentaires se modifient
+maintenant directement dans le tableau (page Tâches globale et onglet
+Tâches d'un chantier) — plus besoin d'ouvrir une fenêtre "Modifier". Le
+texte s'enregistre en quittant le champ (clic ailleurs ou touche Tab), les
+listes déroulantes et les dates s'enregistrent immédiatement. Les tâches
+issues d'un équipement régulé restent en lecture seule pour leur
+désignation (seul leur statut est modifiable ici, comme avant — la
+modification complète se fait depuis la fiche de l'équipement).
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

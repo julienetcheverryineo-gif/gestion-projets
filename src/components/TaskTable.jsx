@@ -15,16 +15,17 @@ const STATUTS_REGITEM = [
 // Affiche indifféremment des tâches "projet" (collection `tasks`) et des
 // tâches issues d'un équipement régulé (`regitems` de type "tache") dans un
 // seul tableau. `t._source` vaut "regitem" pour ces dernières ; leur
-// désignation/statut ne peuvent être modifiés que depuis la fiche de
-// l'équipement (pas de bouton Modifier/Supprimer ici), mais le statut reste
-// modifiable directement, comme sur les tâches normales.
-export default function TaskTable({ taches, peutGerer, onEdit, onDelete, afficherChantier, nomChantier }) {
-  const changerStatut = async (t, statut) => {
+// désignation/statut ne peuvent être modifiées que depuis la fiche de
+// l'équipement, mais le statut reste modifiable directement.
+// Pour les tâches "projet" en revanche, toutes les colonnes sont éditables
+// directement dans le tableau (pas de passage par une fenêtre séparée).
+export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, afficherChantier, nomChantier }) {
+  const changerChamp = async (t, champ, valeur) => {
     if (t._source === "regitem") {
-      await updateDoc(doc(db, "regitems", t.id), { statut });
-    } else {
-      await updateDoc(doc(db, "tasks", t.id), { statut });
+      if (champ === "statut") await updateDoc(doc(db, "regitems", t.id), { statut: valeur });
+      return;
     }
+    await updateDoc(doc(db, "tasks", t.id), { [champ]: valeur });
   };
 
   if (taches.length === 0) {
@@ -36,7 +37,7 @@ export default function TaskTable({ taches, peutGerer, onEdit, onDelete, affiche
   }
 
   return (
-    <table className="data-table">
+    <table className="data-table task-table-editable">
       <thead>
         <tr>
           {afficherChantier && <th>Chantier</th>}
@@ -61,22 +62,80 @@ export default function TaskTable({ taches, peutGerer, onEdit, onDelete, affiche
                   {t.chantierId ? nomChantier(t.chantierId) : "À affecter"}
                 </td>
               )}
-              <td style={{ fontFamily: "var(--font-ui)" }}>
-                {t.titre}
-                {estRegitem && (
-                  <span className="simple-list-meta" style={{ marginLeft: 6 }}>
-                    (équipement : {t._equipementNom})
-                  </span>
-                )}
-              </td>
-              <td style={{ fontFamily: "var(--font-ui)" }}>{t.assigneA || "À affecter"}</td>
-              <td>{t.heuresPrevues || "—"}</td>
-              <td>{t.dateDebut || "—"}</td>
-              <td>{t.echeance || "—"}</td>
+
+              {estRegitem ? (
+                <>
+                  <td style={{ fontFamily: "var(--font-ui)" }}>
+                    {t.titre}
+                    <span className="simple-list-meta" style={{ marginLeft: 6 }}>
+                      (équipement : {t._equipementNom})
+                    </span>
+                  </td>
+                  <td style={{ fontFamily: "var(--font-ui)" }}>{t.assigneA || "À affecter"}</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                </>
+              ) : (
+                <>
+                  <td>
+                    <input
+                      className="import-edit-input"
+                      defaultValue={t.titre}
+                      onBlur={(e) => {
+                        if (e.target.value !== t.titre) changerChamp(t, "titre", e.target.value);
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      className="import-edit-input"
+                      value={t.assigneA || ""}
+                      onChange={(e) => changerChamp(t, "assigneA", e.target.value || null)}
+                    >
+                      <option value="">À affecter</option>
+                      {utilisateurs.map((u) => (
+                        <option key={u.id} value={u.nom}>
+                          {u.nom}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      className="import-edit-input task-cell-heures"
+                      defaultValue={t.heuresPrevues ?? ""}
+                      onBlur={(e) => {
+                        const v = e.target.value ? Number(e.target.value) : null;
+                        if (v !== (t.heuresPrevues ?? null)) changerChamp(t, "heuresPrevues", v);
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="date"
+                      className="import-edit-input"
+                      value={t.dateDebut || ""}
+                      onChange={(e) => changerChamp(t, "dateDebut", e.target.value || null)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="date"
+                      className="import-edit-input"
+                      value={t.echeance || ""}
+                      onChange={(e) => changerChamp(t, "echeance", e.target.value || null)}
+                    />
+                  </td>
+                </>
+              )}
+
               <td>
                 <select
                   value={t.statut ?? "a_faire"}
-                  onChange={(e) => changerStatut(t, e.target.value)}
+                  onChange={(e) => changerChamp(t, "statut", e.target.value)}
                 >
                   {options.map((s) => (
                     <option key={s.value} value={s.value}>
@@ -85,23 +144,32 @@ export default function TaskTable({ taches, peutGerer, onEdit, onDelete, affiche
                   ))}
                 </select>
               </td>
-              <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
-                {t.commentaires || "—"}
+
+              <td>
+                {estRegitem ? (
+                  <span className="simple-list-meta">{t.commentaires || "—"}</span>
+                ) : (
+                  <input
+                    className="import-edit-input"
+                    defaultValue={t.commentaires ?? ""}
+                    onBlur={(e) => {
+                      if (e.target.value !== (t.commentaires ?? "")) {
+                        changerChamp(t, "commentaires", e.target.value || null);
+                      }
+                    }}
+                  />
+                )}
               </td>
+
               <td>
                 {estRegitem ? (
                   <span className="simple-list-meta">Depuis équipement</span>
                 ) : (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn-ghost" onClick={() => onEdit(t)}>
-                      Modifier
+                  peutGerer && (
+                    <button className="btn-ghost btn-danger" onClick={() => onDelete(t.id)}>
+                      ×
                     </button>
-                    {peutGerer && (
-                      <button className="btn-ghost btn-danger" onClick={() => onDelete(t.id)}>
-                        ×
-                      </button>
-                    )}
-                  </div>
+                  )
                 )}
               </td>
             </tr>
