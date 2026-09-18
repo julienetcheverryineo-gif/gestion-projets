@@ -11,11 +11,10 @@ import {
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
-import { formatStatut } from "./Sites";
+import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
 import ImportDevisModal from "../components/ImportDevisModal";
 import TeamFormModal from "../components/TeamFormModal";
 import ReservesPanel from "../components/ReservesPanel";
-import TaskFormModal from "../components/TaskFormModal";
 import TaskTable from "../components/TaskTable";
 
 const STATUTS_MATERIEL = [
@@ -65,10 +64,9 @@ export default function SiteDetail() {
   const [afficherTempsForm, setAfficherTempsForm] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
   const [afficherEquipeForm, setAfficherEquipeForm] = useState(false);
-  const [afficherTacheForm, setAfficherTacheForm] = useState(false);
-  const [tacheEnEdition, setTacheEnEdition] = useState(null);
   const [afficherAffectationMasse, setAfficherAffectationMasse] = useState(false);
-  const [ongletActif, setOngletActif] = useState("equipements");
+  const [afficherChantierForm, setAfficherChantierForm] = useState(false);
+  const [ongletActif, setOngletActif] = useState("taches");
 
   const supprimerLot = async (lotId) => {
     if (!confirm("Supprimer ce lot et ses équipements ?")) return;
@@ -98,7 +96,7 @@ export default function SiteDetail() {
           <h1 style={{ marginTop: 8 }}>{chantier.nom}</h1>
           <p className="page-subtitle">
             {chantier.client && "Client : " + chantier.client + " · "}
-            {formatStatut(chantier.statut)}
+            {formatStatutChantier(chantier.statut)}
             {totalHeures > 0 && " · " + totalHeures + " h passées"}
           </p>
           <div className="team-summary">
@@ -126,6 +124,11 @@ export default function SiteDetail() {
             {peutGerer && (
               <button className="linkish" onClick={() => setAfficherAffectationMasse(true)}>
                 Assigner toutes les tâches à…
+              </button>
+            )}
+            {peutGerer && (
+              <button className="linkish" onClick={() => setAfficherChantierForm(true)}>
+                Modifier le chantier
               </button>
             )}
           </div>
@@ -299,10 +302,20 @@ export default function SiteDetail() {
             <h2>Tâches</h2>
             <button
               className="btn-ghost"
-              onClick={() => {
-                setTacheEnEdition(null);
-                setAfficherTacheForm(true);
-              }}
+              onClick={() =>
+                addDoc(collection(db, "tasks"), {
+                  titre: "Nouvelle tâche",
+                  chantierId,
+                  assigneA: null,
+                  heuresPrevues: null,
+                  dateDebut: null,
+                  echeance: null,
+                  lienDevis: null,
+                  commentaires: null,
+                  statut: "a_faire",
+                  creeLe: serverTimestamp(),
+                })
+              }
             >
               + Ajouter une tâche
             </button>
@@ -319,14 +332,8 @@ export default function SiteDetail() {
         </section>
       )}
 
-      {afficherTacheForm && (
-        <TaskFormModal
-          tache={tacheEnEdition}
-          chantiers={chantiers}
-          chantierIdFixe={tacheEnEdition ? undefined : chantierId}
-          utilisateurs={utilisateurs}
-          onClose={() => setAfficherTacheForm(false)}
-        />
+      {afficherChantierForm && (
+        <SiteFormModal chantier={chantier} onClose={() => setAfficherChantierForm(false)} />
       )}
 
       {afficherAffectationMasse && (

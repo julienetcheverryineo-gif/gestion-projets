@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
-import { deleteDoc, doc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
-import TaskFormModal from "../components/TaskFormModal";
 import TaskTable from "../components/TaskTable";
 
 export default function Tasks() {
@@ -14,12 +13,7 @@ export default function Tasks() {
   const { documents: utilisateurs } = useCollection("users", "email");
   const { documents: regItems } = useCollection("regitems");
   const { documents: regEquipements } = useCollection("regequipements");
-  const [afficherFormulaire, setAfficherFormulaire] = useState(false);
-  const [tacheEnEdition, setTacheEnEdition] = useState(null);
-  const [chantierPourAjout, setChantierPourAjout] = useState(undefined);
   const [groupeOuvert, setGroupeOuvert] = useState(null);
-
-  const nomChantier = (id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter";
 
   const tachesRegitems = useMemo(
     () =>
@@ -68,6 +62,22 @@ export default function Tasks() {
     await deleteDoc(doc(db, "tasks", id));
   };
 
+  const ajouterTache = async (chantierId) => {
+    await addDoc(collection(db, "tasks"), {
+      titre: "Nouvelle tâche",
+      chantierId: chantierId || null,
+      assigneA: null,
+      heuresPrevues: null,
+      dateDebut: null,
+      echeance: null,
+      lienDevis: null,
+      commentaires: null,
+      statut: "a_faire",
+      creeLe: serverTimestamp(),
+    });
+    setGroupeOuvert(chantierId ?? "aaffecter");
+  };
+
   return (
     <div className="page">
       <header className="page-header page-header-actions">
@@ -75,14 +85,7 @@ export default function Tasks() {
           <h1>Tâches</h1>
           <p className="page-subtitle">Toutes les tâches, regroupées par chantier.</p>
         </div>
-        <button
-          className="btn-primary"
-          onClick={() => {
-            setTacheEnEdition(null);
-            setChantierPourAjout(undefined);
-            setAfficherFormulaire(true);
-          }}
-        >
+        <button className="btn-primary" onClick={() => ajouterTache(null)}>
           Nouvelle tâche
         </button>
       </header>
@@ -113,9 +116,7 @@ export default function Tasks() {
                     className="btn-ghost"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setTacheEnEdition(null);
-                      setChantierPourAjout(g.id);
-                      setAfficherFormulaire(true);
+                      ajouterTache(g.id);
                     }}
                   >
                     + Tâche
@@ -135,17 +136,6 @@ export default function Tasks() {
             );
           })}
         </div>
-      )}
-
-      {afficherFormulaire && (
-        <TaskFormModal
-          statutInitial="a_faire"
-          tache={tacheEnEdition}
-          chantiers={chantiers}
-          chantierIdFixe={tacheEnEdition ? undefined : chantierPourAjout}
-          utilisateurs={utilisateurs}
-          onClose={() => setAfficherFormulaire(false)}
-        />
       )}
     </div>
   );

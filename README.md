@@ -444,6 +444,19 @@ issues d'un équipement régulé restent en lecture seule pour leur
 désignation (seul leur statut est modifiable ici, comme avant — la
 modification complète se fait depuis la fiche de l'équipement).
 
+## Ouverture directe sur l'onglet Tâches, création rapide, modification du chantier
+
+- La page d'un chantier s'ouvre désormais directement sur l'onglet
+  **Tâches** (au lieu d'"Équipements régulés").
+- **"+ Ajouter une tâche"** crée immédiatement une ligne ("Nouvelle tâche",
+  à faire, sans responsable ni dates) directement dans le tableau — vous la
+  complétez sur place grâce à l'édition en ligne, plus de fenêtre à
+  remplir avant de voir la tâche apparaître. Même logique pour le bouton
+  "Nouvelle tâche"/"+ Tâche" de la page Tâches globale.
+- Nouveau bouton **"Modifier le chantier"** sur la page du chantier (à côté
+  de "Assigner toutes les tâches à…") pour changer nom, client, adresse,
+  statut ou compte sans repasser par la liste des chantiers.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
