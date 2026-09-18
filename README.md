@@ -395,6 +395,17 @@ Les noms qui ne trouvent pas de correspondance (mail absent du référentiel,
 ou aucun compte avec cet e-mail) sont repris tels quels et signalés dans
 l'aperçu avant import, à corriger manuellement ensuite si besoin.
 
+## Page Chantiers en tableau
+
+La liste des chantiers est passée d'une grille de cartes à un tableau
+triable, plus adapté dès qu'on dépasse une dizaine de chantiers :
+recherche (nom/client), filtre de statut (actifs par défaut, masque les
+terminés), colonnes cliquables pour trier (Chantier, Client, Avancement,
+Réserves), avancement en barre visuelle, et réserves ouvertes mises en
+évidence en rouge quand il y en a. L'avancement utilise désormais le même
+calcul que la vue d'ensemble (équipements régulés testés/faits), plus
+cohérent avec le reste de l'appli qu'avant.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

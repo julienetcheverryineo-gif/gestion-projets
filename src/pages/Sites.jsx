@@ -31,12 +31,16 @@ export default function Sites() {
   const { documents: taches } = useCollection("tasks");
   const { documents: tempsEntries } = useCollection("timeEntries");
   const { documents: utilisateurs } = useCollection("users", "email");
+  const { documents: reserves } = useCollection("reserves");
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [seulementNonInstalle, setSeulementNonInstalle] = useState(true);
   const [nettoyageEnCours, setNettoyageEnCours] = useState(false);
   const [messageNettoyage, setMessageNettoyage] = useState("");
   const [afficherImportSuivi, setAfficherImportSuivi] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  const [filtreStatut, setFiltreStatut] = useState("actifs");
+  const [tri, setTri] = useState({ colonne: "nom", sens: 1 });
 
   const supprimer = async (id) => {
     if (
@@ -131,13 +135,57 @@ export default function Sites() {
   };
 
   const avancement = (chantierId) => {
-    const lotsDuChantier = lots.filter((l) => l.chantierId === chantierId);
-    if (lotsDuChantier.length === 0) return null;
-    const moyenne =
-      lotsDuChantier.reduce((sum, l) => sum + (l.avancement ?? 0), 0) /
-      lotsDuChantier.length;
-    return Math.round(moyenne);
+    const regsDuChantier = regEquipements.filter((r) => r.chantierId === chantierId);
+    const items = regItems.filter((it) =>
+      regsDuChantier.some((r) => r.id === it.regEquipementId)
+    );
+    if (items.length === 0) return null;
+    const faits = items.filter((it) => it.statut === "teste" || it.statut === "fait").length;
+    return Math.round((faits / items.length) * 100);
   };
+
+  const reservesOuvertes = (chantierId) =>
+    reserves.filter((r) => r.chantierId === chantierId && r.statut !== "levee").length;
+
+  const basculerTri = (colonne) => {
+    setTri((t) =>
+      t.colonne === colonne ? { colonne, sens: -t.sens } : { colonne, sens: 1 }
+    );
+  };
+
+  const chantiersAffiches = chantiers
+    .filter((c) => {
+      if (filtreStatut === "tous") return true;
+      if (filtreStatut === "termines") return c.statut === "termine";
+      return c.statut !== "termine"; // "actifs" par défaut
+    })
+    .filter((c) => {
+      const q = recherche.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        c.nom.toLowerCase().includes(q) || (c.client ?? "").toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      const { colonne, sens } = tri;
+      let va, vb;
+      if (colonne === "avancement") {
+        va = avancement(a.id) ?? -1;
+        vb = avancement(b.id) ?? -1;
+      } else if (colonne === "reserves") {
+        va = reservesOuvertes(a.id);
+        vb = reservesOuvertes(b.id);
+      } else if (colonne === "client") {
+        va = (a.client ?? "").toLowerCase();
+        vb = (b.client ?? "").toLowerCase();
+      } else {
+        va = a.nom.toLowerCase();
+        vb = b.nom.toLowerCase();
+      }
+      if (va < vb) return -1 * sens;
+      if (va > vb) return 1 * sens;
+      return 0;
+    });
 
   return (
     <div className="page">
@@ -207,53 +255,116 @@ export default function Sites() {
         </div>
       </header>
 
+      <div className="chantiers-filtres">
+        <input
+          className="chantiers-recherche"
+          placeholder="Rechercher un chantier ou un client…"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+        />
+        <select value={filtreStatut} onChange={(e) => setFiltreStatut(e.target.value)}>
+          <option value="actifs">Actifs (masquer terminés)</option>
+          <option value="tous">Tous statuts</option>
+          <option value="termines">Terminés seulement</option>
+        </select>
+      </div>
+
       {chargement ? (
         <div className="page-loading">Chargement…</div>
-      ) : chantiers.length === 0 ? (
+      ) : chantiersAffiches.length === 0 ? (
         <div className="empty-state">
-          <p className="empty-state-title">Aucun chantier</p>
+          <p className="empty-state-title">
+            {chantiers.length === 0 ? "Aucun chantier" : "Aucun résultat"}
+          </p>
           <p className="empty-state-description">
-            Créez votre premier chantier pour commencer à suivre les lots techniques.
+            {chantiers.length === 0
+              ? "Créez votre premier chantier pour commencer à suivre les lots techniques."
+              : "Essayez une autre recherche ou changez le filtre de statut."}
           </p>
         </div>
       ) : (
-        <div className="project-grid">
-          {chantiers.map((chantier) => {
-            const pct = avancement(chantier.id);
-            return (
-              <div key={chantier.id} className="project-card">
-                <div className="project-card-header">
-                  <span className={"status-dot status-" + (chantier.statut ?? "actif")} />
-                  <h3>{chantier.nom}</h3>
-                </div>
-                {chantier.client && (
-                  <p className="project-card-description">Client : {chantier.client}</p>
-                )}
-                <div className="project-card-meta">
-                  <span>{formatStatut(chantier.statut)}</span>
-                  {pct !== null && <span>Avancement : {pct}%</span>}
-                </div>
-                {pct !== null && (
-                  <div className="progress-bar">
-                    <div className="progress-bar-fill" style={{ width: pct + "%" }} />
-                  </div>
-                )}
-                <div className="project-card-actions">
-                  <Link to={"/chantiers/" + chantier.id} className="btn-ghost">
-                    Ouvrir
-                  </Link>
-                  {peutGerer && (
-                    <button
-                      className="btn-ghost btn-danger"
-                      onClick={() => supprimer(chantier.id)}
-                    >
-                      Supprimer
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <div className="data-table-wrapper">
+          <table className="data-table chantiers-table">
+            <thead>
+              <tr>
+                <th className="th-tri" onClick={() => basculerTri("nom")}>
+                  Chantier{tri.colonne === "nom" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
+                <th className="th-tri" onClick={() => basculerTri("client")}>
+                  Client{tri.colonne === "client" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
+                <th>Statut</th>
+                <th className="th-tri" onClick={() => basculerTri("avancement")}>
+                  Avancement{tri.colonne === "avancement" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
+                <th className="th-tri" onClick={() => basculerTri("reserves")}>
+                  Réserves{tri.colonne === "reserves" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
+                <th>RA</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {chantiersAffiches.map((chantier) => {
+                const pct = avancement(chantier.id);
+                const nbReserves = reservesOuvertes(chantier.id);
+                return (
+                  <tr key={chantier.id}>
+                    <td style={{ fontFamily: "var(--font-ui)", fontWeight: 500 }}>
+                      <span
+                        className={"status-dot status-" + (chantier.statut ?? "actif")}
+                        style={{ marginRight: 8 }}
+                      />
+                      {chantier.nom}
+                    </td>
+                    <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                      {chantier.client || "—"}
+                    </td>
+                    <td style={{ fontFamily: "var(--font-ui)" }}>
+                      {formatStatut(chantier.statut)}
+                    </td>
+                    <td>
+                      {pct !== null ? (
+                        <div className="chantiers-avancement-cell">
+                          <div className="progress-bar chantiers-avancement-bar">
+                            <div className="progress-bar-fill" style={{ width: pct + "%" }} />
+                          </div>
+                          <span className="simple-list-meta">{pct}%</span>
+                        </div>
+                      ) : (
+                        <span className="simple-list-meta">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {nbReserves > 0 ? (
+                        <span className="chantiers-reserves-alerte">{nbReserves} ouverte(s)</span>
+                      ) : (
+                        <span className="simple-list-meta">—</span>
+                      )}
+                    </td>
+                    <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                      {chantier.ra || "Julien ETCHEVERRY"}
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        <Link to={"/chantiers/" + chantier.id} className="btn-ghost">
+                          Ouvrir
+                        </Link>
+                        {peutGerer && (
+                          <button
+                            className="btn-ghost btn-danger"
+                            onClick={() => supprimer(chantier.id)}
+                          >
+                            Supprimer
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

@@ -860,6 +860,52 @@ a {
   gap: 12px;
 }
 
+.chantiers-filtres {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.chantiers-recherche {
+  flex: 1;
+  max-width: 360px;
+}
+
+.data-table-wrapper {
+  background: var(--panel);
+  border: 1px solid var(--ring);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px 16px;
+  overflow-x: auto;
+}
+
+.chantiers-table th {
+  white-space: nowrap;
+}
+.th-tri {
+  cursor: pointer;
+  user-select: none;
+}
+.th-tri:hover {
+  color: var(--text);
+}
+
+.chantiers-avancement-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chantiers-avancement-bar {
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.chantiers-reserves-alerte {
+  color: var(--danger);
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
 .export-filtre-checkbox {
   display: flex;
   align-items: center;
@@ -1399,6 +1445,12 @@ textarea:focus {
   }
   .export-filtre-checkbox {
     justify-content: flex-end;
+  }
+  .chantiers-filtres {
+    flex-direction: column;
+  }
+  .chantiers-recherche {
+    max-width: none;
   }
 
   .stat-grid {

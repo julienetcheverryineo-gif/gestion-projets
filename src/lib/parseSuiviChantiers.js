@@ -49,6 +49,15 @@ export function parseSuiviChantiers(arrayBuffer, utilisateursApp = []) {
       .map((u) => [String(u.email).trim().toLowerCase(), u.nom])
   );
 
+  // Table de correspondance complète, pour affichage/diagnostic : chaque
+  // entrée de la feuille Referentiel, avec le compte applicatif trouvé (ou
+  // non) via son e-mail.
+  const correspondances = [...referentiel.entries()].map(([nomCourtNormalise, email]) => ({
+    nomCourt: nomCourtNormalise,
+    email,
+    nomApp: emailVersNomApp.get(email) || null,
+  }));
+
   const nonApparies = new Set();
 
   const resoudreResponsable = (texteBrut) => {
