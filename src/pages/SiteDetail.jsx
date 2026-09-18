@@ -142,16 +142,16 @@ export default function SiteDetail() {
 
       <div className="page-tabs">
         <button
+          className={"page-tab" + (ongletActif === "taches" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("taches")}
+        >
+          Tâches
+        </button>
+        <button
           className={"page-tab" + (ongletActif === "equipements" ? " page-tab-active" : "")}
           onClick={() => setOngletActif("equipements")}
         >
           Équipements régulés
-        </button>
-        <button
-          className={"page-tab" + (ongletActif === "autres-lots" ? " page-tab-active" : "")}
-          onClick={() => setOngletActif("autres-lots")}
-        >
-          Autres lots
         </button>
         <button
           className={"page-tab" + (ongletActif === "reserves" ? " page-tab-active" : "")}
@@ -160,10 +160,10 @@ export default function SiteDetail() {
           Réserves
         </button>
         <button
-          className={"page-tab" + (ongletActif === "taches" ? " page-tab-active" : "")}
-          onClick={() => setOngletActif("taches")}
+          className={"page-tab" + (ongletActif === "autres-lots" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("autres-lots")}
         >
-          Tâches
+          Autres lots
         </button>
       </div>
 
