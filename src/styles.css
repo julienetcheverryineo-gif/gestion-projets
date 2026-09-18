@@ -860,6 +860,13 @@ a {
   gap: 12px;
 }
 
+.reg-equip-draggable {
+  cursor: grab;
+}
+.reg-equip-draggable:active {
+  cursor: grabbing;
+}
+
 .chantiers-filtres {
   display: flex;
   gap: 10px;

@@ -420,6 +420,19 @@ côté de la liste des chantiers :
   tâches terminées").
 - **Tâches en retard** reste en bas si besoin, comme avant.
 
+## Ordre des équipements régulés
+
+Les équipements s'affichent maintenant dans l'ordre du fichier importé (au
+lieu de l'ordre de création en base, qui les mélangeait) — un champ `ordre`
+est attribué à chaque équipement, à l'import comme à la création manuelle.
+Vous pouvez aussi **glisser-déposer** une carte d'équipement pour la
+repositionner à la main ; l'ordre choisi est mémorisé.
+
+**Limite à connaître** : les équipements déjà créés avant cette mise à jour
+n'ont pas ce champ `ordre` — leur ordre d'affichage actuel ne changera pas
+tout seul. Un glisser-déposer suffit à les ranger comme vous le souhaitez,
+une fois fait c'est acquis.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

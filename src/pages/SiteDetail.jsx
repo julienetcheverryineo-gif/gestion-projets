@@ -40,7 +40,9 @@ export default function SiteDetail() {
 
   // --- Équipements régulés (notre périmètre) ---
   const { documents: tousRegEquipements } = useCollection("regequipements");
-  const regEquipements = tousRegEquipements.filter((e) => e.chantierId === chantierId);
+  const regEquipements = tousRegEquipements
+    .filter((e) => e.chantierId === chantierId)
+    .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
   const { documents: tousRegItems } = useCollection("regitems");
 
   // --- Autres lots techniques (les autres corps d'état) ---
@@ -197,19 +199,37 @@ export default function SiteDetail() {
           </div>
         ) : (
           <div className="lot-list">
-            {regEquipements.map((reg) => (
-              <RegEquipmentCard
+            {regEquipements.map((reg, index) => (
+              <div
                 key={reg.id}
-                reg={reg}
-                items={tousRegItems.filter((it) => it.regEquipementId === reg.id)}
-                peutGerer={peutGerer}
-                utilisateurs={utilisateurs}
-                onEdit={() => {
-                  setRegSelectionne(reg);
-                  setAfficherRegForm(true);
+                draggable={peutGerer}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/reg-equip-id", reg.id);
                 }}
-                onDelete={() => supprimerRegEquipement(reg.id)}
-              />
+                onDragOver={(e) => peutGerer && e.preventDefault()}
+                onDrop={(e) => {
+                  if (!peutGerer) return;
+                  e.preventDefault();
+                  const idDeplace = e.dataTransfer.getData("text/reg-equip-id");
+                  if (!idDeplace || idDeplace === reg.id) return;
+                  const ordreAvant = index > 0 ? regEquipements[index - 1].ordre ?? 0 : (reg.ordre ?? 0) - 2;
+                  const nouvelOrdre = (ordreAvant + (reg.ordre ?? 0)) / 2;
+                  updateDoc(doc(db, "regequipements", idDeplace), { ordre: nouvelOrdre });
+                }}
+                className={peutGerer ? "reg-equip-draggable" : undefined}
+              >
+                <RegEquipmentCard
+                  reg={reg}
+                  items={tousRegItems.filter((it) => it.regEquipementId === reg.id)}
+                  peutGerer={peutGerer}
+                  utilisateurs={utilisateurs}
+                  onEdit={() => {
+                    setRegSelectionne(reg);
+                    setAfficherRegForm(true);
+                  }}
+                  onDelete={() => supprimerRegEquipement(reg.id)}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -605,6 +625,7 @@ function RegEquipmentFormModal({ chantierId, reg, onClose }) {
       await addDoc(collection(db, "regequipements"), {
         nom,
         chantierId,
+        ordre: Date.now(),
         creeLe: serverTimestamp(),
       });
     }

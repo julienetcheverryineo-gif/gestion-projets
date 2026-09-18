@@ -162,12 +162,15 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     const aImporter = postes.filter((p) => p.selectionne);
     if (aImporter.length === 0) return;
     setEnImport(true);
+    const baseOrdre = Date.now();
     try {
-      for (const poste of aImporter) {
+      for (let index = 0; index < aImporter.length; index++) {
+        const poste = aImporter[index];
         const regRef = await addDoc(collection(db, "regequipements"), {
           nom: poste.nomEdite,
           chantierId,
           code: poste.code,
+          ordre: baseOrdre + index,
           creeLe: serverTimestamp(),
         });
         for (const item of poste.items) {
