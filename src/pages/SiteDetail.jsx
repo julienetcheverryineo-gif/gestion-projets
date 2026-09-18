@@ -68,6 +68,29 @@ export default function SiteDetail() {
   const [afficherChantierForm, setAfficherChantierForm] = useState(false);
   const [ongletActif, setOngletActif] = useState("taches");
 
+  const tachesDuChantier = useMemo(() => {
+    const idsRegEquip = regEquipements.map((r) => r.id);
+    const tachesRegitems = tousRegItems
+      .filter((it) => it.type === "tache" && idsRegEquip.includes(it.regEquipementId))
+      .map((it) => {
+        const equip = regEquipements.find((r) => r.id === it.regEquipementId);
+        return {
+          id: it.id,
+          _source: "regitem",
+          _equipementNom: equip?.nom ?? "?",
+          titre: it.designation,
+          chantierId,
+          assigneA: it.assigneA || null,
+          heuresPrevues: null,
+          dateDebut: null,
+          echeance: null,
+          commentaires: it.remarque || null,
+          statut: it.statut,
+        };
+      });
+    return [...tousTaches.filter((t) => t.chantierId === chantierId), ...tachesRegitems];
+  }, [tousTaches, tousRegItems, regEquipements, chantierId]);
+
   const supprimerLot = async (lotId) => {
     if (!confirm("Supprimer ce lot et ses équipements ?")) return;
     const equipementsDuLot = tousEquipements.filter((e) => e.lotId === lotId);
@@ -321,7 +344,7 @@ export default function SiteDetail() {
             </button>
           </div>
           <TaskTable
-            taches={tousTaches.filter((t) => t.chantierId === chantierId)}
+            taches={tachesDuChantier}
             peutGerer={peutGerer}
             utilisateurs={utilisateurs}
             onDelete={async (id) => {

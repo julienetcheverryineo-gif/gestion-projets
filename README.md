@@ -457,6 +457,21 @@ modification complète se fait depuis la fiche de l'équipement).
   de "Assigner toutes les tâches à…") pour changer nom, client, adresse,
   statut ou compte sans repasser par la liste des chantiers.
 
+## Tâches d'équipement régulé dans l'onglet Tâches du chantier, vue par responsable, réserves globales
+
+- L'onglet **Tâches** d'un chantier affiche maintenant aussi les tâches de
+  ses équipements régulés (comme la page Tâches globale déjà).
+- Tableau des chantiers : la colonne **RA** est remplacée par
+  **Responsable** (le responsable de chantier défini dans "Modifier
+  l'équipe"), plus utile pour se repérer d'un coup d'œil.
+- Page **Tâches** globale : deux boutons **"Par chantier" / "Par
+  responsable"** pour changer le regroupement. En mode "Par responsable", la
+  colonne Chantier apparaît dans chaque tableau pour resituer la tâche.
+- Nouvelle page **"Réserves"** (menu de gauche) : synthèse de toutes les
+  réserves de tous les chantiers, avec indicateurs (total, ouvertes,
+  levées), filtres et regroupement par chantier — plus besoin d'ouvrir
+  chaque chantier pour vérifier ses réserves.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

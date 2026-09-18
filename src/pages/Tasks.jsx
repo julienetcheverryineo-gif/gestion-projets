@@ -14,6 +14,7 @@ export default function Tasks() {
   const { documents: regItems } = useCollection("regitems");
   const { documents: regEquipements } = useCollection("regequipements");
   const [groupeOuvert, setGroupeOuvert] = useState(null);
+  const [modeGroupement, setModeGroupement] = useState("chantier");
 
   const tachesRegitems = useMemo(
     () =>
@@ -43,29 +44,41 @@ export default function Tasks() {
     [taches, tachesRegitems]
   );
 
-  const groupes = useMemo(() => {
+  const groupesParChantier = useMemo(() => {
     const map = new Map();
     // Un groupe par chantier existant, même sans tâche, pour qu'on les retrouve tous
     for (const c of chantiers) {
-      map.set(c.id, { id: c.id, nom: c.nom, taches: [] });
+      map.set(c.id, { cle: c.id, nom: c.nom, taches: [] });
     }
-    map.set("aaffecter", { id: null, nom: "À affecter", taches: [] });
+    map.set("aaffecter", { cle: "aaffecter", nom: "À affecter", taches: [] });
     for (const t of toutesLesTaches) {
       const cle = t.chantierId && map.has(t.chantierId) ? t.chantierId : "aaffecter";
       map.get(cle).taches.push(t);
     }
-    return [...map.values()].filter((g) => g.id === null ? g.taches.length > 0 : true);
+    return [...map.values()].filter((g) => g.cle === "aaffecter" ? g.taches.length > 0 : true);
   }, [toutesLesTaches, chantiers]);
+
+  const groupesParResponsable = useMemo(() => {
+    const map = new Map();
+    for (const t of toutesLesTaches) {
+      const nom = t.assigneA || "À affecter";
+      if (!map.has(nom)) map.set(nom, { cle: nom, nom, taches: [] });
+      map.get(nom).taches.push(t);
+    }
+    return [...map.values()].sort((a, b) => b.taches.length - a.taches.length);
+  }, [toutesLesTaches]);
+
+  const groupes = modeGroupement === "chantier" ? groupesParChantier : groupesParResponsable;
 
   const supprimer = async (id) => {
     if (!confirm("Supprimer cette tâche ?")) return;
     await deleteDoc(doc(db, "tasks", id));
   };
 
-  const ajouterTache = async (chantierId) => {
-    await addDoc(collection(db, "tasks"), {
+  const ajouterTache = async (groupe) => {
+    const donnees = {
       titre: "Nouvelle tâche",
-      chantierId: chantierId || null,
+      chantierId: null,
       assigneA: null,
       heuresPrevues: null,
       dateDebut: null,
@@ -74,8 +87,14 @@ export default function Tasks() {
       commentaires: null,
       statut: "a_faire",
       creeLe: serverTimestamp(),
-    });
-    setGroupeOuvert(chantierId ?? "aaffecter");
+    };
+    if (modeGroupement === "chantier") {
+      donnees.chantierId = groupe.cle === "aaffecter" ? null : groupe.cle;
+    } else {
+      donnees.assigneA = groupe.cle === "À affecter" ? null : groupe.cle;
+    }
+    await addDoc(collection(db, "tasks"), donnees);
+    setGroupeOuvert(groupe.cle);
   };
 
   return (
@@ -83,12 +102,31 @@ export default function Tasks() {
       <header className="page-header page-header-actions">
         <div>
           <h1>Tâches</h1>
-          <p className="page-subtitle">Toutes les tâches, regroupées par chantier.</p>
+          <p className="page-subtitle">
+            {modeGroupement === "chantier"
+              ? "Toutes les tâches, regroupées par chantier."
+              : "Toutes les tâches, regroupées par responsable."}
+          </p>
         </div>
-        <button className="btn-primary" onClick={() => ajouterTache(null)}>
+        <button className="btn-primary" onClick={() => ajouterTache({ cle: "aaffecter" })}>
           Nouvelle tâche
         </button>
       </header>
+
+      <div className="page-tabs" style={{ marginBottom: 16 }}>
+        <button
+          className={"page-tab" + (modeGroupement === "chantier" ? " page-tab-active" : "")}
+          onClick={() => setModeGroupement("chantier")}
+        >
+          Par chantier
+        </button>
+        <button
+          className={"page-tab" + (modeGroupement === "responsable" ? " page-tab-active" : "")}
+          onClick={() => setModeGroupement("responsable")}
+        >
+          Par responsable
+        </button>
+      </div>
 
       {groupes.length === 0 ? (
         <div className="empty-state">
@@ -98,12 +136,12 @@ export default function Tasks() {
       ) : (
         <div className="lot-list">
           {groupes.map((g) => {
-            const ouvert = groupeOuvert === (g.id ?? "aaffecter");
+            const ouvert = groupeOuvert === g.cle;
             return (
-              <div key={g.id ?? "aaffecter"} className="lot-card">
+              <div key={g.cle} className="lot-card">
                 <div
                   className="lot-card-header"
-                  onClick={() => setGroupeOuvert(ouvert ? null : g.id ?? "aaffecter")}
+                  onClick={() => setGroupeOuvert(ouvert ? null : g.cle)}
                 >
                   <div>
                     <span className="lot-card-toggle">{ouvert ? "▾" : "▸"}</span>
@@ -116,7 +154,7 @@ export default function Tasks() {
                     className="btn-ghost"
                     onClick={(e) => {
                       e.stopPropagation();
-                      ajouterTache(g.id);
+                      ajouterTache(g);
                     }}
                   >
                     + Tâche
@@ -129,6 +167,8 @@ export default function Tasks() {
                       peutGerer={peutGerer}
                       utilisateurs={utilisateurs}
                       onDelete={supprimer}
+                      afficherChantier={modeGroupement === "responsable"}
+                      nomChantier={(id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter"}
                     />
                   </div>
                 )}

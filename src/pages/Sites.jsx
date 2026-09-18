@@ -288,7 +288,7 @@ export default function Sites() {
                 <th className="th-tri" onClick={() => basculerTri("reserves")}>
                   Réserves{tri.colonne === "reserves" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
-                <th>RA</th>
+                <th>Responsable</th>
                 <th></th>
               </tr>
             </thead>
@@ -331,7 +331,7 @@ export default function Sites() {
                       )}
                     </td>
                     <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
-                      {chantier.ra || "Julien ETCHEVERRY"}
+                      {chantier.responsableChantier || "—"}
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
