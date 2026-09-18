@@ -6,7 +6,6 @@ const NAV_ITEMS = [
   { to: "/", label: "Vue d'ensemble", end: true },
   { to: "/chantiers", label: "Chantiers" },
   { to: "/taches", label: "Tâches" },
-  { to: "/plan-de-charge", label: "Plan de charge" },
 ];
 
 export default function Layout() {

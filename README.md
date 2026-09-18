@@ -406,6 +406,20 @@ Réserves), avancement en barre visuelle, et réserves ouvertes mises en
 calcul que la vue d'ensemble (équipements régulés testés/faits), plus
 cohérent avec le reste de l'appli qu'avant.
 
+## Vue d'ensemble fusionnée avec le Plan de charge
+
+Les deux pages faisaient doublon (chantiers d'un côté, charge d'équipe de
+l'autre, sans lien entre elles). "Plan de charge" a été retiré du menu — sa
+section "Charge par automaticien" vit maintenant dans "Vue d'ensemble", à
+côté de la liste des chantiers :
+
+- **6 indicateurs en haut** : chantiers actifs, tâches en cours, tâches en
+  retard, réserves ouvertes, points restants, heures prévues au total.
+- **Deux panneaux côte à côte** : Chantiers (avancement, lien direct) et
+  Charge par automaticien (dépliable, détail par tâche, case "inclure les
+  tâches terminées").
+- **Tâches en retard** reste en bas si besoin, comme avant.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
