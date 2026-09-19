@@ -472,6 +472,23 @@ modification complète se fait depuis la fiche de l'équipement).
   levées), filtres et regroupement par chantier — plus besoin d'ouvrir
   chaque chantier pour vérifier ses réserves.
 
+## Vraie version mobile
+
+Depuis les premiers ajustements mobile, beaucoup de tableaux denses avaient
+été ajoutés (tâches éditables, chantiers, réserves, matériel) et étaient
+redevenus illisibles sur iPhone — simple défilement horizontal d'un
+tableau bien trop large. Refonte complète :
+
+- **Tous les tableaux de l'appli** (tâches, chantiers, réserves, matériel,
+  utilisateurs, import) se transforment sur mobile en **cartes empilées** :
+  chaque ligne devient un bloc, chaque valeur est précédée de son intitulé
+  de colonne. Plus de défilement horizontal.
+- **Réordonnancement des équipements régulés** : le glisser-déposer ne
+  fonctionne pas au doigt (limite du web, pas de l'appli). Sur mobile, des
+  boutons **▲ Monter / ▼ Descendre** apparaissent à la place.
+- En-têtes de cartes (équipements, lots) et barres d'onglets adaptés pour
+  ne plus déborder sur petit écran.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

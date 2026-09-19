@@ -395,7 +395,7 @@ function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQu
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
-                <td>
+                <td data-label="Désignation">
                   <input
                     className="import-edit-input"
                     value={item.designation}
@@ -405,7 +405,7 @@ function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQu
                 </td>
                 {avecQuantite && (
                   <>
-                    <td>
+                    <td data-label="Qté">
                       <input
                         type="number"
                         className="import-edit-input"
@@ -413,7 +413,7 @@ function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQu
                         onChange={(e) => onChange(item.id, "quantite", Number(e.target.value))}
                       />
                     </td>
-                    <td>
+                    <td data-label="Unité">
                       <input
                         className="import-edit-input"
                         value={item.unite}

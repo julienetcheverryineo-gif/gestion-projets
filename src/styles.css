@@ -873,6 +873,9 @@ a {
 .reg-equip-draggable:active {
   cursor: grabbing;
 }
+.reg-equip-move-mobile {
+  display: none;
+}
 
 .chantiers-filtres {
   display: flex;
@@ -1503,10 +1506,60 @@ textarea:focus {
     overflow-y: auto;
   }
 
+  /* Tableaux -> cartes empilées sur mobile, plus de défilement horizontal.
+     Chaque <td> doit porter un attribut data-label pour afficher son
+     intitulé de colonne devant la valeur. */
   .data-table {
     display: block;
-    overflow-x: auto;
-    white-space: nowrap;
+    white-space: normal;
+  }
+  .data-table thead {
+    display: none;
+  }
+  .data-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .data-table tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    background: var(--panel-raised);
+  }
+  .data-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+  }
+  .data-table td:last-child {
+    border-bottom: none;
+  }
+  .data-table td:empty {
+    display: none;
+  }
+  .data-table td::before {
+    content: attr(data-label);
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .data-table td:not(:has(*))::before,
+  .data-table td:has(> :only-child:is(span, div))::before {
+    align-self: center;
+  }
+  .data-table input,
+  .data-table select,
+  .data-table textarea {
+    text-align: right;
+    max-width: 62%;
   }
 
   .import-popup {
@@ -1527,6 +1580,31 @@ textarea:focus {
   }
   .reg-item-columns {
     grid-template-columns: 1fr;
+  }
+  .reg-equip-move-mobile {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .reg-equip-move-mobile .btn-ghost {
+    flex: 1;
+    font-size: 0.78rem;
+    padding: 8px 6px;
+  }
+  .lot-card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .lot-card-header > div:first-child {
+    width: 100%;
+  }
+  .page-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+  .page-tab {
+    flex-shrink: 0;
   }
   .chat-panel {
     height: calc(100vh - 260px);

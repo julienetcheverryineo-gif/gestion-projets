@@ -217,7 +217,7 @@ export default function Dashboard() {
                               <tbody>
                                 {p.taches.map((t) => (
                                   <tr key={t.id}>
-                                    <td style={{ fontFamily: "var(--font-ui)" }}>
+                                    <td data-label="Chantier" style={{ fontFamily: "var(--font-ui)" }}>
                                       {t.chantierId ? (
                                         <Link to={"/chantiers/" + t.chantierId}>
                                           {nomChantier(t.chantierId)}
@@ -226,11 +226,13 @@ export default function Dashboard() {
                                         "À affecter"
                                       )}
                                     </td>
-                                    <td style={{ fontFamily: "var(--font-ui)" }}>{t.titre}</td>
-                                    <td>{compteChantier(t.chantierId) || "—"}</td>
-                                    <td>{t.heuresPrevues || "—"}</td>
-                                    <td>{t.echeance || "—"}</td>
-                                    <td style={{ fontFamily: "var(--font-ui)" }}>
+                                    <td data-label="Tâche" style={{ fontFamily: "var(--font-ui)" }}>
+                                      {t.titre}
+                                    </td>
+                                    <td data-label="Compte">{compteChantier(t.chantierId) || "—"}</td>
+                                    <td data-label="Heures">{t.heuresPrevues || "—"}</td>
+                                    <td data-label="Date fin">{t.echeance || "—"}</td>
+                                    <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
                                       {formatStatutTache(t.statut)}
                                     </td>
                                   </tr>

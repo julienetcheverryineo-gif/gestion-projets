@@ -298,20 +298,26 @@ export default function Sites() {
                 const nbReserves = reservesOuvertes(chantier.id);
                 return (
                   <tr key={chantier.id}>
-                    <td style={{ fontFamily: "var(--font-ui)", fontWeight: 500 }}>
+                    <td
+                      data-label="Chantier"
+                      style={{ fontFamily: "var(--font-ui)", fontWeight: 500 }}
+                    >
                       <span
                         className={"status-dot status-" + (chantier.statut ?? "actif")}
                         style={{ marginRight: 8 }}
                       />
                       {chantier.nom}
                     </td>
-                    <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                    <td
+                      data-label="Client"
+                      style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                    >
                       {chantier.client || "—"}
                     </td>
-                    <td style={{ fontFamily: "var(--font-ui)" }}>
+                    <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
                       {formatStatutChantier(chantier.statut)}
                     </td>
-                    <td>
+                    <td data-label="Avancement">
                       {pct !== null ? (
                         <div className="chantiers-avancement-cell">
                           <div className="progress-bar chantiers-avancement-bar">
@@ -323,14 +329,17 @@ export default function Sites() {
                         <span className="simple-list-meta">—</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Réserves">
                       {nbReserves > 0 ? (
                         <span className="chantiers-reserves-alerte">{nbReserves} ouverte(s)</span>
                       ) : (
                         <span className="simple-list-meta">—</span>
                       )}
                     </td>
-                    <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                    <td
+                      data-label="Responsable"
+                      style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                    >
                       {chantier.responsableChantier || "—"}
                     </td>
                     <td>

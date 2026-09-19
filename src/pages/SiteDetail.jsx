@@ -244,6 +244,34 @@ export default function SiteDetail() {
                 }}
                 className={peutGerer ? "reg-equip-draggable" : undefined}
               >
+                {peutGerer && (
+                  <div className="reg-equip-move-mobile">
+                    <button
+                      className="btn-ghost"
+                      disabled={index === 0}
+                      onClick={() => {
+                        const voisin = regEquipements[index - 1];
+                        updateDoc(doc(db, "regequipements", reg.id), { ordre: voisin.ordre ?? 0 });
+                        updateDoc(doc(db, "regequipements", voisin.id), { ordre: reg.ordre ?? 0 });
+                      }}
+                      aria-label="Monter"
+                    >
+                      ▲ Monter
+                    </button>
+                    <button
+                      className="btn-ghost"
+                      disabled={index === regEquipements.length - 1}
+                      onClick={() => {
+                        const voisin = regEquipements[index + 1];
+                        updateDoc(doc(db, "regequipements", reg.id), { ordre: voisin.ordre ?? 0 });
+                        updateDoc(doc(db, "regequipements", voisin.id), { ordre: reg.ordre ?? 0 });
+                      }}
+                      aria-label="Descendre"
+                    >
+                      ▼ Descendre
+                    </button>
+                  </div>
+                )}
                 <RegEquipmentCard
                   reg={reg}
                   items={tousRegItems.filter((it) => it.regEquipementId === reg.id)}
@@ -526,11 +554,16 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                 <tbody>
                   {materiel.map((it) => (
                     <tr key={it.id}>
-                      <td style={{ fontFamily: "var(--font-ui)" }}>{it.designation}</td>
-                      <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                      <td data-label="Désignation" style={{ fontFamily: "var(--font-ui)" }}>
+                        {it.designation}
+                      </td>
+                      <td
+                        data-label="Qté"
+                        style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                      >
                         {it.quantite ? it.quantite + " " + (it.unite || "") : "—"}
                       </td>
-                      <td>
+                      <td data-label="Statut">
                         <select
                           value={it.statut}
                           onChange={(e) => changerStatut(it.id, e.target.value)}
@@ -542,7 +575,10 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                           ))}
                         </select>
                       </td>
-                      <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                      <td
+                        data-label="Remarque"
+                        style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                      >
                         {it.remarque || "—"}
                       </td>
                       <td>
@@ -872,11 +908,16 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
               <tbody>
                 {equipements.map((equip) => (
                   <tr key={equip.id}>
-                    <td style={{ fontFamily: "var(--font-ui)" }}>{equip.designation}</td>
-                    <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                    <td data-label="Désignation" style={{ fontFamily: "var(--font-ui)" }}>
+                      {equip.designation}
+                    </td>
+                    <td
+                      data-label="Qté"
+                      style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                    >
                       {equip.quantite ? equip.quantite + " " + (equip.unite || "") : "—"}
                     </td>
-                    <td>
+                    <td data-label="Statut">
                       <select
                         value={equip.statut}
                         onChange={(e) => changerStatutEquip(equip.id, e.target.value)}
@@ -888,7 +929,10 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
                         ))}
                       </select>
                     </td>
-                    <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                    <td
+                      data-label="Remarque"
+                      style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                    >
                       {equip.remarque || "—"}
                     </td>
                     <td>

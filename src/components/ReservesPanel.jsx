@@ -94,16 +94,18 @@ export default function ReservesPanel({ chantierId, peutGerer, utilisateurs }) {
           <tbody>
             {affichees.map((r) => (
               <tr key={r.id}>
-                <td style={{ fontFamily: "var(--font-ui)" }}>
+                <td data-label="Désignation" style={{ fontFamily: "var(--font-ui)" }}>
                   {r.designation}
                   {r.remarque && (
                     <div className="simple-list-meta">{r.remarque}</div>
                   )}
                 </td>
-                <td style={{ fontFamily: "var(--font-ui)" }}>{r.responsable || "—"}</td>
-                <td>{r.dateSignalement || "—"}</td>
-                <td>{r.dateEcheance || "—"}</td>
-                <td>
+                <td data-label="Responsable" style={{ fontFamily: "var(--font-ui)" }}>
+                  {r.responsable || "—"}
+                </td>
+                <td data-label="Signalée le">{r.dateSignalement || "—"}</td>
+                <td data-label="Échéance">{r.dateEcheance || "—"}</td>
+                <td data-label="Statut">
                   <button
                     className={"btn-ghost" + (r.statut === "levee" ? "" : " btn-danger")}
                     onClick={() => basculerStatut(r)}

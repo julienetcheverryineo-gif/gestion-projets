@@ -19,6 +19,8 @@ const STATUTS_REGITEM = [
 // l'équipement, mais le statut reste modifiable directement.
 // Pour les tâches "projet" en revanche, toutes les colonnes sont éditables
 // directement dans le tableau (pas de passage par une fenêtre séparée).
+// Chaque <td> porte un data-label : sur mobile, le tableau se transforme en
+// cartes empilées et ce label sert d'intitulé devant la valeur (voir CSS).
 export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, afficherChantier, nomChantier }) {
   const changerChamp = async (t, champ, valeur) => {
     if (t._source === "regitem") {
@@ -58,27 +60,29 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
           return (
             <tr key={(t._source || "task") + "-" + t.id}>
               {afficherChantier && (
-                <td style={{ fontFamily: "var(--font-ui)" }}>
+                <td data-label="Chantier" style={{ fontFamily: "var(--font-ui)" }}>
                   {t.chantierId ? nomChantier(t.chantierId) : "À affecter"}
                 </td>
               )}
 
               {estRegitem ? (
                 <>
-                  <td style={{ fontFamily: "var(--font-ui)" }}>
+                  <td data-label="Titre" style={{ fontFamily: "var(--font-ui)" }}>
                     {t.titre}
                     <span className="simple-list-meta" style={{ marginLeft: 6 }}>
                       (équipement : {t._equipementNom})
                     </span>
                   </td>
-                  <td style={{ fontFamily: "var(--font-ui)" }}>{t.assigneA || "À affecter"}</td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>—</td>
+                  <td data-label="Responsable" style={{ fontFamily: "var(--font-ui)" }}>
+                    {t.assigneA || "À affecter"}
+                  </td>
+                  <td data-label="Heures">—</td>
+                  <td data-label="Début">—</td>
+                  <td data-label="Fin">—</td>
                 </>
               ) : (
                 <>
-                  <td>
+                  <td data-label="Titre">
                     <input
                       className="import-edit-input"
                       defaultValue={t.titre}
@@ -87,7 +91,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       }}
                     />
                   </td>
-                  <td>
+                  <td data-label="Responsable">
                     <select
                       className="import-edit-input"
                       value={t.assigneA || ""}
@@ -101,7 +105,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       ))}
                     </select>
                   </td>
-                  <td>
+                  <td data-label="Heures">
                     <input
                       type="number"
                       min="0"
@@ -113,7 +117,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       }}
                     />
                   </td>
-                  <td>
+                  <td data-label="Début">
                     <input
                       type="date"
                       className="import-edit-input"
@@ -121,7 +125,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       onChange={(e) => changerChamp(t, "dateDebut", e.target.value || null)}
                     />
                   </td>
-                  <td>
+                  <td data-label="Fin">
                     <input
                       type="date"
                       className="import-edit-input"
@@ -132,7 +136,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                 </>
               )}
 
-              <td>
+              <td data-label="Statut">
                 <select
                   value={t.statut ?? "a_faire"}
                   onChange={(e) => changerChamp(t, "statut", e.target.value)}
@@ -145,7 +149,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                 </select>
               </td>
 
-              <td>
+              <td data-label="Commentaires">
                 {estRegitem ? (
                   <span className="simple-list-meta">{t.commentaires || "—"}</span>
                 ) : (

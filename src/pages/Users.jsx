@@ -113,9 +113,9 @@ export default function Users() {
           <tbody>
             {utilisateurs.map((u) => (
               <tr key={u.id} style={{ opacity: u.actif === false ? 0.5 : 1 }}>
-                <td>{u.nom}</td>
-                <td>{u.email}</td>
-                <td>
+                <td data-label="Nom">{u.nom}</td>
+                <td data-label="E-mail">{u.email}</td>
+                <td data-label="Rôle">
                   <select
                     value={u.role}
                     onChange={(e) => changerRole(u.id, e.target.value)}
@@ -127,7 +127,7 @@ export default function Users() {
                     ))}
                   </select>
                 </td>
-                <td>
+                <td data-label="Statut">
                   <button
                     className={"btn-ghost" + (u.actif === false ? "" : " btn-danger")}
                     onClick={() => basculerActif(u)}
