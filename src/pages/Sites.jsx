@@ -274,11 +274,11 @@ export default function Sites() {
           <table className="data-table chantiers-table">
             <thead>
               <tr>
-                <th className="th-tri" onClick={() => basculerTri("nom")}>
-                  Chantier{tri.colonne === "nom" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
-                </th>
                 <th className="th-tri" onClick={() => basculerTri("client")}>
                   Client{tri.colonne === "client" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
+                <th className="th-tri" onClick={() => basculerTri("nom")}>
+                  Chantier{tri.colonne === "nom" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
                 <th>Statut</th>
                 <th className="th-tri" onClick={() => basculerTri("avancement")}>
@@ -298,6 +298,12 @@ export default function Sites() {
                 return (
                   <tr key={chantier.id}>
                     <td
+                      data-label="Client"
+                      style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                    >
+                      {chantier.client || "—"}
+                    </td>
+                    <td
                       data-label="Chantier"
                       style={{ fontFamily: "var(--font-ui)", fontWeight: 500 }}
                     >
@@ -306,12 +312,6 @@ export default function Sites() {
                         style={{ marginRight: 8 }}
                       />
                       {chantier.nom}
-                    </td>
-                    <td
-                      data-label="Client"
-                      style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
-                    >
-                      {chantier.client || "—"}
                     </td>
                     <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
                       {formatStatutChantier(chantier.statut)}

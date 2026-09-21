@@ -9,6 +9,16 @@ const NAV_ITEMS = [
   { to: "/reserves", label: "Réserves" },
 ];
 
+// Un simple reload() peut resservir une version en cache (c'est ce qui
+// obligeait à quitter/rouvrir l'app sur iPad pour voir les mises à jour).
+// On force un vrai aller-retour réseau en ajoutant un paramètre unique à
+// l'URL : impossible pour le navigateur de répondre depuis son cache.
+function actualiserSansCache() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("_r", Date.now().toString());
+  window.location.href = url.toString();
+}
+
 export default function Layout() {
   const { profile, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -57,6 +67,13 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
+          <button
+            className="btn-ghost btn-refresh sidebar-refresh"
+            onClick={actualiserSansCache}
+            aria-label="Actualiser"
+          >
+            ⟳ Actualiser
+          </button>
           <div className="user-chip">
             <span className="user-role-dot" data-role={profile?.role} />
             <div>
@@ -78,7 +95,7 @@ export default function Layout() {
           <div style={{ display: "flex", gap: 8 }}>
             <button
               className="btn-ghost btn-refresh"
-              onClick={() => window.location.reload()}
+              onClick={actualiserSansCache}
               aria-label="Actualiser"
             >
               ⟳ Actualiser

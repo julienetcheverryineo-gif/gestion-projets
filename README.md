@@ -509,6 +509,21 @@ tableau bien trop large. Refonte complète :
   tâches — matériel et tâches des équipements régulés **et** tâches
   classiques confondues — plutôt que les équipements régulés seuls.
 
+## Bouton Actualiser partout, vrai contournement du cache
+
+Le bouton "⟳ Actualiser" est maintenant visible en permanence, pas
+seulement sur mobile — aussi dans le pied de la barre latérale sur
+ordinateur. Surtout, il ne fait plus un simple `reload()` (qui pouvait
+resservir une version en cache, d'où le besoin de quitter/rouvrir l'app sur
+iPad pour voir une mise à jour) : il rouvre la page avec un paramètre
+d'URL unique à chaque clic, ce qui empêche le navigateur de répondre depuis
+son cache et force un vrai aller-retour réseau.
+
+En renfort côté serveur, `firebase.json` interdit désormais explicitement
+la mise en cache d'`index.html` (toujours revalidé), tandis que les
+fichiers `assets/` (noms uniques à chaque build) restent mis en cache
+longuement — sans risque, puisqu'un nouveau déploiement change leur nom.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
