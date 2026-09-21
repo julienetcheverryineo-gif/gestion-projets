@@ -68,10 +68,6 @@ a {
   display: flex;
   flex-direction: column;
   padding: 20px 16px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
 }
 
 .sidebar-brand {
@@ -522,6 +518,22 @@ a {
 /* ---------- Mobile topbar (avec refresh) ---------- */
 .mobile-topbar {
   display: none;
+}
+
+/* Sidebar fixe sur grand écran : position:fixed est plus fiable que
+   sticky sur Safari/iPad (bugs connus de sticky combiné à flex+overflow). */
+@media (min-width: 861px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+  }
+  .main-content {
+    margin-left: 232px;
+  }
 }
 
 @media (max-width: 860px) {
