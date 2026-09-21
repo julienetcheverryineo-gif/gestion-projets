@@ -489,6 +489,26 @@ tableau bien trop large. Refonte complète :
 - En-têtes de cartes (équipements, lots) et barres d'onglets adaptés pour
   ne plus déborder sur petit écran.
 
+## Tri des chantiers, colonnes de tâches redimensionnables, multi-affectation, avancement global
+
+- **Tri des chantiers** : par défaut, la liste est triée par client puis
+  par nom de chantier (au lieu du nom de chantier seul).
+- **Colonnes du tableau de tâches redimensionnables** : Titre est plus
+  large par défaut, Heures/Début/Fin plus étroites. Chaque colonne se
+  redimensionne en glissant son bord droit à la souris — la taille choisie
+  est mémorisée (`localStorage`) et s'applique à tous les tableaux de
+  tâches de l'appli, pas seulement celui en cours.
+- **Affectation à plusieurs personnes** : le champ "Responsable" d'une
+  tâche (classique ou d'équipement régulé) accepte maintenant plusieurs
+  personnes à la fois, via un menu à cases à cocher. Le regroupement "Par
+  responsable" (page Tâches) et la charge par automaticien (Vue
+  d'ensemble) comptent alors la tâche pour chacune des personnes assignées.
+  Les anciennes tâches à une seule personne restent affichées normalement
+  (compatibilité automatique).
+- **Avancement du chantier (%)** : calculé désormais sur l'ensemble des
+  tâches — matériel et tâches des équipements régulés **et** tâches
+  classiques confondues — plutôt que les équipements régulés seuls.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

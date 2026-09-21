@@ -867,6 +867,52 @@ a {
   width: 60px;
 }
 
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+.col-resizer:hover {
+  background: var(--accent-dim);
+}
+
+.person-multiselect {
+  position: relative;
+}
+.person-multiselect-btn {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person-multiselect-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 8px;
+  min-width: 180px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-table-editable {
+  table-layout: fixed;
+}
+
 .reg-equip-draggable {
   cursor: grab;
 }
@@ -1560,6 +1606,16 @@ textarea:focus {
   .data-table textarea {
     text-align: right;
     max-width: 62%;
+  }
+  .data-table .person-multiselect-btn {
+    text-align: right;
+    max-width: 62%;
+    width: auto;
+    margin-left: auto;
+  }
+  .person-multiselect-panel {
+    right: 0;
+    left: auto;
   }
 
   .import-popup {

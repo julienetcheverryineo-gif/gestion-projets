@@ -16,6 +16,8 @@ import ImportDevisModal from "../components/ImportDevisModal";
 import TeamFormModal from "../components/TeamFormModal";
 import ReservesPanel from "../components/ReservesPanel";
 import TaskTable from "../components/TaskTable";
+import PersonMultiSelect from "../components/PersonMultiSelect";
+import { normaliserAssignes } from "../lib/assignes";
 
 const STATUTS_MATERIEL = [
   { value: "a_faire", label: "À installer" },
@@ -357,7 +359,7 @@ export default function SiteDetail() {
                 addDoc(collection(db, "tasks"), {
                   titre: "Nouvelle tâche",
                   chantierId,
-                  assigneA: null,
+                  assigneA: [],
                   heuresPrevues: null,
                   dateDebut: null,
                   echeance: null,
@@ -399,10 +401,10 @@ export default function SiteDetail() {
             );
             await Promise.all([
               ...tachesDuChantier.map((t) =>
-                updateDoc(doc(db, "tasks", t.id), { assigneA: nom })
+                updateDoc(doc(db, "tasks", t.id), { assigneA: [nom] })
               ),
               ...regTachesDuChantier.map((it) =>
-                updateDoc(doc(db, "regitems", it.id), { assigneA: nom })
+                updateDoc(doc(db, "regitems", it.id), { assigneA: [nom] })
               ),
             ]);
             setAfficherAffectationMasse(false);
@@ -482,8 +484,8 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
   const changerStatut = async (itemId, statut) => {
     await updateDoc(doc(db, "regitems", itemId), { statut });
   };
-  const changerResponsable = async (itemId, assigneA) => {
-    await updateDoc(doc(db, "regitems", itemId), { assigneA: assigneA || null });
+  const changerResponsable = async (itemId, assignes) => {
+    await updateDoc(doc(db, "regitems", itemId), { assigneA: assignes });
   };
   const supprimerItem = async (itemId) => {
     await deleteDoc(doc(db, "regitems", itemId));
@@ -629,18 +631,13 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                       ))}
                     </select>
                     <span className="simple-list-title">{it.designation}</span>
-                    <select
-                      value={it.assigneA || ""}
-                      onChange={(e) => changerResponsable(it.id, e.target.value)}
-                      style={{ flexShrink: 0 }}
-                    >
-                      <option value="">À affecter</option>
-                      {utilisateurs.map((u) => (
-                        <option key={u.id} value={u.nom}>
-                          {u.nom}
-                        </option>
-                      ))}
-                    </select>
+                    <div style={{ flexShrink: 0, width: 170 }}>
+                      <PersonMultiSelect
+                        valeurs={normaliserAssignes(it.assigneA)}
+                        utilisateurs={utilisateurs}
+                        onChange={(v) => changerResponsable(it.id, v)}
+                      />
+                    </div>
                     <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
                       ×
                     </button>
@@ -730,7 +727,7 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
   const [quantite, setQuantite] = useState("");
   const [unite, setUnite] = useState("");
   const [remarque, setRemarque] = useState("");
-  const [assigneA, setAssigneA] = useState("");
+  const [assigneA, setAssigneA] = useState([]);
   const [enCours, setEnCours] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -743,7 +740,7 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
       remarque,
       quantite: quantite ? Number(quantite) : 0,
       unite,
-      assigneA: type === "tache" ? assigneA || null : null,
+      assigneA: type === "tache" ? assigneA : [],
       statut: "a_faire",
       creeLe: serverTimestamp(),
     });
@@ -778,15 +775,12 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
           </label>
           {type === "tache" && (
             <label>
-              Responsable
-              <select value={assigneA} onChange={(e) => setAssigneA(e.target.value)}>
-                <option value="">À affecter</option>
-                {utilisateurs.map((u) => (
-                  <option key={u.id} value={u.nom}>
-                    {u.nom}
-                  </option>
-                ))}
-              </select>
+              Responsable(s)
+              <PersonMultiSelect
+                valeurs={assigneA}
+                utilisateurs={utilisateurs}
+                onChange={setAssigneA}
+              />
             </label>
           )}
           {type === "materiel" && (

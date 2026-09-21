@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { normaliserAssignes } from "../lib/assignes";
+import PersonMultiSelect from "./PersonMultiSelect";
 
 const STATUTS_TASK = [
   { value: "a_faire", label: "À faire" },
@@ -12,19 +15,83 @@ const STATUTS_REGITEM = [
   { value: "fait", label: "Fait" },
 ];
 
+// Largeurs de colonnes par défaut (px). Le titre est volontairement large,
+// heures/dates volontairement étroites.
+const LARGEURS_DEFAUT = {
+  chantier: 140,
+  titre: 320,
+  responsable: 170,
+  heures: 64,
+  debut: 118,
+  fin: 118,
+  statut: 110,
+  commentaires: 180,
+  actions: 40,
+};
+
+const CLE_STOCKAGE = "taskTableColWidths";
+
+function chargerLargeurs() {
+  try {
+    const brut = localStorage.getItem(CLE_STOCKAGE);
+    if (!brut) return { ...LARGEURS_DEFAUT };
+    return { ...LARGEURS_DEFAUT, ...JSON.parse(brut) };
+  } catch {
+    return { ...LARGEURS_DEFAUT };
+  }
+}
+
 // Affiche indifféremment des tâches "projet" (collection `tasks`) et des
 // tâches issues d'un équipement régulé (`regitems` de type "tache") dans un
 // seul tableau. `t._source` vaut "regitem" pour ces dernières ; leur
 // désignation/statut ne peuvent être modifiées que depuis la fiche de
-// l'équipement, mais le statut reste modifiable directement.
-// Pour les tâches "projet" en revanche, toutes les colonnes sont éditables
-// directement dans le tableau (pas de passage par une fenêtre séparée).
-// Chaque <td> porte un data-label : sur mobile, le tableau se transforme en
-// cartes empilées et ce label sert d'intitulé devant la valeur (voir CSS).
+// l'équipement, mais le statut et le(s) responsable(s) restent modifiables
+// directement. Pour les tâches "projet", toutes les colonnes sont éditables
+// directement dans le tableau. Les colonnes sont redimensionnables à la
+// souris (glisser le bord droit d'un en-tête) ; la taille est mémorisée
+// pour toute l'appli (localStorage), pas seulement ce tableau.
 export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, afficherChantier, nomChantier }) {
+  const [largeurs, setLargeurs] = useState(chargerLargeurs);
+  const redimensionRef = useRef(null);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const info = redimensionRef.current;
+      if (!info) return;
+      const deltaX = e.clientX - info.startX;
+      const nouvelle = Math.max(40, info.startWidth + deltaX);
+      setLargeurs((prev) => ({ ...prev, [info.colonne]: nouvelle }));
+    };
+    const onUp = () => {
+      if (!redimensionRef.current) return;
+      redimensionRef.current = null;
+      setLargeurs((actuelles) => {
+        try {
+          localStorage.setItem(CLE_STOCKAGE, JSON.stringify(actuelles));
+        } catch {
+          // stockage indisponible : tant pis, on garde juste la taille en mémoire
+        }
+        return actuelles;
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const demarrerRedimension = (colonne) => (e) => {
+    e.preventDefault();
+    redimensionRef.current = { colonne, startX: e.clientX, startWidth: largeurs[colonne] };
+  };
+
   const changerChamp = async (t, champ, valeur) => {
     if (t._source === "regitem") {
-      if (champ === "statut") await updateDoc(doc(db, "regitems", t.id), { statut: valeur });
+      if (champ === "statut" || champ === "assigneA") {
+        await updateDoc(doc(db, "regitems", t.id), { [champ]: valeur });
+      }
       return;
     }
     await updateDoc(doc(db, "tasks", t.id), { [champ]: valeur });
@@ -38,25 +105,33 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
     );
   }
 
+  const Entete = ({ colonne, children }) => (
+    <th style={{ width: largeurs[colonne], position: "relative" }}>
+      {children}
+      <span className="col-resizer" onMouseDown={demarrerRedimension(colonne)} />
+    </th>
+  );
+
   return (
-    <table className="data-table task-table-editable">
+    <table className="data-table task-table-editable" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
-          {afficherChantier && <th>Chantier</th>}
-          <th>Titre</th>
-          <th>Responsable</th>
-          <th>Heures</th>
-          <th>Début</th>
-          <th>Fin</th>
-          <th>Statut</th>
-          <th>Commentaires</th>
-          <th></th>
+          {afficherChantier && <Entete colonne="chantier">Chantier</Entete>}
+          <Entete colonne="titre">Titre</Entete>
+          <Entete colonne="responsable">Responsable</Entete>
+          <Entete colonne="heures">Heures</Entete>
+          <Entete colonne="debut">Début</Entete>
+          <Entete colonne="fin">Fin</Entete>
+          <Entete colonne="statut">Statut</Entete>
+          <Entete colonne="commentaires">Commentaires</Entete>
+          <th style={{ width: largeurs.actions }}></th>
         </tr>
       </thead>
       <tbody>
         {taches.map((t) => {
           const estRegitem = t._source === "regitem";
           const options = estRegitem ? STATUTS_REGITEM : STATUTS_TASK;
+          const assignes = normaliserAssignes(t.assigneA);
           return (
             <tr key={(t._source || "task") + "-" + t.id}>
               {afficherChantier && (
@@ -73,8 +148,12 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       (équipement : {t._equipementNom})
                     </span>
                   </td>
-                  <td data-label="Responsable" style={{ fontFamily: "var(--font-ui)" }}>
-                    {t.assigneA || "À affecter"}
+                  <td data-label="Responsable">
+                    <PersonMultiSelect
+                      valeurs={assignes}
+                      utilisateurs={utilisateurs}
+                      onChange={(v) => changerChamp(t, "assigneA", v)}
+                    />
                   </td>
                   <td data-label="Heures">—</td>
                   <td data-label="Début">—</td>
@@ -92,24 +171,17 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                     />
                   </td>
                   <td data-label="Responsable">
-                    <select
-                      className="import-edit-input"
-                      value={t.assigneA || ""}
-                      onChange={(e) => changerChamp(t, "assigneA", e.target.value || null)}
-                    >
-                      <option value="">À affecter</option>
-                      {utilisateurs.map((u) => (
-                        <option key={u.id} value={u.nom}>
-                          {u.nom}
-                        </option>
-                      ))}
-                    </select>
+                    <PersonMultiSelect
+                      valeurs={assignes}
+                      utilisateurs={utilisateurs}
+                      onChange={(v) => changerChamp(t, "assigneA", v)}
+                    />
                   </td>
                   <td data-label="Heures">
                     <input
                       type="number"
                       min="0"
-                      className="import-edit-input task-cell-heures"
+                      className="import-edit-input"
                       defaultValue={t.heuresPrevues ?? ""}
                       onBlur={(e) => {
                         const v = e.target.value ? Number(e.target.value) : null;

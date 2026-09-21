@@ -7,6 +7,7 @@ import { useCollection } from "../lib/firestoreHooks";
 import { exporterMaterielAchats } from "../lib/exportMateriel";
 import ImportSuiviModal from "../components/ImportSuiviModal";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
+import { calculerAvancementChantier } from "../lib/avancement";
 
 export default function Sites() {
   const { isAdmin, isChefDeProjet } = useAuth();
@@ -28,7 +29,7 @@ export default function Sites() {
   const [afficherImportSuivi, setAfficherImportSuivi] = useState(false);
   const [recherche, setRecherche] = useState("");
   const [filtreStatut, setFiltreStatut] = useState("actifs");
-  const [tri, setTri] = useState({ colonne: "nom", sens: 1 });
+  const [tri, setTri] = useState({ colonne: "client", sens: 1 });
 
   const supprimer = async (id) => {
     if (
@@ -122,15 +123,8 @@ export default function Sites() {
     setTimeout(() => setMessageNettoyage(""), 5000);
   };
 
-  const avancement = (chantierId) => {
-    const regsDuChantier = regEquipements.filter((r) => r.chantierId === chantierId);
-    const items = regItems.filter((it) =>
-      regsDuChantier.some((r) => r.id === it.regEquipementId)
-    );
-    if (items.length === 0) return null;
-    const faits = items.filter((it) => it.statut === "teste" || it.statut === "fait").length;
-    return Math.round((faits / items.length) * 100);
-  };
+  const avancement = (chantierId) =>
+    calculerAvancementChantier(chantierId, { regEquipements, regItems, taches });
 
   const reservesOuvertes = (chantierId) =>
     reserves.filter((r) => r.chantierId === chantierId && r.statut !== "levee").length;
@@ -172,6 +166,11 @@ export default function Sites() {
       }
       if (va < vb) return -1 * sens;
       if (va > vb) return 1 * sens;
+      // À égalité (même client par exemple), on trie toujours par nom en second critère
+      const nomA = a.nom.toLowerCase();
+      const nomB = b.nom.toLowerCase();
+      if (nomA < nomB) return -1 * sens;
+      if (nomA > nomB) return 1 * sens;
       return 0;
     });
 

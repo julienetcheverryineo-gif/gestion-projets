@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
+import { calculerAvancementChantier } from "../lib/avancement";
+import { normaliserAssignes } from "../lib/assignes";
 
 export default function Dashboard() {
   const { documents: chantiers, chargement: chargementChantiers } =
@@ -66,15 +68,8 @@ export default function Dashboard() {
 
   const chargement = chargementChantiers || chargementTaches;
 
-  const avancementChantier = (chantierId) => {
-    const regsDuChantier = regEquipements.filter((r) => r.chantierId === chantierId);
-    const items = regItems.filter((it) =>
-      regsDuChantier.some((r) => r.id === it.regEquipementId)
-    );
-    if (items.length === 0) return null;
-    const faits = items.filter((it) => it.statut === "teste" || it.statut === "fait").length;
-    return Math.round((faits / items.length) * 100);
-  };
+  const avancementChantier = (chantierId) =>
+    calculerAvancementChantier(chantierId, { regEquipements, regItems, taches });
 
   // --- Charge par automaticien ---
   const tachesRetenuesCharge = useMemo(
@@ -85,12 +80,15 @@ export default function Dashboard() {
   const parPersonne = useMemo(() => {
     const map = new Map();
     for (const t of tachesRetenuesCharge) {
-      const nom = t.assigneA || "À affecter";
-      if (!map.has(nom)) map.set(nom, { nom, taches: [], totalHeures: 0, chantiers: new Set() });
-      const entree = map.get(nom);
-      entree.taches.push(t);
-      entree.totalHeures += Number(t.heuresPrevues || 0);
-      if (t.chantierId) entree.chantiers.add(nomChantier(t.chantierId));
+      const noms = normaliserAssignes(t.assigneA);
+      const cles = noms.length > 0 ? noms : ["À affecter"];
+      for (const nom of cles) {
+        if (!map.has(nom)) map.set(nom, { nom, taches: [], totalHeures: 0, chantiers: new Set() });
+        const entree = map.get(nom);
+        entree.taches.push(t);
+        entree.totalHeures += Number(t.heuresPrevues || 0);
+        if (t.chantierId) entree.chantiers.add(nomChantier(t.chantierId));
+      }
     }
     return [...map.values()].sort((a, b) => b.totalHeures - a.totalHeures);
   }, [tachesRetenuesCharge, chantiers]);

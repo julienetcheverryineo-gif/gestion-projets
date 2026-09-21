@@ -3,6 +3,7 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp } from "firebase/fi
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
+import { normaliserAssignes } from "../lib/assignes";
 import TaskTable from "../components/TaskTable";
 
 export default function Tasks() {
@@ -61,9 +62,12 @@ export default function Tasks() {
   const groupesParResponsable = useMemo(() => {
     const map = new Map();
     for (const t of toutesLesTaches) {
-      const nom = t.assigneA || "À affecter";
-      if (!map.has(nom)) map.set(nom, { cle: nom, nom, taches: [] });
-      map.get(nom).taches.push(t);
+      const noms = normaliserAssignes(t.assigneA);
+      const cles = noms.length > 0 ? noms : ["À affecter"];
+      for (const nom of cles) {
+        if (!map.has(nom)) map.set(nom, { cle: nom, nom, taches: [] });
+        map.get(nom).taches.push(t);
+      }
     }
     return [...map.values()].sort((a, b) => b.taches.length - a.taches.length);
   }, [toutesLesTaches]);
@@ -79,7 +83,7 @@ export default function Tasks() {
     const donnees = {
       titre: "Nouvelle tâche",
       chantierId: null,
-      assigneA: null,
+      assigneA: [],
       heuresPrevues: null,
       dateDebut: null,
       echeance: null,
@@ -91,7 +95,7 @@ export default function Tasks() {
     if (modeGroupement === "chantier") {
       donnees.chantierId = groupe.cle === "aaffecter" ? null : groupe.cle;
     } else {
-      donnees.assigneA = groupe.cle === "À affecter" ? null : groupe.cle;
+      donnees.assigneA = groupe.cle === "À affecter" ? [] : [groupe.cle];
     }
     await addDoc(collection(db, "tasks"), donnees);
     setGroupeOuvert(groupe.cle);
