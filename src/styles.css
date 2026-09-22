@@ -929,6 +929,26 @@ a {
   table-layout: fixed;
 }
 
+.tache-designation-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px 6px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  border-radius: 4px;
+  color: var(--text);
+}
+.tache-designation-input:hover {
+  border-color: var(--border);
+}
+.tache-designation-input:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  outline: none;
+}
+
 .reg-equip-draggable {
   cursor: grab;
 }
@@ -936,7 +956,14 @@ a {
   cursor: grabbing;
 }
 .reg-equip-move-mobile {
-  display: none;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.reg-equip-move-mobile .btn-ghost {
+  flex: 1;
+  font-size: 0.78rem;
+  padding: 7px 6px;
 }
 
 .chantiers-filtres {
@@ -1652,16 +1679,6 @@ textarea:focus {
   }
   .reg-item-columns {
     grid-template-columns: 1fr;
-  }
-  .reg-equip-move-mobile {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-  .reg-equip-move-mobile .btn-ghost {
-    flex: 1;
-    font-size: 0.78rem;
-    padding: 8px 6px;
   }
   .lot-card-header {
     flex-wrap: wrap;

@@ -1,9 +1,10 @@
 import * as XLSX from "xlsx";
 
 const STATUTS_LABEL = {
-  a_faire: "À installer",
+  a_faire: "À acheter", // ancien code, conservé pour compatibilité avec les données existantes
+  a_acheter: "À acheter",
+  recu: "Reçu",
   installe: "Installé",
-  configure: "Configuré",
   teste: "Testé",
 };
 
@@ -25,7 +26,11 @@ export function exporterMaterielAchats({
 
   let materiel = regItems.filter((it) => it.type === "materiel");
   if (seulementNonInstalle) {
-    materiel = materiel.filter((it) => it.statut !== "teste" && it.statut !== "configure");
+    // "Non installé" = pas encore acheté (les statuts reçu/installé/testé
+    // indiquent que l'achat est déjà fait, inutile de le lister à nouveau)
+    materiel = materiel.filter(
+      (it) => it.statut !== "recu" && it.statut !== "installe" && it.statut !== "teste"
+    );
   }
 
   const lignesDetail = materiel.map((it) => {

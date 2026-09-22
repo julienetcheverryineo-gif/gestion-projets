@@ -18,11 +18,12 @@ import ReservesPanel from "../components/ReservesPanel";
 import TaskTable from "../components/TaskTable";
 import PersonMultiSelect from "../components/PersonMultiSelect";
 import { normaliserAssignes } from "../lib/assignes";
+import { estTactile } from "../lib/tactile";
 
 const STATUTS_MATERIEL = [
-  { value: "a_faire", label: "À installer" },
+  { value: "a_acheter", label: "À acheter" },
+  { value: "recu", label: "Reçu" },
   { value: "installe", label: "Installé" },
-  { value: "configure", label: "Configuré" },
   { value: "teste", label: "Testé" },
 ];
 
@@ -105,6 +106,21 @@ export default function SiteDetail() {
     const items = tousRegItems.filter((it) => it.regEquipementId === regId);
     await Promise.all(items.map((it) => deleteDoc(doc(db, "regitems", it.id))));
     await deleteDoc(doc(db, "regequipements", regId));
+  };
+
+  // Déplace un équipement de la position `depuis` vers `vers`, puis
+  // renumérote toute la liste (0, 1, 2…). Plus fiable qu'un simple échange
+  // de deux valeurs, qui ne fonctionne pas quand l'une d'elles (ou les
+  // deux) n'a jamais eu de champ `ordre` — cas fréquent pour les
+  // équipements créés avant l'ajout de cette fonctionnalité.
+  const deplacerEquipement = async (depuis, vers) => {
+    if (vers < 0 || vers >= regEquipements.length || depuis === vers) return;
+    const copie = [...regEquipements];
+    const [item] = copie.splice(depuis, 1);
+    copie.splice(vers, 0, item);
+    await Promise.all(
+      copie.map((r, i) => updateDoc(doc(db, "regequipements", r.id), { ordre: i }))
+    );
   };
 
   if (!chantier) {
@@ -230,7 +246,7 @@ export default function SiteDetail() {
             {regEquipements.map((reg, index) => (
               <div
                 key={reg.id}
-                draggable={peutGerer}
+                draggable={peutGerer && !estTactile}
                 onDragStart={(e) => {
                   e.dataTransfer.setData("text/reg-equip-id", reg.id);
                 }}
@@ -239,23 +255,18 @@ export default function SiteDetail() {
                   if (!peutGerer) return;
                   e.preventDefault();
                   const idDeplace = e.dataTransfer.getData("text/reg-equip-id");
-                  if (!idDeplace || idDeplace === reg.id) return;
-                  const ordreAvant = index > 0 ? regEquipements[index - 1].ordre ?? 0 : (reg.ordre ?? 0) - 2;
-                  const nouvelOrdre = (ordreAvant + (reg.ordre ?? 0)) / 2;
-                  updateDoc(doc(db, "regequipements", idDeplace), { ordre: nouvelOrdre });
+                  const indexDepart = regEquipements.findIndex((r) => r.id === idDeplace);
+                  if (indexDepart === -1 || idDeplace === reg.id) return;
+                  deplacerEquipement(indexDepart, index);
                 }}
-                className={peutGerer ? "reg-equip-draggable" : undefined}
+                className={peutGerer && !estTactile ? "reg-equip-draggable" : undefined}
               >
                 {peutGerer && (
                   <div className="reg-equip-move-mobile">
                     <button
                       className="btn-ghost"
                       disabled={index === 0}
-                      onClick={() => {
-                        const voisin = regEquipements[index - 1];
-                        updateDoc(doc(db, "regequipements", reg.id), { ordre: voisin.ordre ?? 0 });
-                        updateDoc(doc(db, "regequipements", voisin.id), { ordre: reg.ordre ?? 0 });
-                      }}
+                      onClick={() => deplacerEquipement(index, index - 1)}
                       aria-label="Monter"
                     >
                       ▲ Monter
@@ -263,11 +274,7 @@ export default function SiteDetail() {
                     <button
                       className="btn-ghost"
                       disabled={index === regEquipements.length - 1}
-                      onClick={() => {
-                        const voisin = regEquipements[index + 1];
-                        updateDoc(doc(db, "regequipements", reg.id), { ordre: voisin.ordre ?? 0 });
-                        updateDoc(doc(db, "regequipements", voisin.id), { ordre: reg.ordre ?? 0 });
-                      }}
+                      onClick={() => deplacerEquipement(index, index + 1)}
                       aria-label="Descendre"
                     >
                       ▼ Descendre
@@ -487,6 +494,9 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
   const changerResponsable = async (itemId, assignes) => {
     await updateDoc(doc(db, "regitems", itemId), { assigneA: assignes });
   };
+  const changerChamp = async (itemId, champ, valeur) => {
+    await updateDoc(doc(db, "regitems", itemId), { [champ]: valeur });
+  };
   const supprimerItem = async (itemId) => {
     await deleteDoc(doc(db, "regitems", itemId));
   };
@@ -548,6 +558,7 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                   <tr>
                     <th>Désignation</th>
                     <th>Qté</th>
+                    <th>Unité</th>
                     <th>Statut</th>
                     <th>Remarque</th>
                     <th></th>
@@ -556,18 +567,43 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                 <tbody>
                   {materiel.map((it) => (
                     <tr key={it.id}>
-                      <td data-label="Désignation" style={{ fontFamily: "var(--font-ui)" }}>
-                        {it.designation}
+                      <td data-label="Désignation">
+                        <input
+                          className="import-edit-input"
+                          defaultValue={it.designation}
+                          onBlur={(e) => {
+                            if (e.target.value !== it.designation) {
+                              changerChamp(it.id, "designation", e.target.value);
+                            }
+                          }}
+                        />
                       </td>
-                      <td
-                        data-label="Qté"
-                        style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
-                      >
-                        {it.quantite ? it.quantite + " " + (it.unite || "") : "—"}
+                      <td data-label="Qté">
+                        <input
+                          type="number"
+                          min="0"
+                          className="import-edit-input task-cell-heures"
+                          defaultValue={it.quantite ?? ""}
+                          onBlur={(e) => {
+                            const v = e.target.value ? Number(e.target.value) : 0;
+                            if (v !== (it.quantite ?? 0)) changerChamp(it.id, "quantite", v);
+                          }}
+                        />
+                      </td>
+                      <td data-label="Unité">
+                        <input
+                          className="import-edit-input"
+                          defaultValue={it.unite ?? ""}
+                          onBlur={(e) => {
+                            if (e.target.value !== (it.unite ?? "")) {
+                              changerChamp(it.id, "unite", e.target.value);
+                            }
+                          }}
+                        />
                       </td>
                       <td data-label="Statut">
                         <select
-                          value={it.statut}
+                          value={it.statut === "a_faire" ? "a_acheter" : it.statut}
                           onChange={(e) => changerStatut(it.id, e.target.value)}
                         >
                           {STATUTS_MATERIEL.map((s) => (
@@ -577,11 +613,16 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                           ))}
                         </select>
                       </td>
-                      <td
-                        data-label="Remarque"
-                        style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
-                      >
-                        {it.remarque || "—"}
+                      <td data-label="Remarque">
+                        <input
+                          className="import-edit-input"
+                          defaultValue={it.remarque ?? ""}
+                          onBlur={(e) => {
+                            if (e.target.value !== (it.remarque ?? "")) {
+                              changerChamp(it.id, "remarque", e.target.value);
+                            }
+                          }}
+                        />
                       </td>
                       <td>
                         <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
@@ -630,7 +671,15 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                         </option>
                       ))}
                     </select>
-                    <span className="simple-list-title">{it.designation}</span>
+                    <input
+                      className="simple-list-title tache-designation-input"
+                      defaultValue={it.designation}
+                      onBlur={(e) => {
+                        if (e.target.value !== it.designation) {
+                          changerChamp(it.id, "designation", e.target.value);
+                        }
+                      }}
+                    />
                     <div style={{ flexShrink: 0, width: 170 }}>
                       <PersonMultiSelect
                         valeurs={normaliserAssignes(it.assigneA)}
@@ -741,7 +790,7 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
       quantite: quantite ? Number(quantite) : 0,
       unite,
       assigneA: type === "tache" ? assigneA : [],
-      statut: "a_faire",
+      statut: type === "materiel" ? "a_acheter" : "a_faire",
       creeLe: serverTimestamp(),
     });
     setEnCours(false);
@@ -913,7 +962,7 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
                     </td>
                     <td data-label="Statut">
                       <select
-                        value={equip.statut}
+                        value={equip.statut === "a_faire" ? "a_acheter" : equip.statut}
                         onChange={(e) => changerStatutEquip(equip.id, e.target.value)}
                       >
                         {STATUTS_MATERIEL.map((s) => (
@@ -1016,7 +1065,7 @@ function EquipmentFormModal({ lotId, onClose }) {
       quantite: quantite ? Number(quantite) : 0,
       unite,
       lotId,
-      statut: "a_faire",
+      statut: "a_acheter",
       creeLe: serverTimestamp(),
     });
     setEnCours(false);

@@ -236,7 +236,7 @@ export default function Sites() {
                 checked={seulementNonInstalle}
                 onChange={(e) => setSeulementNonInstalle(e.target.checked)}
               />
-              Uniquement le matériel non installé
+              Uniquement le matériel non acheté
             </label>
           )}
         </div>

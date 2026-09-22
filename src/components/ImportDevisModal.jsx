@@ -182,7 +182,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
             remarque: item.detail || "",
             unite: item.unite || "",
             quantite: item.quantite || 0,
-            statut: "a_faire",
+            statut: item.type === "materiel" ? "a_acheter" : "a_faire",
             creeLe: serverTimestamp(),
           });
         }

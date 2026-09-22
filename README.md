@@ -524,6 +524,27 @@ la mise en cache d'`index.html` (toujours revalidé), tandis que les
 fichiers `assets/` (noms uniques à chaque build) restent mis en cache
 longuement — sans risque, puisqu'un nouveau déploiement change leur nom.
 
+## Matériel et tâches d'équipement régulé éditables, nouveaux statuts, réordonnancement corrigé
+
+- **Matériel et tâches désormais éditables directement** dans la fiche
+  équipement : désignation, quantité, unité et remarque pour le matériel ;
+  désignation pour les tâches — jusqu'ici seuls statut et responsable
+  l'étaient.
+- **Statuts du matériel** : "À acheter" → "Reçu" → "Installé" → "Testé"
+  (remplace l'ancienne liste À installer/Installé/Configuré/Testé). Les
+  anciennes données (`a_faire`) s'affichent automatiquement comme
+  "À acheter", sans opération de migration nécessaire. L'export achats et
+  sa case "matériel non acheté" suivent la même logique.
+- **Bug corrigé — réordonnancement des équipements régulés** : l'échange de
+  position ne faisait rien pour les équipements créés avant l'introduction
+  du champ `ordre` (les deux valeurs étaient absentes, l'échange revenait à
+  ne rien faire). Le déplacement (glisser-déposer comme boutons ▲/▼)
+  renumérote maintenant toute la liste à chaque mouvement, ce qui fonctionne
+  quel que soit l'état de départ. Un détecteur d'appareil tactile
+  (`src/lib/tactile.js`) désactive proprement le glisser-déposer sur
+  iPad/iPhone (non fonctionnel au doigt) au profit des boutons ▲/▼, désormais
+  toujours visibles (plus seulement en dessous de 860px de large).
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
