@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { useCollection } from "../lib/firestoreHooks";
 import { normaliserAssignes } from "../lib/assignes";
 
@@ -34,12 +36,45 @@ function libelleMois(cle) {
   return noms[Number(mois) - 1] + " " + annee;
 }
 
+// Répartit les heures d'une tâche entre les mois qu'elle couvre, au
+// prorata du nombre de jours dans chacun. Une tâche du 01/01 au 01/03 pour
+// 16h ne met donc pas les 16h en janvier : elle en met une petite part sur
+// chacun des trois mois traversés, proportionnellement à leur nombre de
+// jours dans la période. Si une seule date (ou aucune) est connue, tout va
+// sur ce mois-là (ou en "non planifié").
+function repartirHeuresParMois(dateDebut, echeance, heures) {
+  const debut = dateDebut && echeance && echeance >= dateDebut ? dateDebut : null;
+  if (!debut) {
+    const cle = moisCle(dateDebut) || moisCle(echeance);
+    return cle ? { [cle]: heures } : {};
+  }
+  const totalJours = joursEntre(dateDebut, echeance) + 1; // bornes incluses
+  const joursParMois = {};
+  let curseur = new Date(dateDebut);
+  const fin = new Date(echeance);
+  while (curseur <= fin) {
+    const cle = formatDateLocale(curseur).slice(0, 7);
+    joursParMois[cle] = (joursParMois[cle] || 0) + 1;
+    curseur = new Date(curseur.getFullYear(), curseur.getMonth(), curseur.getDate() + 1);
+  }
+  const resultat = {};
+  for (const [cle, jours] of Object.entries(joursParMois)) {
+    resultat[cle] = (heures * jours) / totalJours;
+  }
+  return resultat;
+}
+
+function arrondirHeures(h) {
+  return Math.round(h * 10) / 10;
+}
+
 export default function Planning() {
   const { documents: taches, chargement } = useCollection("tasks");
   const { documents: chantiers } = useCollection("sites");
   const { documents: regItems } = useCollection("regitems");
   const { documents: regEquipements } = useCollection("regequipements");
   const [chantierFiltre, setChantierFiltre] = useState("tous");
+  const [tacheEnEdition, setTacheEnEdition] = useState(null);
 
   const nomChantier = (id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter";
 
@@ -128,15 +163,42 @@ export default function Planning() {
       groupe.taches.sort((a, b) => a.dateDebut.localeCompare(b.dateDebut));
     }
 
+    // Vue agrégée : une barre par chantier (du plus tôt au plus tard parmi
+    // ses tâches datées), avec le total d'heures de TOUTES ses tâches
+    // (datées ou non, pour refléter la charge réelle même si la barre en
+    // elle-même ne peut se positionner qu'à partir des tâches datées).
+    const chantierBars = [...parChantier.entries()].map(([cle, groupe]) => {
+      const debut = groupe.taches[0].dateDebut;
+      const fin = groupe.taches.reduce((max, t) => (t.echeance > max ? t.echeance : max), groupe.taches[0].echeance);
+      const heuresTotal = tachesVisibles
+        .filter((t) => (t.chantierId || "aaffecter") === cle)
+        .reduce((s, t) => s + Number(t.heuresPrevues || 0), 0);
+      return {
+        cle,
+        nom: groupe.nom,
+        left: joursEntre(debutTimeline, debut) * pxParJour,
+        largeur: Math.max(6, (joursEntre(debut, fin) + 1) * pxParJour),
+        heuresTotal,
+      };
+    });
+
     const aujourdHui = formatDateLocale(new Date());
     const ligneAujourdHui =
       aujourdHui >= debutTimeline && aujourdHui <= finTimeline
         ? joursEntre(debutTimeline, aujourdHui) * pxParJour
         : null;
 
-    return { debutTimeline, pxParJour, largeurTotale, mois, parChantier, ligneAujourdHui };
+    return {
+      debutTimeline,
+      pxParJour,
+      largeurTotale,
+      mois,
+      parChantier,
+      chantierBars,
+      ligneAujourdHui,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tachesGantt, chantiers]);
+  }, [tachesGantt, tachesVisibles, chantiers]);
 
   // ---------- Charge par automaticien ----------
   const charge = useMemo(() => {
@@ -146,18 +208,19 @@ export default function Planning() {
       if (heures <= 0) continue;
       const noms = normaliserAssignes(t.assigneA);
       if (noms.length === 0) continue;
-      const cleMois = moisCle(t.dateDebut) || moisCle(t.echeance);
+      const repartition = repartirHeuresParMois(t.dateDebut, t.echeance, heures);
+      const totalReparti = Object.values(repartition).reduce((s, h) => s + h, 0);
+      const resteNonPlanifie = heures - totalReparti; // 0 si une répartition complète a été possible
       for (const nom of noms) {
         if (!parPersonne.has(nom)) {
           parPersonne.set(nom, { nom, parMois: {}, nonPlanifie: 0, total: 0 });
         }
         const entree = parPersonne.get(nom);
         entree.total += heures;
-        if (cleMois) {
-          entree.parMois[cleMois] = (entree.parMois[cleMois] || 0) + heures;
-        } else {
-          entree.nonPlanifie += heures;
+        for (const [cle, h] of Object.entries(repartition)) {
+          entree.parMois[cle] = (entree.parMois[cle] || 0) + h;
         }
+        if (resteNonPlanifie > 0) entree.nonPlanifie += resteNonPlanifie;
       }
     }
     const tousLesMois = new Set();
@@ -202,11 +265,64 @@ export default function Planning() {
         <>
           <section className="panel">
             <div className="panel-header">
-              <h2>Gantt</h2>
+              <h2>Gantt par chantier</h2>
+              <span className="simple-list-meta">
+                Vue agrégée — une barre par chantier, sans le détail des tâches.
+              </span>
+            </div>
+
+            {!gantt ? (
+              <div className="empty-state">
+                <p className="empty-state-title">Aucun chantier positionnable</p>
+                <p className="empty-state-description">
+                  Cette vue a besoin d'au moins une tâche datée par chantier pour tracer sa
+                  barre.
+                </p>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <div style={{ minWidth: gantt.largeurTotale + 180 }}>
+                  <div className="gantt-mois-header" style={{ marginLeft: 180 }}>
+                    <div style={{ position: "relative", height: 24, width: gantt.largeurTotale }}>
+                      {gantt.mois.map((m) => (
+                        <div key={m.cle} className="gantt-mois-label" style={{ left: m.left }}>
+                          {m.label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {gantt.chantierBars.map((cb) => (
+                    <div key={cb.cle} className="gantt-ligne">
+                      <div className="gantt-ligne-titre" title={cb.nom}>
+                        {cb.nom}
+                      </div>
+                      <div className="gantt-piste" style={{ width: gantt.largeurTotale }}>
+                        {gantt.ligneAujourdHui !== null && (
+                          <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
+                        )}
+                        <div
+                          className="gantt-barre gantt-barre-chantier"
+                          style={{ left: cb.left, width: cb.largeur }}
+                          title={cb.nom + " — " + arrondirHeures(cb.heuresTotal) + " h au total"}
+                        >
+                          <span className="gantt-barre-heures">{arrondirHeures(cb.heuresTotal)} h</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Gantt détaillé</h2>
               <span className="simple-list-meta">
                 {tachesGantt.length} tâche(s) avec dates complètes
                 {tachesSansDatesCompletes.length > 0 &&
                   " · " + tachesSansDatesCompletes.length + " sans dates, non affichée(s) ici"}
+                {" · cliquer une tâche pour la recaler"}
               </span>
             </div>
 
@@ -250,11 +366,17 @@ export default function Planning() {
                               {gantt.ligneAujourdHui !== null && (
                                 <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
                               )}
-                              <div
-                                className={"gantt-barre gantt-barre-" + (t.statut ?? "a_faire")}
+                              <button
+                                type="button"
+                                className={"gantt-barre gantt-barre-cliquable gantt-barre-" + (t.statut ?? "a_faire")}
                                 style={{ left, width: largeur }}
-                                title={t.titre + " — " + t.dateDebut + " → " + t.echeance}
-                              />
+                                title={t.titre + " — " + t.dateDebut + " → " + t.echeance + " — cliquer pour recaler"}
+                                onClick={() => setTacheEnEdition(t)}
+                              >
+                                {t.heuresPrevues ? (
+                                  <span className="gantt-barre-heures">{t.heuresPrevues} h</span>
+                                ) : null}
+                              </button>
                             </div>
                           </div>
                         );
@@ -308,18 +430,18 @@ export default function Planning() {
                           return (
                             <td key={m} data-label={libelleMois(m)}>
                               <div className={"charge-cellule " + classeCharge(h)}>
-                                {h > 0 ? h + " h" : "—"}
+                                {h > 0 ? arrondirHeures(h) + " h" : "—"}
                               </div>
                             </td>
                           );
                         })}
                         <td data-label="Non planifié">
                           <span className="simple-list-meta">
-                            {p.nonPlanifie > 0 ? p.nonPlanifie + " h" : "—"}
+                            {p.nonPlanifie > 0 ? arrondirHeures(p.nonPlanifie) + " h" : "—"}
                           </span>
                         </td>
                         <td data-label="Total" style={{ fontFamily: "var(--font-ui)", fontWeight: 600 }}>
-                          {p.total} h
+                          {arrondirHeures(p.total)} h
                         </td>
                       </tr>
                     ))}
@@ -330,6 +452,93 @@ export default function Planning() {
           </section>
         </>
       )}
+
+      {tacheEnEdition && (
+        <TacheGanttModal
+          tache={tacheEnEdition}
+          onClose={() => setTacheEnEdition(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Popup d'édition rapide depuis le Gantt : ajuster les dates (recaler),
+// les heures ou le statut d'une tâche sans quitter la vue planning.
+function TacheGanttModal({ tache, onClose }) {
+  const [dateDebut, setDateDebut] = useState(tache.dateDebut || "");
+  const [echeance, setEcheance] = useState(tache.echeance || "");
+  const [heuresPrevues, setHeuresPrevues] = useState(tache.heuresPrevues ?? "");
+  const [statut, setStatut] = useState(tache.statut ?? "a_faire");
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (echeance && dateDebut && echeance < dateDebut) {
+      setErreur("La date de fin ne peut pas être avant la date de début.");
+      return;
+    }
+    setErreur("");
+    setEnCours(true);
+    await updateDoc(doc(db, "tasks", tache.id), {
+      dateDebut: dateDebut || null,
+      echeance: echeance || null,
+      heuresPrevues: heuresPrevues ? Number(heuresPrevues) : null,
+      statut,
+    });
+    setEnCours(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Recaler la tâche</h2>
+        <p className="empty-state-description" style={{ margin: "0 0 14px" }}>
+          {tache.titre}
+        </p>
+        <form onSubmit={handleSubmit} className="form">
+          <div className="form-inline">
+            <label>
+              Date début
+              <input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} />
+            </label>
+            <label>
+              Date fin
+              <input type="date" value={echeance} onChange={(e) => setEcheance(e.target.value)} />
+            </label>
+          </div>
+          <div className="form-inline">
+            <label>
+              Heures prévues
+              <input
+                type="number"
+                min="0"
+                value={heuresPrevues}
+                onChange={(e) => setHeuresPrevues(e.target.value)}
+              />
+            </label>
+            <label>
+              Statut
+              <select value={statut} onChange={(e) => setStatut(e.target.value)}>
+                <option value="a_faire">À faire</option>
+                <option value="en_cours">En cours</option>
+                <option value="termine">Terminé</option>
+              </select>
+            </label>
+          </div>
+          {erreur && <div className="form-error">{erreur}</div>}
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={enCours}>
+              {enCours ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

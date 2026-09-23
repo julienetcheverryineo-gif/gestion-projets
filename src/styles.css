@@ -1054,6 +1054,34 @@ a {
   border-radius: 4px;
   background: var(--text-muted);
 }
+.gantt-barre-cliquable {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+.gantt-barre-cliquable:hover {
+  filter: brightness(0.92);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.gantt-barre-heures {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  padding: 0 4px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.gantt-barre-chantier {
+  background: #2f6fb0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .gantt-barre-a_faire {
   background: #9aa5b1;
 }

@@ -678,6 +678,29 @@ Comme pour le Gantt, la qualité de ce tableau dépend directement du
 remplissage des dates de début/fin sur les tâches — plus elles sont
 renseignées, plus la charge mensuelle est fiable.
 
+## Correction : répartition des heures au prorata sur plusieurs mois
+
+Une tâche du 01/01 au 01/03 pour 16h ne met plus les 16h en entier sur
+janvier — les heures sont maintenant réparties au prorata du nombre de
+jours que la tâche occupe dans chaque mois traversé (ex : ~8,3h en
+janvier, ~7,5h en février, ~0,3h en mars pour cet exemple). Le total sur
+la ligne "Total" reste bien la somme exacte des heures prévues de la
+tâche.
+
+## Gantt par chantier, heures affichées, édition en popup
+
+- **Gantt par chantier** : nouvelle vue agrégée au-dessus du Gantt détaillé
+  — une seule barre par chantier (du plus tôt au plus tard parmi ses
+  tâches datées), avec le total d'heures de toutes ses tâches affiché
+  dessus. Utile pour une vue d'ensemble rapide sans se perdre dans le
+  détail de chaque tâche.
+- **Heures affichées sur les barres** : chaque barre (Gantt détaillé comme
+  Gantt par chantier) affiche maintenant son nombre d'heures directement
+  dessus, pas seulement au survol.
+- **Recaler une tâche en popup** : cliquer une barre du Gantt détaillé
+  ouvre une petite fenêtre pour ajuster ses dates de début/fin, ses heures
+  prévues ou son statut, sans quitter la page Planning.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
