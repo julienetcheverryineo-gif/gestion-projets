@@ -611,6 +611,24 @@ style par défaut du navigateur, d'où l'incohérence visuelle.
   **à la création du chantier** (l'équipe peut rester vide, à affecter
   plus tard).
 
+## Colonne Équipement, vue à plat par défaut, tri et filtre par colonne
+
+- **Tâches** : nouvelle colonne "Équipement", éditable (texte libre) pour
+  les tâches classiques. Les tâches issues d'anciens équipements régulés
+  (avant qu'on sépare les deux) l'affichent en lecture seule, comme avant.
+- **Listing matériel** : s'ouvre désormais **à plat par défaut** (tableau
+  unique, plus besoin de déplier équipement par équipement) — le bouton
+  bascule vers la vue groupée si besoin. En vue à plat, la colonne
+  "Équipement" est un menu déroulant : on peut réaffecter une ligne de
+  matériel à un autre équipement du chantier directement depuis le tableau.
+- **Tri et filtre par colonne**, sur les deux tableaux (Tâches et Listing
+  matériel à plat) : cliquer un intitulé de colonne trie (clic à nouveau
+  pour inverser, une troisième fois pour revenir à l'ordre manuel) ; une
+  ligne de recherche sous les en-têtes filtre chaque colonne
+  indépendamment (recherche simple, insensible à la casse). Trier une
+  colonne désactive temporairement le glisser-déposer des tâches — les
+  deux logiques d'ordre (manuelle et triée) ne peuvent pas cohabiter.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

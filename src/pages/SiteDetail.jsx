@@ -63,7 +63,7 @@ export default function SiteDetail() {
   const [ongletActif, setOngletActif] = useState("taches");
   const [groupementTaches, setGroupementTaches] = useState("flat");
   const [groupeTacheOuvert, setGroupeTacheOuvert] = useState(null);
-  const [groupementMateriel, setGroupementMateriel] = useState("equipement");
+  const [groupementMateriel, setGroupementMateriel] = useState("flat");
 
   const tachesDuChantier = useMemo(() => {
     const idsRegEquip = regEquipements.map((r) => r.id);
@@ -1282,10 +1282,32 @@ function AssignAllModal({ utilisateurs, onClose, onConfirm }) {
 // Vue "à plat" du matériel de tous les équipements régulés d'un chantier,
 // façon tableau des tâches (une colonne Équipement au lieu de groupes
 // dépliables), pour scanner/éditer rapidement une longue liste d'achats.
+function valeurColonneMateriel(it, colonne, nomEquipement) {
+  switch (colonne) {
+    case "equipement":
+      return nomEquipement(it.regEquipementId);
+    case "designation":
+      return it.designation || "";
+    case "quantite":
+      return it.quantite ?? "";
+    case "unite":
+      return it.unite || "";
+    case "statut":
+      return it.statut === "a_faire" ? "a_acheter" : it.statut || "";
+    case "remarque":
+      return it.remarque || "";
+    default:
+      return "";
+  }
+}
+
 function MaterielTablePlat({ regEquipements, regItems, peutGerer }) {
+  const [tri, setTri] = useState({ colonne: null, sens: 1 });
+  const [filtres, setFiltres] = useState({});
+
   const nomEquipement = (id) => regEquipements.find((r) => r.id === id)?.nom ?? "?";
   const idsRegEquip = regEquipements.map((r) => r.id);
-  const materiel = regItems.filter(
+  const materielBrut = regItems.filter(
     (it) => it.type === "materiel" && idsRegEquip.includes(it.regEquipementId)
   );
 
@@ -1299,7 +1321,41 @@ function MaterielTablePlat({ regEquipements, regItems, peutGerer }) {
     await deleteDoc(doc(db, "regitems", itemId));
   };
 
-  if (materiel.length === 0) {
+  const basculerTri = (colonne) => {
+    setTri((t) => {
+      if (t.colonne !== colonne) return { colonne, sens: 1 };
+      if (t.sens === 1) return { colonne, sens: -1 };
+      return { colonne: null, sens: 1 };
+    });
+  };
+  const changerFiltre = (colonne, valeur) => setFiltres((f) => ({ ...f, [colonne]: valeur }));
+
+  const materiel = useMemo(() => {
+    const entreesFiltre = Object.entries(filtres).filter(([, v]) => v && v.trim());
+    let liste = materielBrut;
+    if (entreesFiltre.length > 0) {
+      liste = liste.filter((it) =>
+        entreesFiltre.every(([colonne, valeur]) =>
+          String(valeurColonneMateriel(it, colonne, nomEquipement))
+            .toLowerCase()
+            .includes(valeur.trim().toLowerCase())
+        )
+      );
+    }
+    if (tri.colonne) {
+      liste = [...liste].sort((a, b) => {
+        const va = valeurColonneMateriel(a, tri.colonne, nomEquipement);
+        const vb = valeurColonneMateriel(b, tri.colonne, nomEquipement);
+        if (va < vb) return -1 * tri.sens;
+        if (va > vb) return 1 * tri.sens;
+        return 0;
+      });
+    }
+    return liste;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materielBrut, filtres, tri]);
+
+  if (materielBrut.length === 0) {
     return (
       <p className="empty-state-description" style={{ margin: "8px 0" }}>
         Aucun matériel.
@@ -1307,91 +1363,137 @@ function MaterielTablePlat({ regEquipements, regItems, peutGerer }) {
     );
   }
 
+  const Entete = ({ colonne, largeur, children }) => (
+    <th style={largeur ? { width: largeur } : undefined}>
+      <button type="button" className="th-tri-btn" onClick={() => basculerTri(colonne)}>
+        {children}
+        {tri.colonne === colonne ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+      </button>
+    </th>
+  );
+  const FiltreCell = ({ colonne }) => (
+    <th>
+      <input
+        className="th-filtre-input"
+        placeholder="Filtrer…"
+        value={filtres[colonne] ?? ""}
+        onChange={(e) => changerFiltre(colonne, e.target.value)}
+      />
+    </th>
+  );
+
   return (
-    <table className="data-table">
+    <table className="data-table" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
-          <th>Équipement</th>
-          <th>Désignation</th>
-          <th>Qté</th>
-          <th>Unité</th>
-          <th>Statut</th>
-          <th>Remarque</th>
+          <Entete colonne="equipement" largeur={160}>Équipement</Entete>
+          <Entete colonne="designation">Désignation</Entete>
+          <Entete colonne="quantite" largeur={70}>Qté</Entete>
+          <Entete colonne="unite" largeur={70}>Unité</Entete>
+          <Entete colonne="statut" largeur={120}>Statut</Entete>
+          <Entete colonne="remarque">Remarque</Entete>
+          <th style={{ width: 32 }}></th>
+        </tr>
+        <tr>
+          <FiltreCell colonne="equipement" />
+          <FiltreCell colonne="designation" />
+          <FiltreCell colonne="quantite" />
+          <FiltreCell colonne="unite" />
+          <FiltreCell colonne="statut" />
+          <FiltreCell colonne="remarque" />
           <th></th>
         </tr>
       </thead>
       <tbody>
-        {materiel.map((it) => (
-          <tr key={it.id}>
-            <td data-label="Équipement" style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
-              {nomEquipement(it.regEquipementId)}
-            </td>
-            <td data-label="Désignation">
-              <input
-                className="import-edit-input"
-                defaultValue={it.designation}
-                onBlur={(e) => {
-                  if (e.target.value !== it.designation) {
-                    changerChamp(it.id, "designation", e.target.value);
-                  }
-                }}
-              />
-            </td>
-            <td data-label="Qté">
-              <input
-                type="number"
-                min="0"
-                className="import-edit-input task-cell-heures"
-                defaultValue={it.quantite ?? ""}
-                onBlur={(e) => {
-                  const v = e.target.value ? Number(e.target.value) : 0;
-                  if (v !== (it.quantite ?? 0)) changerChamp(it.id, "quantite", v);
-                }}
-              />
-            </td>
-            <td data-label="Unité">
-              <input
-                className="import-edit-input"
-                defaultValue={it.unite ?? ""}
-                onBlur={(e) => {
-                  if (e.target.value !== (it.unite ?? "")) {
-                    changerChamp(it.id, "unite", e.target.value);
-                  }
-                }}
-              />
-            </td>
-            <td data-label="Statut">
-              <select
-                value={it.statut === "a_faire" ? "a_acheter" : it.statut}
-                onChange={(e) => changerStatut(it.id, e.target.value)}
-              >
-                {STATUTS_MATERIEL.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </td>
-            <td data-label="Remarque">
-              <input
-                className="import-edit-input"
-                defaultValue={it.remarque ?? ""}
-                onBlur={(e) => {
-                  if (e.target.value !== (it.remarque ?? "")) {
-                    changerChamp(it.id, "remarque", e.target.value);
-                  }
-                }}
-              />
-            </td>
-            <td>
-              {peutGerer && (
-                <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
-                  ×
-                </button>
-              )}
+        {materiel.length === 0 ? (
+          <tr>
+            <td colSpan={7} style={{ textAlign: "center", padding: "16px 0" }}>
+              <span className="simple-list-meta">Aucun matériel ne correspond aux filtres.</span>
             </td>
           </tr>
-        ))}
+        ) : (
+          materiel.map((it) => (
+            <tr key={it.id}>
+              <td data-label="Équipement">
+                <select
+                  className="import-edit-input"
+                  value={it.regEquipementId}
+                  onChange={(e) => changerChamp(it.id, "regEquipementId", e.target.value)}
+                >
+                  {regEquipements.map((reg) => (
+                    <option key={reg.id} value={reg.id}>
+                      {reg.nom}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td data-label="Désignation">
+                <input
+                  className="import-edit-input"
+                  defaultValue={it.designation}
+                  onBlur={(e) => {
+                    if (e.target.value !== it.designation) {
+                      changerChamp(it.id, "designation", e.target.value);
+                    }
+                  }}
+                />
+              </td>
+              <td data-label="Qté">
+                <input
+                  type="number"
+                  min="0"
+                  className="import-edit-input task-cell-heures"
+                  defaultValue={it.quantite ?? ""}
+                  onBlur={(e) => {
+                    const v = e.target.value ? Number(e.target.value) : 0;
+                    if (v !== (it.quantite ?? 0)) changerChamp(it.id, "quantite", v);
+                  }}
+                />
+              </td>
+              <td data-label="Unité">
+                <input
+                  className="import-edit-input"
+                  defaultValue={it.unite ?? ""}
+                  onBlur={(e) => {
+                    if (e.target.value !== (it.unite ?? "")) {
+                      changerChamp(it.id, "unite", e.target.value);
+                    }
+                  }}
+                />
+              </td>
+              <td data-label="Statut">
+                <select
+                  value={it.statut === "a_faire" ? "a_acheter" : it.statut}
+                  onChange={(e) => changerStatut(it.id, e.target.value)}
+                >
+                  {STATUTS_MATERIEL.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td data-label="Remarque">
+                <input
+                  className="import-edit-input"
+                  defaultValue={it.remarque ?? ""}
+                  onBlur={(e) => {
+                    if (e.target.value !== (it.remarque ?? "")) {
+                      changerChamp(it.id, "remarque", e.target.value);
+                    }
+                  }}
+                />
+              </td>
+              <td>
+                {peutGerer && (
+                  <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
+                    ×
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))
+        )}
       </tbody>
     </table>
   );
