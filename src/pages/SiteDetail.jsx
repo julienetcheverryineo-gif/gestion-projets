@@ -16,6 +16,7 @@ import ImportDevisModal from "../components/ImportDevisModal";
 import ReservesPanel from "../components/ReservesPanel";
 import TaskTable from "../components/TaskTable";
 import { estTactile } from "../lib/tactile";
+import { equipeChantier, electriciensChantier } from "../lib/equipe";
 
 const STATUTS_MATERIEL = [
   { value: "a_acheter", label: "À acheter" },
@@ -49,6 +50,9 @@ export default function SiteDetail() {
   const totalHeures = tempsChantier.reduce((s, t) => s + Number(t.duree || 0), 0);
 
   const { documents: utilisateurs } = useCollection("users", "email");
+  const utilisateursEquipe = utilisateurs.filter((u) =>
+    equipeChantier(chantier).includes(u.nom)
+  );
   const { documents: tousTaches } = useCollection("tasks");
 
   const [afficherRegForm, setAfficherRegForm] = useState(false);
@@ -420,7 +424,8 @@ export default function SiteDetail() {
             <TaskTable
               taches={tachesDuChantier}
               peutGerer={peutGerer}
-              utilisateurs={utilisateurs}
+              utilisateurs={utilisateursEquipe}
+              electriciens={electriciensChantier(chantier)}
               onDelete={async (id) => {
                 if (!confirm("Supprimer cette tâche ?")) return;
                 await deleteDoc(doc(db, "tasks", id));
@@ -451,7 +456,8 @@ export default function SiteDetail() {
                       <TaskTable
                         taches={g.taches}
                         peutGerer={peutGerer}
-                        utilisateurs={utilisateurs}
+                        utilisateurs={utilisateursEquipe}
+                        electriciens={electriciensChantier(chantier)}
                         onDelete={async (id) => {
                           if (!confirm("Supprimer cette tâche ?")) return;
                           await deleteDoc(doc(db, "tasks", id));
@@ -476,7 +482,8 @@ export default function SiteDetail() {
 
       {afficherAffectationMasse && (
         <AssignAllModal
-          utilisateurs={utilisateurs}
+          utilisateurs={utilisateursEquipe}
+          electriciens={electriciensChantier(chantier)}
           onClose={() => setAfficherAffectationMasse(false)}
           onConfirm={async (nom) => {
             const idsRegEquip = regEquipements.map((r) => r.id);
@@ -1232,7 +1239,7 @@ function TimeFormModal({ chantierId, lots, profil, onClose }) {
   );
 }
 
-function AssignAllModal({ utilisateurs, onClose, onConfirm }) {
+function AssignAllModal({ utilisateurs, electriciens = [], onClose, onConfirm }) {
   const [nom, setNom] = useState("");
   const [enCours, setEnCours] = useState(false);
 
@@ -1263,6 +1270,15 @@ function AssignAllModal({ utilisateurs, onClose, onConfirm }) {
                   {u.nom}
                 </option>
               ))}
+              {electriciens.length > 0 && (
+                <optgroup label="Électriciens">
+                  {electriciens.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
           <div className="modal-actions">

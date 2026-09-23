@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 
 // Petit menu déroulant à cases à cocher pour choisir plusieurs personnes.
 // `valeurs` est toujours un tableau de noms ; `onChange` reçoit le nouveau
-// tableau complet à chaque coche/décoche.
-export default function PersonMultiSelect({ valeurs, utilisateurs, onChange }) {
+// tableau complet à chaque coche/décoche. `autresNoms` (optionnel) ajoute
+// une seconde section de noms libres sans compte applicatif (ex : les
+// électriciens affectés au chantier, souvent externes).
+export default function PersonMultiSelect({ valeurs, utilisateurs, autresNoms = [], onChange }) {
   const [ouvert, setOuvert] = useState(false);
   const ref = useRef(null);
 
@@ -50,6 +52,21 @@ export default function PersonMultiSelect({ valeurs, utilisateurs, onChange }) {
               {u.nom}
             </label>
           ))}
+          {autresNoms.length > 0 && (
+            <>
+              <div className="person-multiselect-separateur">Électriciens</div>
+              {autresNoms.map((nom) => (
+                <label key={nom} className="team-checklist-item">
+                  <input
+                    type="checkbox"
+                    checked={valeurs.includes(nom)}
+                    onChange={() => basculer(nom)}
+                  />
+                  {nom}
+                </label>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

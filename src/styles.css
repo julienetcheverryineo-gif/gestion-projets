@@ -940,6 +940,17 @@ a {
   gap: 4px;
 }
 
+.person-multiselect-separateur {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
 .tache-drag-handle {
   cursor: grab;
   color: var(--text-muted);

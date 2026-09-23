@@ -85,7 +85,7 @@ function valeurColonne(t, colonne, nomChantier) {
 // en-têtes) et triée (clic sur l'intitulé, cycle aucun → ↑ → ↓).
 // Les colonnes sont redimensionnables (glisser le bord d'un en-tête) ;
 // la taille est mémorisée pour toute l'appli.
-export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, afficherChantier, nomChantier }) {
+export default function TaskTable({ taches, peutGerer, utilisateurs, electriciens = [], onDelete, afficherChantier, nomChantier }) {
   const [largeurs, setLargeurs] = useState(chargerLargeurs);
   const [tri, setTri] = useState({ colonne: null, sens: 1 });
   const [filtres, setFiltres] = useState({});
@@ -346,6 +346,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       <PersonMultiSelect
                         valeurs={assignes}
                         utilisateurs={utilisateurs}
+                        autresNoms={electriciens}
                         onChange={(v) => changerChamp(t, "assigneA", v)}
                       />
                     </td>
@@ -368,6 +369,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       <PersonMultiSelect
                         valeurs={assignes}
                         utilisateurs={utilisateurs}
+                        autresNoms={electriciens}
                         onChange={(v) => changerChamp(t, "assigneA", v)}
                       />
                     </td>

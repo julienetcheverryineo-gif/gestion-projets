@@ -29,6 +29,9 @@ export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
   const [electriciensTexte, setElectriciensTexte] = useState(
     (chantier?.electriciens ?? []).join(", ")
   );
+  const [electricienAAffecter, setElectricienAAffecter] = useState(
+    chantier?.electricienAAffecter ?? false
+  );
   const [enCours, setEnCours] = useState(false);
 
   const basculerAutomaticien = (nomPersonne) => {
@@ -54,6 +57,7 @@ export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
       responsableChantier,
       automaticiens,
       electriciens,
+      electricienAAffecter,
     };
     if (chantier) {
       await updateDoc(doc(db, "sites", chantier.id), donnees);
@@ -151,6 +155,15 @@ export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
               onChange={(e) => setElectriciensTexte(e.target.value)}
               placeholder="ex : Jean Dupont, Marc Petit"
             />
+          </label>
+          <label className="team-checklist-item" style={{ marginTop: -6 }}>
+            <input
+              type="checkbox"
+              checked={electricienAAffecter}
+              onChange={(e) => setElectricienAAffecter(e.target.checked)}
+            />
+            Électricien à affecter (besoin identifié, personne pas encore choisie — apparaît
+            comme option dans le responsable des tâches)
           </label>
 
           <div className="modal-actions">

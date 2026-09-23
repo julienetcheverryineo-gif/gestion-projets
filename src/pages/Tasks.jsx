@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import { normaliserAssignes } from "../lib/assignes";
+import { equipeChantier, electriciensChantier } from "../lib/equipe";
 import TaskTable from "../components/TaskTable";
 
 export default function Tasks() {
@@ -84,6 +85,31 @@ export default function Tasks() {
     }
     return [...map.values()].sort((a, b) => b.taches.length - a.taches.length);
   }, [toutesLesTaches]);
+
+  const tousElectriciens = useMemo(
+    () => [...new Set(chantiers.flatMap((c) => electriciensChantier(c)))],
+    [chantiers]
+  );
+  const tousUtilisateursEquipe = useMemo(
+    () => utilisateurs.filter((u) => chantiers.some((c) => equipeChantier(c).includes(u.nom))),
+    [utilisateurs, chantiers]
+  );
+
+  // En mode "par chantier", chaque groupe correspond à un seul chantier :
+  // on peut alors restreindre précisément à son équipe. Dans les autres
+  // modes (responsable/équipement), les tâches d'un même groupe peuvent
+  // venir de plusieurs chantiers : on propose l'union de toutes les
+  // équipes plutôt que de choisir arbitrairement un chantier.
+  const utilisateursPourGroupe = (g) => {
+    if (modeGroupement !== "chantier" || g.cle === "aaffecter") return tousUtilisateursEquipe;
+    const chantier = chantiers.find((c) => c.id === g.cle);
+    return utilisateurs.filter((u) => equipeChantier(chantier).includes(u.nom));
+  };
+  const electriciensPourGroupe = (g) => {
+    if (modeGroupement !== "chantier" || g.cle === "aaffecter") return tousElectriciens;
+    const chantier = chantiers.find((c) => c.id === g.cle);
+    return electriciensChantier(chantier);
+  };
 
   const groupes =
     modeGroupement === "chantier"
@@ -197,7 +223,8 @@ export default function Tasks() {
                     <TaskTable
                       taches={g.taches}
                       peutGerer={peutGerer}
-                      utilisateurs={utilisateurs}
+                      utilisateurs={utilisateursPourGroupe(g)}
+                      electriciens={electriciensPourGroupe(g)}
                       onDelete={supprimer}
                       afficherChantier={modeGroupement === "responsable"}
                       nomChantier={(id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter"}

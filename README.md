@@ -629,6 +629,32 @@ style par défaut du navigateur, d'où l'incohérence visuelle.
   colonne désactive temporairement le glisser-déposer des tâches — les
   deux logiques d'ordre (manuelle et triée) ne peuvent pas cohabiter.
 
+## Électriciens sélectionnables comme responsables
+
+Les électriciens affectés à un chantier (souvent externes, sans compte
+applicatif) apparaissent maintenant dans le sélecteur "Responsable" des
+tâches — en plus des comptes utilisateurs, dans une section séparée du
+menu. Disponible partout où on affecte une tâche : tableau des tâches
+(chantier et page globale), tâches d'équipement régulé, et "Assigner
+toutes les tâches à…". Sur la page Tâches globale (qui peut mélanger
+plusieurs chantiers), la liste combine les électriciens de tous les
+chantiers.
+
+## Responsable restreint à l'équipe du chantier, électricien à affecter
+
+- Le sélecteur "Responsable" d'une tâche ne propose plus tous les comptes
+  de l'application, mais uniquement les personnes réellement affectées au
+  chantier (RA, responsable de chantier, automaticiens) — plus les
+  électriciens. Sur la page Tâches globale, quand le regroupement mélange
+  plusieurs chantiers ("Par responsable", "Par équipement"), la liste
+  proposée est l'union des équipes concernées ; en mode "Par chantier",
+  elle reste précise au chantier du groupe ouvert.
+- Nouvelle case **"Électricien à affecter"** dans le formulaire chantier
+  (à côté du champ Électriciens) : à cocher quand un électricien est
+  nécessaire mais pas encore désigné. Une fois cochée, "Électricien à
+  affecter" apparaît comme option choisissable dans le responsable des
+  tâches, pour marquer le besoin sans attendre d'avoir un nom.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
