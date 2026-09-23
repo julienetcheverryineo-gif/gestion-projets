@@ -16,8 +16,6 @@ import ImportDevisModal from "../components/ImportDevisModal";
 import TeamFormModal from "../components/TeamFormModal";
 import ReservesPanel from "../components/ReservesPanel";
 import TaskTable from "../components/TaskTable";
-import PersonMultiSelect from "../components/PersonMultiSelect";
-import { normaliserAssignes } from "../lib/assignes";
 import { estTactile } from "../lib/tactile";
 
 const STATUTS_MATERIEL = [
@@ -25,11 +23,6 @@ const STATUTS_MATERIEL = [
   { value: "recu", label: "Reçu" },
   { value: "installe", label: "Installé" },
   { value: "teste", label: "Testé" },
-];
-
-const STATUTS_TACHE = [
-  { value: "a_faire", label: "À faire" },
-  { value: "fait", label: "Fait" },
 ];
 
 export default function SiteDetail() {
@@ -159,19 +152,6 @@ export default function SiteDetail() {
                 <strong>Électriciens :</strong> {chantier.electriciens.join(", ")}
               </span>
             )}
-            <button className="linkish" onClick={() => setAfficherEquipeForm(true)}>
-              Modifier l'équipe
-            </button>
-            {peutGerer && (
-              <button className="linkish" onClick={() => setAfficherAffectationMasse(true)}>
-                Assigner toutes les tâches à…
-              </button>
-            )}
-            {peutGerer && (
-              <button className="linkish" onClick={() => setAfficherChantierForm(true)}>
-                Modifier le chantier
-              </button>
-            )}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -184,6 +164,27 @@ export default function SiteDetail() {
         </div>
       </header>
 
+      <div className="chantier-actions-bar">
+        <button className="btn-ghost" onClick={() => setAfficherEquipeForm(true)}>
+          Modifier l'équipe
+        </button>
+        {peutGerer && (
+          <button className="btn-ghost" onClick={() => setAfficherAffectationMasse(true)}>
+            Assigner toutes les tâches à…
+          </button>
+        )}
+        {peutGerer && (
+          <button className="btn-ghost" onClick={() => setAfficherChantierForm(true)}>
+            Modifier le chantier
+          </button>
+        )}
+        {peutGerer && (
+          <button className="btn-ghost" onClick={() => setAfficherImport(true)}>
+            Importer une minute de devis
+          </button>
+        )}
+      </div>
+
       <div className="page-tabs">
         <button
           className={"page-tab" + (ongletActif === "taches" ? " page-tab-active" : "")}
@@ -195,7 +196,7 @@ export default function SiteDetail() {
           className={"page-tab" + (ongletActif === "equipements" ? " page-tab-active" : "")}
           onClick={() => setOngletActif("equipements")}
         >
-          Équipements régulés
+          Listing matériel
         </button>
         <button
           className={"page-tab" + (ongletActif === "reserves" ? " page-tab-active" : "")}
@@ -214,22 +215,17 @@ export default function SiteDetail() {
       {ongletActif === "equipements" && (
       <section className="panel">
         <div className="panel-header">
-          <h2>Équipements régulés</h2>
+          <h2>Listing matériel</h2>
           {peutGerer && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-ghost" onClick={() => setAfficherImport(true)}>
-                Importer une minute de devis
-              </button>
-              <button
-                className="btn-ghost"
-                onClick={() => {
-                  setRegSelectionne(null);
-                  setAfficherRegForm(true);
-                }}
-              >
-                + Ajouter un équipement
-              </button>
-            </div>
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                setRegSelectionne(null);
+                setAfficherRegForm(true);
+              }}
+            >
+              + Ajouter un équipement
+            </button>
           )}
         </div>
 
@@ -238,7 +234,8 @@ export default function SiteDetail() {
             <p className="empty-state-title">Aucun équipement régulé</p>
             <p className="empty-state-description">
               Ajoutez un équipement (ex : LOCAL RCU, CTA RDJ…) manuellement, ou importez
-              une minute de devis pour les créer automatiquement avec leur matériel.
+              une minute de devis (bouton en haut de page) pour créer les équipements et
+              leur matériel automatiquement.
             </p>
           </div>
         ) : (
@@ -285,7 +282,6 @@ export default function SiteDetail() {
                   reg={reg}
                   items={tousRegItems.filter((it) => it.regEquipementId === reg.id)}
                   peutGerer={peutGerer}
-                  utilisateurs={utilisateurs}
                   onEdit={() => {
                     setRegSelectionne(reg);
                     setAfficherRegForm(true);
@@ -477,22 +473,17 @@ export default function SiteDetail() {
 // Équipements régulés (notre périmètre)
 // ============================================================================
 
-function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelete }) {
+function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
   const [ouvert, setOuvert] = useState(false);
   const [afficherItemForm, setAfficherItemForm] = useState(false);
-  const [typePourAjout, setTypePourAjout] = useState("materiel");
 
   const materiel = items.filter((it) => it.type === "materiel");
-  const taches = items.filter((it) => it.type === "tache");
-  const total = items.length;
-  const faits = items.filter((it) => it.statut === "teste" || it.statut === "fait").length;
+  const total = materiel.length;
+  const faits = materiel.filter((it) => it.statut === "teste").length;
   const pct = total > 0 ? Math.round((faits / total) * 100) : 0;
 
   const changerStatut = async (itemId, statut) => {
     await updateDoc(doc(db, "regitems", itemId), { statut });
-  };
-  const changerResponsable = async (itemId, assignes) => {
-    await updateDoc(doc(db, "regitems", itemId), { assigneA: assignes });
   };
   const changerChamp = async (itemId, champ, valeur) => {
     await updateDoc(doc(db, "regitems", itemId), { [champ]: valeur });
@@ -508,7 +499,7 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
           <span className="lot-card-toggle">{ouvert ? "▾" : "▸"}</span>
           <strong>{reg.nom}</strong>
           <span className="simple-list-meta" style={{ marginLeft: 10 }}>
-            {materiel.length} matériel · {taches.length} tâche(s)
+            {materiel.length} matériel
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -542,189 +533,104 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
       </div>
 
       {ouvert && (
-        <div className="lot-card-body reg-item-columns">
-          <div className="item-section-materiel">
-            <div className="reg-subheading reg-subheading-materiel">
-              <span className="reg-subheading-icon">🔧</span>
-              Matériel
-            </div>
-            {materiel.length === 0 ? (
-              <p className="empty-state-description" style={{ margin: "4px 0" }}>
-                Aucun matériel.
-              </p>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Désignation</th>
-                    <th>Qté</th>
-                    <th>Unité</th>
-                    <th>Statut</th>
-                    <th>Remarque</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {materiel.map((it) => (
-                    <tr key={it.id}>
-                      <td data-label="Désignation">
-                        <input
-                          className="import-edit-input"
-                          defaultValue={it.designation}
-                          onBlur={(e) => {
-                            if (e.target.value !== it.designation) {
-                              changerChamp(it.id, "designation", e.target.value);
-                            }
-                          }}
-                        />
-                      </td>
-                      <td data-label="Qté">
-                        <input
-                          type="number"
-                          min="0"
-                          className="import-edit-input task-cell-heures"
-                          defaultValue={it.quantite ?? ""}
-                          onBlur={(e) => {
-                            const v = e.target.value ? Number(e.target.value) : 0;
-                            if (v !== (it.quantite ?? 0)) changerChamp(it.id, "quantite", v);
-                          }}
-                        />
-                      </td>
-                      <td data-label="Unité">
-                        <input
-                          className="import-edit-input"
-                          defaultValue={it.unite ?? ""}
-                          onBlur={(e) => {
-                            if (e.target.value !== (it.unite ?? "")) {
-                              changerChamp(it.id, "unite", e.target.value);
-                            }
-                          }}
-                        />
-                      </td>
-                      <td data-label="Statut">
-                        <select
-                          value={it.statut === "a_faire" ? "a_acheter" : it.statut}
-                          onChange={(e) => changerStatut(it.id, e.target.value)}
-                        >
-                          {STATUTS_MATERIEL.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td data-label="Remarque">
-                        <input
-                          className="import-edit-input"
-                          defaultValue={it.remarque ?? ""}
-                          onBlur={(e) => {
-                            if (e.target.value !== (it.remarque ?? "")) {
-                              changerChamp(it.id, "remarque", e.target.value);
-                            }
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
-                          ×
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {peutGerer && (
-              <button
-                className="kanban-add-inline"
-                onClick={() => {
-                  setTypePourAjout("materiel");
-                  setAfficherItemForm(true);
-                }}
-              >
-                + Ajouter du matériel
-              </button>
-            )}
-          </div>
-
-          <div className="item-section-tache">
-            <div className="reg-subheading reg-subheading-tache">
-              <span className="reg-subheading-icon">☑</span>
-              Tâches
-            </div>
-            {taches.length === 0 ? (
-              <p className="empty-state-description" style={{ margin: "4px 0" }}>
-                Aucune tâche.
-              </p>
-            ) : (
-              <ul className="simple-list">
-                {taches.map((it) => (
-                  <li key={it.id}>
-                    <select
-                      value={it.statut}
-                      onChange={(e) => changerStatut(it.id, e.target.value)}
-                      style={{ flexShrink: 0 }}
-                    >
-                      {STATUTS_TACHE.map((s) => (
-                        <option key={s.value} value={s.value}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      className="simple-list-title tache-designation-input"
-                      defaultValue={it.designation}
-                      onBlur={(e) => {
-                        if (e.target.value !== it.designation) {
-                          changerChamp(it.id, "designation", e.target.value);
-                        }
-                      }}
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      className="import-edit-input tache-heures-input"
-                      title="Heures prévues"
-                      defaultValue={it.heuresPrevues ?? ""}
-                      onBlur={(e) => {
-                        const v = e.target.value ? Number(e.target.value) : null;
-                        if (v !== (it.heuresPrevues ?? null)) changerChamp(it.id, "heuresPrevues", v);
-                      }}
-                    />
-                    <div style={{ flexShrink: 0, width: 170 }}>
-                      <PersonMultiSelect
-                        valeurs={normaliserAssignes(it.assigneA)}
-                        utilisateurs={utilisateurs}
-                        onChange={(v) => changerResponsable(it.id, v)}
+        <div className="lot-card-body">
+          {materiel.length === 0 ? (
+            <p className="empty-state-description" style={{ margin: "4px 0" }}>
+              Aucun matériel.
+            </p>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Désignation</th>
+                  <th>Qté</th>
+                  <th>Unité</th>
+                  <th>Statut</th>
+                  <th>Remarque</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {materiel.map((it) => (
+                  <tr key={it.id}>
+                    <td data-label="Désignation">
+                      <input
+                        className="import-edit-input"
+                        defaultValue={it.designation}
+                        onBlur={(e) => {
+                          if (e.target.value !== it.designation) {
+                            changerChamp(it.id, "designation", e.target.value);
+                          }
+                        }}
                       />
-                    </div>
-                    <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
-                      ×
-                    </button>
-                  </li>
+                    </td>
+                    <td data-label="Qté">
+                      <input
+                        type="number"
+                        min="0"
+                        className="import-edit-input task-cell-heures"
+                        defaultValue={it.quantite ?? ""}
+                        onBlur={(e) => {
+                          const v = e.target.value ? Number(e.target.value) : 0;
+                          if (v !== (it.quantite ?? 0)) changerChamp(it.id, "quantite", v);
+                        }}
+                      />
+                    </td>
+                    <td data-label="Unité">
+                      <input
+                        className="import-edit-input"
+                        defaultValue={it.unite ?? ""}
+                        onBlur={(e) => {
+                          if (e.target.value !== (it.unite ?? "")) {
+                            changerChamp(it.id, "unite", e.target.value);
+                          }
+                        }}
+                      />
+                    </td>
+                    <td data-label="Statut">
+                      <select
+                        value={it.statut === "a_faire" ? "a_acheter" : it.statut}
+                        onChange={(e) => changerStatut(it.id, e.target.value)}
+                      >
+                        {STATUTS_MATERIEL.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td data-label="Remarque">
+                      <input
+                        className="import-edit-input"
+                        defaultValue={it.remarque ?? ""}
+                        onBlur={(e) => {
+                          if (e.target.value !== (it.remarque ?? "")) {
+                            changerChamp(it.id, "remarque", e.target.value);
+                          }
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
+                        ×
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </ul>
-            )}
-            {peutGerer && (
-              <button
-                className="kanban-add-inline"
-                onClick={() => {
-                  setTypePourAjout("tache");
-                  setAfficherItemForm(true);
-                }}
-              >
-                + Ajouter une tâche
-              </button>
-            )}
-          </div>
+              </tbody>
+            </table>
+          )}
+          {peutGerer && (
+            <button className="kanban-add-inline" onClick={() => setAfficherItemForm(true)}>
+              + Ajouter du matériel
+            </button>
+          )}
         </div>
       )}
 
       {afficherItemForm && (
         <RegItemFormModal
           regEquipementId={reg.id}
-          typeInitial={typePourAjout}
-          utilisateurs={utilisateurs}
           onClose={() => setAfficherItemForm(false)}
         />
       )}
@@ -781,14 +687,11 @@ function RegEquipmentFormModal({ chantierId, reg, onClose }) {
   );
 }
 
-function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose }) {
-  const [type, setType] = useState(typeInitial);
+function RegItemFormModal({ regEquipementId, onClose }) {
   const [designation, setDesignation] = useState("");
   const [quantite, setQuantite] = useState("");
   const [unite, setUnite] = useState("");
   const [remarque, setRemarque] = useState("");
-  const [assigneA, setAssigneA] = useState([]);
-  const [heuresPrevues, setHeuresPrevues] = useState("");
   const [enCours, setEnCours] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -796,14 +699,14 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
     setEnCours(true);
     await addDoc(collection(db, "regitems"), {
       regEquipementId,
-      type,
+      type: "materiel",
       designation,
       remarque,
       quantite: quantite ? Number(quantite) : 0,
       unite,
-      assigneA: type === "tache" ? assigneA : [],
-      heuresPrevues: type === "tache" && heuresPrevues ? Number(heuresPrevues) : null,
-      statut: type === "materiel" ? "a_acheter" : "a_faire",
+      assigneA: [],
+      heuresPrevues: null,
+      statut: "a_acheter",
       creeLe: serverTimestamp(),
     });
     setEnCours(false);
@@ -813,70 +716,36 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{type === "materiel" ? "Nouveau matériel" : "Nouvelle tâche"}</h2>
+        <h2>Nouveau matériel</h2>
         <form onSubmit={handleSubmit} className="form">
-          <label>
-            Type
-            <select value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="materiel">Matériel</option>
-              <option value="tache">Tâche</option>
-            </select>
-          </label>
           <label>
             Désignation
             <input
               value={designation}
               onChange={(e) => setDesignation(e.target.value)}
-              placeholder={
-                type === "materiel"
-                  ? "ex : Sonde température CTA1"
-                  : "ex : Programmation automate"
-              }
+              placeholder="ex : Sonde température CTA1"
               required
             />
           </label>
-          {type === "tache" && (
-            <>
-              <label>
-                Responsable(s)
-                <PersonMultiSelect
-                  valeurs={assigneA}
-                  utilisateurs={utilisateurs}
-                  onChange={setAssigneA}
-                />
-              </label>
-              <label>
-                Heures prévues
-                <input
-                  type="number"
-                  min="0"
-                  value={heuresPrevues}
-                  onChange={(e) => setHeuresPrevues(e.target.value)}
-                />
-              </label>
-            </>
-          )}
-          {type === "materiel" && (
-            <div className="form-inline">
-              <label>
-                Quantité
-                <input
-                  type="number"
-                  min="0"
-                  value={quantite}
-                  onChange={(e) => setQuantite(e.target.value)}
-                />
-              </label>
-              <label>
-                Unité
-                <input
-                  value={unite}
-                  onChange={(e) => setUnite(e.target.value)}
-                  placeholder="u, Ens…"
-                />
-              </label>
-            </div>
-          )}
+          <div className="form-inline">
+            <label>
+              Quantité
+              <input
+                type="number"
+                min="0"
+                value={quantite}
+                onChange={(e) => setQuantite(e.target.value)}
+              />
+            </label>
+            <label>
+              Unité
+              <input
+                value={unite}
+                onChange={(e) => setUnite(e.target.value)}
+                placeholder="u, Ens…"
+              />
+            </label>
+          </div>
           <label>
             Remarque
             <input value={remarque} onChange={(e) => setRemarque(e.target.value)} />
@@ -1156,7 +1025,7 @@ function ReportModal({ chantier, regEquipements, regItems, lots, equipements, on
     lignes.push("Date : " + new Date().toLocaleDateString("fr-FR"));
     lignes.push("");
 
-    lignes.push("== Équipements régulés ==");
+    lignes.push("== Listing matériel ==");
     if (regEquipements.length === 0) {
       lignes.push("Aucun équipement renseigné.");
     }

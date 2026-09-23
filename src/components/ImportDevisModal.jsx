@@ -166,24 +166,45 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     try {
       for (let index = 0; index < aImporter.length; index++) {
         const poste = aImporter[index];
-        const regRef = await addDoc(collection(db, "regequipements"), {
-          nom: poste.nomEdite,
-          chantierId,
-          code: poste.code,
-          ordre: baseOrdre + index,
-          creeLe: serverTimestamp(),
-        });
+        const aDuMateriel = poste.items.some(
+          (it) => it.type === "materiel" && it.designation.trim()
+        );
+        let regRef = null;
+        if (aDuMateriel) {
+          regRef = await addDoc(collection(db, "regequipements"), {
+            nom: poste.nomEdite,
+            chantierId,
+            code: poste.code,
+            ordre: baseOrdre + index,
+            creeLe: serverTimestamp(),
+          });
+        }
         for (const item of poste.items) {
           if (!item.designation.trim()) continue;
+          if (item.type === "tache") {
+            await addDoc(collection(db, "tasks"), {
+              titre: item.designation,
+              chantierId,
+              assigneA: [],
+              heuresPrevues: item.heuresPrevues || null,
+              dateDebut: null,
+              echeance: null,
+              lienDevis: null,
+              commentaires: "Équipement : " + poste.nomEdite,
+              statut: "a_faire",
+              creeLe: serverTimestamp(),
+            });
+            continue;
+          }
+          if (!regRef) continue;
           await addDoc(collection(db, "regitems"), {
             regEquipementId: regRef.id,
-            type: item.type,
+            type: "materiel",
             designation: item.designation,
             remarque: item.detail || "",
             unite: item.unite || "",
             quantite: item.quantite || 0,
-            heuresPrevues: item.type === "tache" ? item.heuresPrevues || null : null,
-            statut: item.type === "materiel" ? "a_acheter" : "a_faire",
+            statut: "a_acheter",
             creeLe: serverTimestamp(),
           });
         }

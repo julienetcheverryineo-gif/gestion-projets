@@ -949,6 +949,13 @@ a {
   outline: none;
 }
 
+.chantier-actions-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
 .tache-heures-input {
   flex-shrink: 0;
   width: 52px;

@@ -556,6 +556,34 @@ formulaire d'ajout manuel, fiche équipement (nouveau petit champ à côté du
 responsable), page Tâches globale et Vue d'ensemble (comptent désormais ces
 heures dans les totaux et la charge par automaticien).
 
+## Restructuration : Listing matériel séparé des tâches
+
+L'onglet "Équipements régulés" devient **"Listing matériel"** et n'affiche
+plus que du matériel (Désignation, Qté, Unité, Statut, Remarque) — la
+section Tâches, devenue illisible une fois les heures ajoutées (trop de
+champs sur une ligne trop étroite), est retirée de cette vue. Les tâches
+d'un chantier, y compris celles issues d'un équipement, se gèrent
+désormais **uniquement depuis l'onglet "Tâches"**.
+
+Concrètement, à l'import d'une minute de devis : le **matériel** continue
+de créer un équipement régulé (dans le Listing matériel) ; les **tâches**
+sont maintenant créées directement dans la collection des tâches
+classiques, avec un commentaire "Équipement : Nom" pour garder le lien
+d'origine. Un poste composé uniquement de tâches (aucun matériel) ne crée
+plus d'équipement vide dans le listing.
+
+Les tâches d'équipement déjà existantes en base (créées avant cette mise à
+jour) restent visibles et gérables depuis l'onglet Tâches, comme avant —
+rien n'est perdu, seul l'endroit où on les gère a changé.
+
+**Barre d'actions du chantier** : "Modifier l'équipe", "Assigner toutes les
+tâches à…", "Modifier le chantier" et désormais **"Importer une minute de
+devis"** (déplacé depuis le panneau Listing matériel) forment une seule
+rangée de boutons homogènes juste sous l'en-tête. Au passage, un bug
+d'origine est corrigé : ces boutons utilisaient une classe CSS
+(`linkish`) qui n'avait jamais été définie et s'affichaient donc avec le
+style par défaut du navigateur, d'où l'incohérence visuelle.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
