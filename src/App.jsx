@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Sites from "./pages/Sites";
 import SiteDetail from "./pages/SiteDetail";
 import Tasks from "./pages/Tasks";
+import Planning from "./pages/Planning";
 import ReservesGlobal from "./pages/ReservesGlobal";
 import Users from "./pages/Users";
 
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="chantiers" element={<Sites />} />
             <Route path="chantiers/:chantierId" element={<SiteDetail />} />
             <Route path="taches" element={<Tasks />} />
+            <Route path="planning" element={<Planning />} />
             <Route path="reserves" element={<ReservesGlobal />} />
             <Route
               path="utilisateurs"

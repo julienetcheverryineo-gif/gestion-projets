@@ -996,6 +996,107 @@ a {
   table-layout: fixed;
 }
 
+/* ---------- Gantt ---------- */
+.gantt-mois-header {
+  position: relative;
+}
+.gantt-mois-label {
+  position: absolute;
+  top: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-left: 1px solid var(--border);
+  padding-left: 6px;
+  height: 100%;
+}
+.gantt-groupe {
+  margin-top: 10px;
+}
+.gantt-groupe-titre {
+  font-weight: 600;
+  font-size: 0.86rem;
+  margin: 10px 0 4px;
+  padding-left: 180px;
+}
+.gantt-ligne {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  border-top: 1px solid var(--border);
+}
+.gantt-ligne-titre {
+  width: 180px;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  color: var(--text-muted);
+  padding-right: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gantt-piste {
+  position: relative;
+  height: 22px;
+  background: repeating-linear-gradient(
+    to right,
+    transparent,
+    transparent 29px,
+    var(--border) 29px,
+    var(--border) 30px
+  );
+}
+.gantt-barre {
+  position: absolute;
+  top: 3px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--text-muted);
+}
+.gantt-barre-a_faire {
+  background: #9aa5b1;
+}
+.gantt-barre-en_cours {
+  background: #2f6fb0;
+}
+.gantt-barre-termine {
+  background: var(--accent);
+}
+.gantt-aujourdhui {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--danger);
+  z-index: 1;
+}
+
+/* ---------- Charge automaticiens ---------- */
+.charge-cellule {
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.charge-cellule-vide {
+  color: var(--text-muted);
+}
+.charge-cellule-verte {
+  background: rgba(47, 158, 107, 0.15);
+  color: #1f7a4d;
+}
+.charge-cellule-orange {
+  background: rgba(230, 160, 40, 0.18);
+  color: #96650f;
+}
+.charge-cellule-rouge {
+  background: rgba(214, 69, 69, 0.18);
+  color: #a1312f;
+}
+
 .tache-designation-input {
   flex: 1;
   min-width: 0;

@@ -655,6 +655,29 @@ chantiers.
   affecter" apparaît comme option choisissable dans le responsable des
   tâches, pour marquer le besoin sans attendre d'avoir un nom.
 
+## Planning : Gantt et charge des automaticiens
+
+Nouvelle page **"Planning"** (menu de gauche), avec un filtre par chantier :
+
+- **Gantt** : une barre par tâche ayant à la fois une date de début et une
+  date de fin, groupées par chantier, avec un repère "aujourd'hui" et une
+  couleur par statut (gris = à faire, bleu = en cours, vert = terminé).
+  **Limite à connaître** : seules les tâches avec les deux dates renseignées
+  apparaissent — le nombre de tâches sans dates complètes (souvent les
+  tâches importées d'un devis, qui n'ont que des heures) est affiché à côté
+  du titre, pour ne rien cacher silencieusement plutôt que de laisser croire
+  que le Gantt est complet.
+- **Charge par automaticien** : tableau croisé personne × mois, avec le
+  total d'heures prévues (tâches classiques et d'équipements régulés
+  confondues) coloré selon un plafond de **156 h/mois** — vert en dessous de
+  75 %, orange en approche, rouge au dépassement. Les tâches sans date sont
+  comptées dans une colonne "Non planifié" séparée plutôt qu'ignorées ou
+  mal réparties dans un mois au hasard.
+
+Comme pour le Gantt, la qualité de ce tableau dépend directement du
+remplissage des dates de début/fin sur les tâches — plus elles sont
+renseignées, plus la charge mensuelle est fiable.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
