@@ -155,7 +155,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
                       onChange={(v) => changerChamp(t, "assigneA", v)}
                     />
                   </td>
-                  <td data-label="Heures">—</td>
+                  <td data-label="Heures">{t.heuresPrevues || "—"}</td>
                   <td data-label="Début">—</td>
                   <td data-label="Fin">—</td>
                 </>

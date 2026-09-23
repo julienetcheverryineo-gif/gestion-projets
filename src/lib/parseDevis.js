@@ -13,6 +13,7 @@ const LABELS = {
   quantite: ["qté", "qte", "quantité", "quantite"],
   typeFo: ["type de fo"],
   typeMo: ["type mo", "type de mo"],
+  tempsUnitaire: ["temps unitaire"],
 };
 
 function normaliser(texte) {
@@ -45,7 +46,8 @@ function trouverColonne(entete, cles) {
 // ligne brute du tableau. Une ligne qui a à la fois un code Type de FO et un
 // code Type MO génère une ligne de matériel ET une ligne de tâche.
 function construireLignesArticle(donnees, compteurRef) {
-  const { description, nomArticle, reference, unite, quantite, typeFo, typeMo } = donnees;
+  const { description, nomArticle, reference, unite, quantite, typeFo, typeMo, tempsUnitaire } =
+    donnees;
 
   const designationBrute = description || nomArticle;
   if (!designationBrute) return [];
@@ -54,11 +56,16 @@ function construireLignesArticle(donnees, compteurRef) {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  const estSousTitre = !reference && !unite && !quantite && !typeFo && !typeMo;
+  const estSousTitre =
+    !reference && !unite && !quantite && !typeFo && !typeMo && !tempsUnitaire;
   if (estSousTitre) return []; // sous-section informative (ex: "AUTOMATE")
 
   const detailOrigine = resteDescription.join(" ").slice(0, 200);
   const resultats = [];
+
+  // Heures prévues d'une tâche = temps unitaire (colonne "Temps unitaire")
+  // multiplié par la quantité de la ligne (ex: 4h × 4 occurrences = 16h).
+  const heuresTache = tempsUnitaire ? tempsUnitaire * (quantite || 1) : null;
 
   // Pour du matériel : la référence (ex: "ECY-16DI") est plus utile comme
   // désignation principale que la description générique du devis. Quand
@@ -95,6 +102,7 @@ function construireLignesArticle(donnees, compteurRef) {
       unite: "",
       quantite: 0,
       detail: "",
+      heuresPrevues: heuresTache,
     });
   } else if (!typeFo) {
     compteurRef.n += 1;
@@ -109,6 +117,7 @@ function construireLignesArticle(donnees, compteurRef) {
       reference,
       unite,
       quantite,
+      heuresPrevues: estMateriel ? undefined : heuresTache,
     });
   }
 
@@ -146,6 +155,7 @@ export function analyserClasseur(arrayBuffer) {
   const cQuantite = trouverColonne(entete, LABELS.quantite);
   const cTypeFo = trouverColonne(entete, LABELS.typeFo);
   const cTypeMo = trouverColonne(entete, LABELS.typeMo);
+  const cTempsUnitaire = trouverColonne(entete, LABELS.tempsUnitaire);
 
   // Lecture brute de toutes les lignes de données une seule fois.
   const lignesBrutes = [];
@@ -163,6 +173,7 @@ export function analyserClasseur(arrayBuffer) {
       quantite: cQuantite >= 0 ? Number(ligne[cQuantite] ?? 0) || 0 : 0,
       typeFo: cTypeFo >= 0 ? String(ligne[cTypeFo] ?? "").trim() : "",
       typeMo: cTypeMo >= 0 ? String(ligne[cTypeMo] ?? "").trim() : "",
+      tempsUnitaire: cTempsUnitaire >= 0 ? Number(ligne[cTempsUnitaire] ?? 0) || 0 : 0,
     });
   }
 

@@ -182,6 +182,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
             remarque: item.detail || "",
             unite: item.unite || "",
             quantite: item.quantite || 0,
+            heuresPrevues: item.type === "tache" ? item.heuresPrevues || null : null,
             statut: item.type === "materiel" ? "a_acheter" : "a_faire",
             creeLe: serverTimestamp(),
           });
@@ -332,6 +333,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
                           }
                           onDelete={(itemId) => supprimerItem(index, itemId)}
                           onAdd={() => ajouterItem(index, "tache")}
+                          avecHeures
                         />
                       </div>
                     )}
@@ -367,7 +369,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
   );
 }
 
-function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQuantite }) {
+function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQuantite, avecHeures }) {
   return (
     <div className={"import-item-group item-section-" + type}>
       <div className={"reg-subheading reg-subheading-" + type}>
@@ -389,6 +391,7 @@ function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQu
                   <th style={{ width: 70 }}>Unité</th>
                 </>
               )}
+              {avecHeures && <th style={{ width: 60 }}>Heures</th>}
               <th style={{ width: 32 }}></th>
             </tr>
           </thead>
@@ -421,6 +424,23 @@ function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQu
                       />
                     </td>
                   </>
+                )}
+                {avecHeures && (
+                  <td data-label="Heures">
+                    <input
+                      type="number"
+                      min="0"
+                      className="import-edit-input"
+                      value={item.heuresPrevues ?? ""}
+                      onChange={(e) =>
+                        onChange(
+                          item.id,
+                          "heuresPrevues",
+                          e.target.value ? Number(e.target.value) : null
+                        )
+                      }
+                    />
+                  </td>
                 )}
                 <td>
                   <button className="btn-ghost btn-danger" onClick={() => onDelete(item.id)}>

@@ -545,6 +545,17 @@ longuement — sans risque, puisqu'un nouveau déploiement change leur nom.
   iPad/iPhone (non fonctionnel au doigt) au profit des boutons ▲/▼, désormais
   toujours visibles (plus seulement en dessous de 860px de large).
 
+## Heures par tâche à l'import de devis
+
+Les heures prévues de chaque tâche sont désormais extraites automatiquement
+depuis la colonne **"Temps unitaire"** du devis (multipliée par la quantité
+de la ligne, ex : 4h × 4 occurrences = 16h) et visibles/modifiables dans
+l'aperçu avant import. Jusqu'ici, les tâches d'équipement régulé n'avaient
+tout simplement aucun champ heures — ajouté partout où c'était nécessaire :
+formulaire d'ajout manuel, fiche équipement (nouveau petit champ à côté du
+responsable), page Tâches globale et Vue d'ensemble (comptent désormais ces
+heures dans les totaux et la charge par automaticien).
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

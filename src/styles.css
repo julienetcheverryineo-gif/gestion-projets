@@ -949,6 +949,12 @@ a {
   outline: none;
 }
 
+.tache-heures-input {
+  flex-shrink: 0;
+  width: 52px;
+  text-align: center;
+}
+
 .reg-equip-draggable {
   cursor: grab;
 }

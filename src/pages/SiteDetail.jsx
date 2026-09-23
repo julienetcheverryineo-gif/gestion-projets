@@ -680,6 +680,17 @@ function RegEquipmentCard({ reg, items, peutGerer, utilisateurs, onEdit, onDelet
                         }
                       }}
                     />
+                    <input
+                      type="number"
+                      min="0"
+                      className="import-edit-input tache-heures-input"
+                      title="Heures prévues"
+                      defaultValue={it.heuresPrevues ?? ""}
+                      onBlur={(e) => {
+                        const v = e.target.value ? Number(e.target.value) : null;
+                        if (v !== (it.heuresPrevues ?? null)) changerChamp(it.id, "heuresPrevues", v);
+                      }}
+                    />
                     <div style={{ flexShrink: 0, width: 170 }}>
                       <PersonMultiSelect
                         valeurs={normaliserAssignes(it.assigneA)}
@@ -777,6 +788,7 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
   const [unite, setUnite] = useState("");
   const [remarque, setRemarque] = useState("");
   const [assigneA, setAssigneA] = useState([]);
+  const [heuresPrevues, setHeuresPrevues] = useState("");
   const [enCours, setEnCours] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -790,6 +802,7 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
       quantite: quantite ? Number(quantite) : 0,
       unite,
       assigneA: type === "tache" ? assigneA : [],
+      heuresPrevues: type === "tache" && heuresPrevues ? Number(heuresPrevues) : null,
       statut: type === "materiel" ? "a_acheter" : "a_faire",
       creeLe: serverTimestamp(),
     });
@@ -823,14 +836,25 @@ function RegItemFormModal({ regEquipementId, typeInitial, utilisateurs, onClose 
             />
           </label>
           {type === "tache" && (
-            <label>
-              Responsable(s)
-              <PersonMultiSelect
-                valeurs={assigneA}
-                utilisateurs={utilisateurs}
-                onChange={setAssigneA}
-              />
-            </label>
+            <>
+              <label>
+                Responsable(s)
+                <PersonMultiSelect
+                  valeurs={assigneA}
+                  utilisateurs={utilisateurs}
+                  onChange={setAssigneA}
+                />
+              </label>
+              <label>
+                Heures prévues
+                <input
+                  type="number"
+                  min="0"
+                  value={heuresPrevues}
+                  onChange={(e) => setHeuresPrevues(e.target.value)}
+                />
+              </label>
+            </>
           )}
           {type === "materiel" && (
             <div className="form-inline">

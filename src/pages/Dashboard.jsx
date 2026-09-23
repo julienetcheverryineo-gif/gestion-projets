@@ -31,7 +31,7 @@ export default function Dashboard() {
             titre: it.designation + (equip ? " (" + equip.nom + ")" : ""),
             chantierId: equip?.chantierId ?? null,
             assigneA: it.assigneA || null,
-            heuresPrevues: null,
+            heuresPrevues: it.heuresPrevues ?? null,
             echeance: null,
             statut: it.statut === "fait" ? "termine" : "a_faire",
           };
