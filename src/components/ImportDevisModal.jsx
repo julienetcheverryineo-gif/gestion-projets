@@ -179,19 +179,23 @@ export default function ImportDevisModal({ chantierId, onClose }) {
             creeLe: serverTimestamp(),
           });
         }
+        let ordreTache = 0;
         for (const item of poste.items) {
           if (!item.designation.trim()) continue;
           if (item.type === "tache") {
+            ordreTache += 1;
             await addDoc(collection(db, "tasks"), {
               titre: item.designation,
               chantierId,
+              equipementSource: poste.nomEdite,
               assigneA: [],
               heuresPrevues: item.heuresPrevues || null,
               dateDebut: null,
               echeance: null,
               lienDevis: null,
-              commentaires: "Équipement : " + poste.nomEdite,
+              commentaires: null,
               statut: "a_faire",
+              ordre: baseOrdre + index * 1000 + ordreTache,
               creeLe: serverTimestamp(),
             });
             continue;

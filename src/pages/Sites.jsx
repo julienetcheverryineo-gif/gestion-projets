@@ -375,6 +375,7 @@ export default function Sites() {
       {afficherFormulaire && (
         <SiteFormModal
           chantier={chantierEnEdition}
+          utilisateurs={utilisateurs}
           onClose={() => setAfficherFormulaire(false)}
         />
       )}

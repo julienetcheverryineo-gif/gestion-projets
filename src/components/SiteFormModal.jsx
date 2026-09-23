@@ -12,18 +12,49 @@ export function formatStatutChantier(statut) {
   return STATUTS_CHANTIER.find((s) => s.value === statut)?.label ?? statut;
 }
 
-export default function SiteFormModal({ chantier, onClose }) {
+// Formulaire chantier unifié : infos générales ET équipe en un seul endroit,
+// aussi bien à la création (l'équipe peut rester vide, à affecter plus
+// tard) qu'à la modification.
+export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
   const [nom, setNom] = useState(chantier?.nom ?? "");
   const [client, setClient] = useState(chantier?.client ?? "");
   const [adresse, setAdresse] = useState(chantier?.adresse ?? "");
   const [statut, setStatut] = useState(chantier?.statut ?? "actif");
   const [compte, setCompte] = useState(chantier?.compte ?? "");
+  const [ra, setRa] = useState(chantier?.ra ?? "Julien ETCHEVERRY");
+  const [responsableChantier, setResponsableChantier] = useState(
+    chantier?.responsableChantier ?? ""
+  );
+  const [automaticiens, setAutomaticiens] = useState(chantier?.automaticiens ?? []);
+  const [electriciensTexte, setElectriciensTexte] = useState(
+    (chantier?.electriciens ?? []).join(", ")
+  );
   const [enCours, setEnCours] = useState(false);
+
+  const basculerAutomaticien = (nomPersonne) => {
+    setAutomaticiens((liste) =>
+      liste.includes(nomPersonne) ? liste.filter((n) => n !== nomPersonne) : [...liste, nomPersonne]
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setEnCours(true);
-    const donnees = { nom, client, adresse, statut, compte };
+    const electriciens = electriciensTexte
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
+    const donnees = {
+      nom,
+      client,
+      adresse,
+      statut,
+      compte,
+      ra,
+      responsableChantier,
+      automaticiens,
+      electriciens,
+    };
     if (chantier) {
       await updateDoc(doc(db, "sites", chantier.id), donnees);
     } else {
@@ -70,6 +101,58 @@ export default function SiteFormModal({ chantier, onClose }) {
               />
             </label>
           </div>
+
+          <div className="form-divider">Équipe (facultatif, à affecter plus tard si besoin)</div>
+
+          <div className="form-inline">
+            <label>
+              RA (responsable d'affaire)
+              <input value={ra} onChange={(e) => setRa(e.target.value)} />
+            </label>
+            <label>
+              Responsable de chantier
+              <select
+                value={responsableChantier}
+                onChange={(e) => setResponsableChantier(e.target.value)}
+              >
+                <option value="">—</option>
+                {utilisateurs.map((u) => (
+                  <option key={u.id} value={u.nom}>
+                    {u.nom}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <div className="reg-subheading" style={{ marginBottom: 8 }}>
+              Automaticiens (utilisateurs de l'application)
+            </div>
+            <div className="team-checklist">
+              {utilisateurs.map((u) => (
+                <label key={u.id} className="team-checklist-item">
+                  <input
+                    type="checkbox"
+                    checked={automaticiens.includes(u.nom)}
+                    onChange={() => basculerAutomaticien(u.nom)}
+                  />
+                  {u.nom}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <label>
+            Électriciens (souvent externes, sans compte — noms libres séparés par une
+            virgule)
+            <input
+              value={electriciensTexte}
+              onChange={(e) => setElectriciensTexte(e.target.value)}
+              placeholder="ex : Jean Dupont, Marc Petit"
+            />
+          </label>
+
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>
               Annuler

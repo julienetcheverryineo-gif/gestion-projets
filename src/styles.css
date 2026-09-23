@@ -194,7 +194,8 @@ a {
 
 /* ---------- Buttons ---------- */
 .btn-primary,
-.btn-ghost {
+.btn-ghost,
+.btn-accent {
   font-family: var(--font-ui);
   font-size: 0.88rem;
   font-weight: 500;
@@ -213,6 +214,20 @@ a {
   filter: brightness(1.08);
 }
 .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-accent {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btn-accent:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-accent:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -923,6 +938,23 @@ a {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.tache-drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 1rem;
+  user-select: none;
+}
+.tache-move-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tache-move-mobile .btn-ghost {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  line-height: 1;
 }
 
 .task-table-editable {

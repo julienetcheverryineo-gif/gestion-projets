@@ -584,6 +584,33 @@ d'origine est corrigé : ces boutons utilisaient une classe CSS
 (`linkish`) qui n'avait jamais été définie et s'affichaient donc avec le
 style par défaut du navigateur, d'où l'incohérence visuelle.
 
+## Regroupements, réorganisation des tâches, boutons homogènes
+
+- **Regroupement au choix** : l'onglet Tâches d'un chantier et le Listing
+  matériel proposent chacun un bouton "Grouper par équipement" / "Vue à
+  plat" — utile pour scanner rapidement une longue liste sans naviguer
+  équipement par équipement. Le Listing matériel en vue à plat prend la
+  forme d'un vrai tableau (une colonne "Équipement" remplace le
+  regroupement), dans le même esprit que le tableau des tâches. La page
+  Tâches globale gagne un troisième mode **"Par équipement"**, à côté de
+  "Par chantier" et "Par responsable".
+- **Réorganisation des tâches** : comme pour les équipements régulés, une
+  tâche se déplace en la glissant (souris, via la poignée ⠿) ou avec des
+  boutons ▲/▼ sur appareil tactile (le glisser-déposer ne fonctionnant pas
+  au doigt). Un champ `ordre` a été ajouté aux tâches pour retenir la
+  position choisie.
+- **Sur PC, glisser-déposer uniquement** pour réorganiser les équipements
+  régulés — les boutons ▲/▼ Monter/Descendre ne s'affichent plus que sur
+  appareil tactile (ils faisaient doublon avec le glisser sur PC).
+- **Boutons homogènes et verts EQUANS** : "Modifier le chantier",
+  "Assigner toutes les tâches à…" et "Importer une minute de devis" (dans
+  cet ordre) forment une rangée de boutons au contour vert EQUANS,
+  juste sous l'en-tête du chantier. Le bouton "Modifier l'équipe" a
+  disparu : chantier et équipe (RA, responsable, automaticiens,
+  électriciens) se modifient désormais en un seul formulaire, y compris
+  **à la création du chantier** (l'équipe peut rester vide, à affecter
+  plus tard).
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

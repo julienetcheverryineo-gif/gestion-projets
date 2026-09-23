@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { normaliserAssignes } from "../lib/assignes";
+import { estTactile } from "../lib/tactile";
 import PersonMultiSelect from "./PersonMultiSelect";
 
 const STATUTS_TASK = [
@@ -42,17 +43,24 @@ function chargerLargeurs() {
 }
 
 // Affiche indifféremment des tâches "projet" (collection `tasks`) et des
-// tâches issues d'un équipement régulé (`regitems` de type "tache") dans un
-// seul tableau. `t._source` vaut "regitem" pour ces dernières ; leur
-// désignation/statut ne peuvent être modifiées que depuis la fiche de
-// l'équipement, mais le statut et le(s) responsable(s) restent modifiables
-// directement. Pour les tâches "projet", toutes les colonnes sont éditables
-// directement dans le tableau. Les colonnes sont redimensionnables à la
-// souris (glisser le bord droit d'un en-tête) ; la taille est mémorisée
-// pour toute l'appli (localStorage), pas seulement ce tableau.
+// tâches issues d'un équipement régulé (`regitems` de type "tache", pour
+// compatibilité avec les données créées avant qu'on sépare les deux) dans
+// un seul tableau. `t._source` vaut "regitem" pour ces dernières ; elles ne
+// peuvent pas être réordonnées ni voir leur désignation modifiée ici (ça se
+// fait depuis la fiche équipement), mais statut et responsable(s) restent
+// éditables. Les tâches "projet" sont, elles, intégralement éditables et
+// réordonnables : glisser une ligne par sa poignée (souris) ou les boutons
+// ▲/▼ (tactile, le glisser-déposer HTML5 ne fonctionnant pas au doigt).
+// Les colonnes sont redimensionnables (glisser le bord d'un en-tête) ; la
+// taille est mémorisée pour toute l'appli.
 export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, afficherChantier, nomChantier }) {
   const [largeurs, setLargeurs] = useState(chargerLargeurs);
   const redimensionRef = useRef(null);
+
+  const tachesTriees = useMemo(
+    () => [...taches].sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0)),
+    [taches]
+  );
 
   useEffect(() => {
     const onMove = (e) => {
@@ -97,7 +105,23 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
     await updateDoc(doc(db, "tasks", t.id), { [champ]: valeur });
   };
 
-  if (taches.length === 0) {
+  // Déplace la tâche de `depuis` vers `vers` dans la liste affichée, puis
+  // renumérote (0, 1, 2…) toutes les tâches "projet" de cette liste — les
+  // tâches issues d'un équipement (`_source === "regitem"`) ne sont pas
+  // réordonnables ici et gardent leur position d'origine.
+  const deplacerTache = async (depuis, vers) => {
+    if (vers < 0 || vers >= tachesTriees.length || depuis === vers) return;
+    const copie = [...tachesTriees];
+    const [item] = copie.splice(depuis, 1);
+    copie.splice(vers, 0, item);
+    await Promise.all(
+      copie
+        .filter((t) => t._source !== "regitem")
+        .map((t, i) => updateDoc(doc(db, "tasks", t.id), { ordre: i }))
+    );
+  };
+
+  if (tachesTriees.length === 0) {
     return (
       <p className="empty-state-description" style={{ margin: "8px 0" }}>
         Aucune tâche.
@@ -116,6 +140,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
     <table className="data-table task-table-editable" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
+          {peutGerer && <th style={{ width: estTactile ? 64 : 24 }}></th>}
           {afficherChantier && <Entete colonne="chantier">Chantier</Entete>}
           <Entete colonne="titre">Titre</Entete>
           <Entete colonne="responsable">Responsable</Entete>
@@ -128,12 +153,55 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, onDelete, a
         </tr>
       </thead>
       <tbody>
-        {taches.map((t) => {
+        {tachesTriees.map((t, index) => {
           const estRegitem = t._source === "regitem";
           const options = estRegitem ? STATUTS_REGITEM : STATUTS_TASK;
           const assignes = normaliserAssignes(t.assigneA);
+          const reorganisable = peutGerer && !estRegitem;
           return (
-            <tr key={(t._source || "task") + "-" + t.id}>
+            <tr
+              key={(t._source || "task") + "-" + t.id}
+              draggable={reorganisable && !estTactile}
+              onDragStart={(e) => {
+                if (!reorganisable) return;
+                e.dataTransfer.setData("text/task-index", String(index));
+              }}
+              onDragOver={(e) => reorganisable && e.preventDefault()}
+              onDrop={(e) => {
+                if (!reorganisable) return;
+                e.preventDefault();
+                const indexDepart = Number(e.dataTransfer.getData("text/task-index"));
+                if (Number.isNaN(indexDepart)) return;
+                deplacerTache(indexDepart, index);
+              }}
+              className={reorganisable && !estTactile ? "reg-equip-draggable" : undefined}
+            >
+              {peutGerer && (
+                <td>
+                  {reorganisable && estTactile ? (
+                    <div className="tache-move-mobile">
+                      <button
+                        className="btn-ghost"
+                        disabled={index === 0}
+                        onClick={() => deplacerTache(index, index - 1)}
+                        aria-label="Monter"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        className="btn-ghost"
+                        disabled={index === tachesTriees.length - 1}
+                        onClick={() => deplacerTache(index, index + 1)}
+                        aria-label="Descendre"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  ) : (
+                    reorganisable && <span className="tache-drag-handle">⠿</span>
+                  )}
+                </td>
+              )}
               {afficherChantier && (
                 <td data-label="Chantier" style={{ fontFamily: "var(--font-ui)" }}>
                   {t.chantierId ? nomChantier(t.chantierId) : "À affecter"}

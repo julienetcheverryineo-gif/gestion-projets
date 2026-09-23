@@ -13,7 +13,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
 import ImportDevisModal from "../components/ImportDevisModal";
-import TeamFormModal from "../components/TeamFormModal";
 import ReservesPanel from "../components/ReservesPanel";
 import TaskTable from "../components/TaskTable";
 import { estTactile } from "../lib/tactile";
@@ -59,10 +58,12 @@ export default function SiteDetail() {
   const [afficherRapport, setAfficherRapport] = useState(false);
   const [afficherTempsForm, setAfficherTempsForm] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
-  const [afficherEquipeForm, setAfficherEquipeForm] = useState(false);
   const [afficherAffectationMasse, setAfficherAffectationMasse] = useState(false);
   const [afficherChantierForm, setAfficherChantierForm] = useState(false);
   const [ongletActif, setOngletActif] = useState("taches");
+  const [groupementTaches, setGroupementTaches] = useState("flat");
+  const [groupeTacheOuvert, setGroupeTacheOuvert] = useState(null);
+  const [groupementMateriel, setGroupementMateriel] = useState("equipement");
 
   const tachesDuChantier = useMemo(() => {
     const idsRegEquip = regEquipements.map((r) => r.id);
@@ -76,8 +77,9 @@ export default function SiteDetail() {
           _equipementNom: equip?.nom ?? "?",
           titre: it.designation,
           chantierId,
+          equipementSource: equip?.nom ?? null,
           assigneA: it.assigneA || null,
-          heuresPrevues: null,
+          heuresPrevues: it.heuresPrevues ?? null,
           dateDebut: null,
           echeance: null,
           commentaires: it.remarque || null,
@@ -86,6 +88,18 @@ export default function SiteDetail() {
       });
     return [...tousTaches.filter((t) => t.chantierId === chantierId), ...tachesRegitems];
   }, [tousTaches, tousRegItems, regEquipements, chantierId]);
+
+  const groupesTachesParEquipement = useMemo(() => {
+    const map = new Map();
+    for (const t of tachesDuChantier) {
+      const cle = t.equipementSource || "sans-equipement";
+      if (!map.has(cle)) {
+        map.set(cle, { cle, nom: t.equipementSource || "Sans équipement", taches: [] });
+      }
+      map.get(cle).taches.push(t);
+    }
+    return [...map.values()].sort((a, b) => b.taches.length - a.taches.length);
+  }, [tachesDuChantier]);
 
   const supprimerLot = async (lotId) => {
     if (!confirm("Supprimer ce lot et ses équipements ?")) return;
@@ -165,21 +179,18 @@ export default function SiteDetail() {
       </header>
 
       <div className="chantier-actions-bar">
-        <button className="btn-ghost" onClick={() => setAfficherEquipeForm(true)}>
-          Modifier l'équipe
-        </button>
         {peutGerer && (
-          <button className="btn-ghost" onClick={() => setAfficherAffectationMasse(true)}>
-            Assigner toutes les tâches à…
-          </button>
-        )}
-        {peutGerer && (
-          <button className="btn-ghost" onClick={() => setAfficherChantierForm(true)}>
+          <button className="btn-accent" onClick={() => setAfficherChantierForm(true)}>
             Modifier le chantier
           </button>
         )}
         {peutGerer && (
-          <button className="btn-ghost" onClick={() => setAfficherImport(true)}>
+          <button className="btn-accent" onClick={() => setAfficherAffectationMasse(true)}>
+            Assigner toutes les tâches à…
+          </button>
+        )}
+        {peutGerer && (
+          <button className="btn-accent" onClick={() => setAfficherImport(true)}>
             Importer une minute de devis
           </button>
         )}
@@ -216,17 +227,29 @@ export default function SiteDetail() {
       <section className="panel">
         <div className="panel-header">
           <h2>Listing matériel</h2>
-          {peutGerer && (
-            <button
-              className="btn-ghost"
-              onClick={() => {
-                setRegSelectionne(null);
-                setAfficherRegForm(true);
-              }}
-            >
-              + Ajouter un équipement
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            {regEquipements.length > 0 && (
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  setGroupementMateriel(groupementMateriel === "equipement" ? "flat" : "equipement")
+                }
+              >
+                {groupementMateriel === "equipement" ? "Vue à plat" : "Grouper par équipement"}
+              </button>
+            )}
+            {peutGerer && (
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  setRegSelectionne(null);
+                  setAfficherRegForm(true);
+                }}
+              >
+                + Ajouter un équipement
+              </button>
+            )}
+          </div>
         </div>
 
         {regEquipements.length === 0 ? (
@@ -238,6 +261,12 @@ export default function SiteDetail() {
               leur matériel automatiquement.
             </p>
           </div>
+        ) : groupementMateriel === "flat" ? (
+          <MaterielTablePlat
+            regEquipements={regEquipements}
+            regItems={tousRegItems}
+            peutGerer={peutGerer}
+          />
         ) : (
           <div className="lot-list">
             {regEquipements.map((reg, index) => (
@@ -258,7 +287,7 @@ export default function SiteDetail() {
                 }}
                 className={peutGerer && !estTactile ? "reg-equip-draggable" : undefined}
               >
-                {peutGerer && (
+                {peutGerer && estTactile && (
                   <div className="reg-equip-move-mobile">
                     <button
                       className="btn-ghost"
@@ -356,40 +385,93 @@ export default function SiteDetail() {
         <section className="panel">
           <div className="panel-header">
             <h2>Tâches</h2>
-            <button
-              className="btn-ghost"
-              onClick={() =>
-                addDoc(collection(db, "tasks"), {
-                  titre: "Nouvelle tâche",
-                  chantierId,
-                  assigneA: [],
-                  heuresPrevues: null,
-                  dateDebut: null,
-                  echeance: null,
-                  lienDevis: null,
-                  commentaires: null,
-                  statut: "a_faire",
-                  creeLe: serverTimestamp(),
-                })
-              }
-            >
-              + Ajouter une tâche
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn-ghost"
+                onClick={() => setGroupementTaches(groupementTaches === "equipement" ? "flat" : "equipement")}
+              >
+                {groupementTaches === "equipement" ? "Vue à plat" : "Grouper par équipement"}
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  addDoc(collection(db, "tasks"), {
+                    titre: "Nouvelle tâche",
+                    chantierId,
+                    equipementSource: null,
+                    assigneA: [],
+                    heuresPrevues: null,
+                    dateDebut: null,
+                    echeance: null,
+                    lienDevis: null,
+                    commentaires: null,
+                    statut: "a_faire",
+                    ordre: Date.now(),
+                    creeLe: serverTimestamp(),
+                  })
+                }
+              >
+                + Ajouter une tâche
+              </button>
+            </div>
           </div>
-          <TaskTable
-            taches={tachesDuChantier}
-            peutGerer={peutGerer}
-            utilisateurs={utilisateurs}
-            onDelete={async (id) => {
-              if (!confirm("Supprimer cette tâche ?")) return;
-              await deleteDoc(doc(db, "tasks", id));
-            }}
-          />
+
+          {groupementTaches === "flat" ? (
+            <TaskTable
+              taches={tachesDuChantier}
+              peutGerer={peutGerer}
+              utilisateurs={utilisateurs}
+              onDelete={async (id) => {
+                if (!confirm("Supprimer cette tâche ?")) return;
+                await deleteDoc(doc(db, "tasks", id));
+              }}
+            />
+          ) : (
+            <div className="lot-list">
+              {groupesTachesParEquipement.map((g) => (
+                <div key={g.cle} className="lot-card">
+                  <div
+                    className="lot-card-header"
+                    onClick={() =>
+                      setGroupeTacheOuvert(groupeTacheOuvert === g.cle ? null : g.cle)
+                    }
+                  >
+                    <div>
+                      <span className="lot-card-toggle">
+                        {groupeTacheOuvert === g.cle ? "▾" : "▸"}
+                      </span>
+                      <strong>{g.nom}</strong>
+                      <span className="simple-list-meta" style={{ marginLeft: 10 }}>
+                        {g.taches.length} tâche(s)
+                      </span>
+                    </div>
+                  </div>
+                  {groupeTacheOuvert === g.cle && (
+                    <div className="lot-card-body">
+                      <TaskTable
+                        taches={g.taches}
+                        peutGerer={peutGerer}
+                        utilisateurs={utilisateurs}
+                        onDelete={async (id) => {
+                          if (!confirm("Supprimer cette tâche ?")) return;
+                          await deleteDoc(doc(db, "tasks", id));
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
       {afficherChantierForm && (
-        <SiteFormModal chantier={chantier} onClose={() => setAfficherChantierForm(false)} />
+        <SiteFormModal
+          chantier={chantier}
+          utilisateurs={utilisateurs}
+          onClose={() => setAfficherChantierForm(false)}
+        />
       )}
 
       {afficherAffectationMasse && (
@@ -412,14 +494,6 @@ export default function SiteDetail() {
             ]);
             setAfficherAffectationMasse(false);
           }}
-        />
-      )}
-
-      {afficherEquipeForm && (
-        <TeamFormModal
-          chantier={chantier}
-          utilisateurs={utilisateurs}
-          onClose={() => setAfficherEquipeForm(false)}
         />
       )}
 
@@ -1202,5 +1276,123 @@ function AssignAllModal({ utilisateurs, onClose, onConfirm }) {
         </form>
       </div>
     </div>
+  );
+}
+
+// Vue "à plat" du matériel de tous les équipements régulés d'un chantier,
+// façon tableau des tâches (une colonne Équipement au lieu de groupes
+// dépliables), pour scanner/éditer rapidement une longue liste d'achats.
+function MaterielTablePlat({ regEquipements, regItems, peutGerer }) {
+  const nomEquipement = (id) => regEquipements.find((r) => r.id === id)?.nom ?? "?";
+  const idsRegEquip = regEquipements.map((r) => r.id);
+  const materiel = regItems.filter(
+    (it) => it.type === "materiel" && idsRegEquip.includes(it.regEquipementId)
+  );
+
+  const changerStatut = async (itemId, statut) => {
+    await updateDoc(doc(db, "regitems", itemId), { statut });
+  };
+  const changerChamp = async (itemId, champ, valeur) => {
+    await updateDoc(doc(db, "regitems", itemId), { [champ]: valeur });
+  };
+  const supprimerItem = async (itemId) => {
+    await deleteDoc(doc(db, "regitems", itemId));
+  };
+
+  if (materiel.length === 0) {
+    return (
+      <p className="empty-state-description" style={{ margin: "8px 0" }}>
+        Aucun matériel.
+      </p>
+    );
+  }
+
+  return (
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>Équipement</th>
+          <th>Désignation</th>
+          <th>Qté</th>
+          <th>Unité</th>
+          <th>Statut</th>
+          <th>Remarque</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {materiel.map((it) => (
+          <tr key={it.id}>
+            <td data-label="Équipement" style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+              {nomEquipement(it.regEquipementId)}
+            </td>
+            <td data-label="Désignation">
+              <input
+                className="import-edit-input"
+                defaultValue={it.designation}
+                onBlur={(e) => {
+                  if (e.target.value !== it.designation) {
+                    changerChamp(it.id, "designation", e.target.value);
+                  }
+                }}
+              />
+            </td>
+            <td data-label="Qté">
+              <input
+                type="number"
+                min="0"
+                className="import-edit-input task-cell-heures"
+                defaultValue={it.quantite ?? ""}
+                onBlur={(e) => {
+                  const v = e.target.value ? Number(e.target.value) : 0;
+                  if (v !== (it.quantite ?? 0)) changerChamp(it.id, "quantite", v);
+                }}
+              />
+            </td>
+            <td data-label="Unité">
+              <input
+                className="import-edit-input"
+                defaultValue={it.unite ?? ""}
+                onBlur={(e) => {
+                  if (e.target.value !== (it.unite ?? "")) {
+                    changerChamp(it.id, "unite", e.target.value);
+                  }
+                }}
+              />
+            </td>
+            <td data-label="Statut">
+              <select
+                value={it.statut === "a_faire" ? "a_acheter" : it.statut}
+                onChange={(e) => changerStatut(it.id, e.target.value)}
+              >
+                {STATUTS_MATERIEL.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </td>
+            <td data-label="Remarque">
+              <input
+                className="import-edit-input"
+                defaultValue={it.remarque ?? ""}
+                onBlur={(e) => {
+                  if (e.target.value !== (it.remarque ?? "")) {
+                    changerChamp(it.id, "remarque", e.target.value);
+                  }
+                }}
+              />
+            </td>
+            <td>
+              {peutGerer && (
+                <button className="btn-ghost btn-danger" onClick={() => supprimerItem(it.id)}>
+                  ×
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
