@@ -701,6 +701,25 @@ tâche.
   ouvre une petite fenêtre pour ajuster ses dates de début/fin, ses heures
   prévues ou son statut, sans quitter la page Planning.
 
+## Planning séparé en trois pages, "Client - Chantier"
+
+La page "Planning" unique est remplacée par trois pages distinctes (menu
+de gauche), toutes avec le même filtre par chantier et partageant le même
+calcul de données en coulisses :
+
+- **Planning consolidé** : uniquement la vue agrégée, une barre par
+  chantier.
+- **Planning détaillé** : le Gantt tâche par tâche (cliquer une tâche pour
+  la recaler en popup) **et** la Charge du service ensemble, pour garder
+  le contexte des deux côte à côte.
+- **Charge du service** : le même tableau de charge, mais seul — accès
+  rapide sans le Gantt.
+
+Dans les trois vues, un chantier s'affiche désormais **"Client -
+Chantier"** (ex : "MAJOURAOU - Optimisation énergétique") plutôt que son
+seul nom — dans le Gantt comme dans le filtre déroulant. Un chantier sans
+client renseigné garde simplement son nom.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

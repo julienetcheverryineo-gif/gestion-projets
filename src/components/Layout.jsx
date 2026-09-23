@@ -6,7 +6,9 @@ const NAV_ITEMS = [
   { to: "/", label: "Vue d'ensemble", end: true },
   { to: "/chantiers", label: "Chantiers" },
   { to: "/taches", label: "Tâches" },
-  { to: "/planning", label: "Planning" },
+  { to: "/planning-consolide", label: "Planning consolidé" },
+  { to: "/planning-detaille", label: "Planning détaillé" },
+  { to: "/charge-service", label: "Charge du service" },
   { to: "/reserves", label: "Réserves" },
 ];
 
