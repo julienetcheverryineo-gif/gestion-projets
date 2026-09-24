@@ -81,10 +81,23 @@ export function usePlanningData() {
   const { documents: chantiers } = useCollection("sites");
   const { documents: regItems } = useCollection("regitems");
   const { documents: regEquipements } = useCollection("regequipements");
+  const { documents: utilisateurs } = useCollection("users", "email");
   const [chantierFiltre, setChantierFiltre] = useState("tous");
 
   const chantierParId = (id) => chantiers.find((c) => c.id === id);
   const nomChantier = (id) => libelleChantier(chantierParId(id));
+
+  // Un nom est "électricien" soit parce que le compte applicatif associé a
+  // ce rôle, soit (le plus souvent) parce qu'il ne correspond à aucun
+  // compte — les électriciens externes étant de simples noms libres sur le
+  // chantier, sans compte. Tout le reste (automaticien, chef de projet,
+  // admin, ou un nom qui matche un compte sans rôle électricien) est classé
+  // "automaticien" au sens large de l'équipe interne.
+  const typePersonne = (nom) => {
+    const u = utilisateurs.find((u) => u.nom === nom);
+    if (u) return u.role === "electricien" ? "electricien" : "automaticien";
+    return "electricien";
+  };
 
   // Tâches d'équipement régulé fusionnées (pour la charge — elles n'ont
   // jamais de dates, donc jamais sur le Gantt, mais leurs heures comptent).
@@ -193,6 +206,29 @@ export function usePlanningData() {
       };
     });
 
+    // Vue par personne : une tâche apparaît dans la ligne de chacun de ses
+    // responsables (une tâche à deux personnes apparaît deux fois, une par
+    // ligne — c'est bien le planning de CHAQUE personne qu'on regarde).
+    const parPersonne = new Map();
+    for (const t of tachesGantt) {
+      const noms = normaliserAssignes(t.assigneA);
+      const cles = noms.length > 0 ? noms : ["aaffecter"];
+      for (const nom of cles) {
+        if (!parPersonne.has(nom)) {
+          parPersonne.set(nom, {
+            nom: nom === "aaffecter" ? "À affecter" : nom,
+            type: nom === "aaffecter" ? "automaticien" : typePersonne(nom),
+            taches: [],
+          });
+        }
+        parPersonne.get(nom).taches.push(t);
+      }
+    }
+    for (const groupe of parPersonne.values()) {
+      groupe.taches.sort((a, b) => a.dateDebut.localeCompare(b.dateDebut));
+    }
+    const personneGroupes = [...parPersonne.values()].sort((a, b) => b.taches.length - a.taches.length);
+
     const aujourdHui = formatDateLocale(new Date());
     const ligneAujourdHui =
       aujourdHui >= debutTimeline && aujourdHui <= finTimeline
@@ -206,12 +242,13 @@ export function usePlanningData() {
       mois,
       parChantier,
       chantierBars,
+      personneGroupes,
       ligneAujourdHui,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tachesGantt, tachesVisibles, chantiers]);
+  }, [tachesGantt, tachesVisibles, chantiers, utilisateurs]);
 
-  // ---------- Charge du service (par automaticien) ----------
+  // ---------- Charge du service (par personne) ----------
   const charge = useMemo(() => {
     const parPersonne = new Map();
     for (const t of tachesVisibles) {
@@ -224,14 +261,41 @@ export function usePlanningData() {
       const resteNonPlanifie = heures - totalReparti;
       for (const nom of noms) {
         if (!parPersonne.has(nom)) {
-          parPersonne.set(nom, { nom, parMois: {}, nonPlanifie: 0, total: 0 });
+          parPersonne.set(nom, {
+            nom,
+            type: typePersonne(nom),
+            parMois: {},
+            detailParMois: {},
+            nonPlanifie: 0,
+            detailNonPlanifie: [],
+            total: 0,
+          });
         }
         const entree = parPersonne.get(nom);
         entree.total += heures;
         for (const [cle, h] of Object.entries(repartition)) {
           entree.parMois[cle] = (entree.parMois[cle] || 0) + h;
+          if (!entree.detailParMois[cle]) entree.detailParMois[cle] = [];
+          entree.detailParMois[cle].push({
+            id: t.id,
+            titre: t.titre,
+            chantierId: t.chantierId,
+            heures: h,
+            statut: t.statut,
+            dateDebut: t.dateDebut,
+            echeance: t.echeance,
+          });
         }
-        if (resteNonPlanifie > 0) entree.nonPlanifie += resteNonPlanifie;
+        if (resteNonPlanifie > 0) {
+          entree.nonPlanifie += resteNonPlanifie;
+          entree.detailNonPlanifie.push({
+            id: t.id,
+            titre: t.titre,
+            chantierId: t.chantierId,
+            heures: resteNonPlanifie,
+            statut: t.statut,
+          });
+        }
       }
     }
     const tousLesMois = new Set();
@@ -239,9 +303,14 @@ export function usePlanningData() {
       for (const cle of Object.keys(p.parMois)) tousLesMois.add(cle);
     }
     const moisTries = [...tousLesMois].sort();
-    const personnes = [...parPersonne.values()].sort((a, b) => b.total - a.total);
-    return { moisTries, personnes };
-  }, [tachesVisibles]);
+    const toutes = [...parPersonne.values()].sort((a, b) => b.total - a.total);
+    return {
+      moisTries,
+      personnes: toutes,
+      automaticiens: toutes.filter((p) => p.type === "automaticien"),
+      electriciens: toutes.filter((p) => p.type === "electricien"),
+    };
+  }, [tachesVisibles, utilisateurs]);
 
   return {
     chargement,
@@ -252,5 +321,6 @@ export function usePlanningData() {
     tachesSansDatesCompletes,
     gantt,
     charge,
+    nomChantier,
   };
 }

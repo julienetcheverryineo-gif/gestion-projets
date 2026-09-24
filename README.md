@@ -720,6 +720,41 @@ Chantier"** (ex : "MAJOURAOU - Optimisation énergétique") plutôt que son
 seul nom — dans le Gantt comme dans le filtre déroulant. Un chantier sans
 client renseigné garde simplement son nom.
 
+## Détail cliquable et séparation automaticiens/électriciens
+
+- **Charge du service** (page dédiée et section de Planning détaillé) :
+  chaque case avec des heures est maintenant cliquable — une popup montre
+  le détail des tâches qui composent cette charge pour ce mois (chantier,
+  tâche, heures, statut), pour comprendre d'un coup d'œil pourquoi
+  quelqu'un est en rouge.
+- **Automaticiens et électriciens séparés** en deux tableaux distincts,
+  plutôt que mélangés sous "Automaticien". La distinction se fait par
+  compte applicatif : un nom qui correspond à un compte de rôle
+  "Électricien" va dans le tableau Électriciens ; les autres noms (compte
+  automaticien/chef de projet/admin, ou un nom externe sans compte —
+  électricien externe du chantier) suivent la même logique déjà en place
+  ailleurs dans l'appli.
+
+## Planning par personne
+
+Nouveau bouton **"Planning par personne"** : un Gantt tâche par tâche,
+groupé par automaticien puis par électricien (deux sections distinctes),
+au lieu d'un groupement par chantier. Une tâche à plusieurs responsables
+apparaît sur la ligne de chacun — c'est bien le planning individuel de
+chaque personne qu'on regarde, pas une simple redite du Gantt détaillé.
+Chaque barre reste cliquable pour recaler la tâche, comme sur le Gantt
+détaillé.
+
+## Retour à une seule page Planning, avec onglets
+
+Les quatre boutons de menu séparés (Planning consolidé, détaillé, par
+personne, Charge du service) redeviennent **un seul bouton "Planning"**.
+À l'intérieur, quatre onglets au style vert EQUANS (même style que les
+boutons "Modifier le chantier" etc.) permettent de basculer entre les
+vues sans recharger de page ni perdre le filtre par chantier choisi :
+Consolidé, Détaillé, Par personne, Charge du service. L'onglet actif est
+en vert plein, les autres en contour.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
