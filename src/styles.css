@@ -1335,24 +1335,19 @@ a {
   font-family: var(--font-ui);
 }
 
-.taches-flag {
+.taches-flag-icone {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-family: var(--font-ui);
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: default;
 }
 .taches-flag-ok {
   color: var(--ok);
-  background: color-mix(in srgb, var(--ok) 14%, transparent);
 }
 .taches-flag-warn {
   color: var(--warn);
-  background: color-mix(in srgb, var(--warn) 16%, transparent);
 }
 
 .export-filtre-checkbox {

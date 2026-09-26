@@ -304,6 +304,14 @@ export default function Sites() {
           <table className="data-table chantiers-table">
             <thead>
               <tr>
+                <th
+                  className="th-tri"
+                  style={{ width: 40, textAlign: "center" }}
+                  onClick={() => basculerTri("taches")}
+                  title="Toutes les tâches du chantier ont-elles titre, responsable, heures et dates ?"
+                >
+                  ✓{tri.colonne === "taches" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
                 <th className="th-tri" onClick={() => basculerTri("client")}>
                   Client{tri.colonne === "client" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
@@ -317,9 +325,6 @@ export default function Sites() {
                 <th className="th-tri" onClick={() => basculerTri("reserves")}>
                   Réserves{tri.colonne === "reserves" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
-                <th className="th-tri" onClick={() => basculerTri("taches")}>
-                  Tâches{tri.colonne === "taches" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
-                </th>
                 <th>Responsable</th>
                 <th></th>
               </tr>
@@ -331,6 +336,35 @@ export default function Sites() {
                 const completude = completudeTaches(chantier.id);
                 return (
                   <tr key={chantier.id}>
+                    <td data-label="Tâches" style={{ textAlign: "center" }}>
+                      {completude.etat === "aucune" ? (
+                        <span className="simple-list-meta" title="Aucune tâche pour l'instant">
+                          —
+                        </span>
+                      ) : completude.etat === "completes" ? (
+                        <span
+                          className="taches-flag-icone taches-flag-ok"
+                          title={
+                            completude.total +
+                            " tâche(s), toutes complètes (titre, responsable, heures, dates)"
+                          }
+                        >
+                          ✓
+                        </span>
+                      ) : (
+                        <span
+                          className="taches-flag-icone taches-flag-warn"
+                          title={
+                            completude.incompletes +
+                            " tâche(s) sur " +
+                            completude.total +
+                            " avec titre, responsable, heures ou dates manquant(s)"
+                          }
+                        >
+                          ⚠
+                        </span>
+                      )}
+                    </td>
                     <td
                       data-label="Client"
                       style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
@@ -367,30 +401,6 @@ export default function Sites() {
                         <span className="chantiers-reserves-alerte">{nbReserves} ouverte(s)</span>
                       ) : (
                         <span className="simple-list-meta">—</span>
-                      )}
-                    </td>
-                    <td data-label="Tâches">
-                      {completude.etat === "aucune" ? (
-                        <span className="simple-list-meta">—</span>
-                      ) : completude.etat === "completes" ? (
-                        <span
-                          className="taches-flag taches-flag-ok"
-                          title={completude.total + " tâche(s), toutes complètes (titre, responsable, heures, dates)"}
-                        >
-                          ✓ Complètes
-                        </span>
-                      ) : (
-                        <span
-                          className="taches-flag taches-flag-warn"
-                          title={
-                            completude.incompletes +
-                            " tâche(s) sur " +
-                            completude.total +
-                            " avec titre, responsable, heures ou dates manquant(s)"
-                          }
-                        >
-                          ⚠ {completude.incompletes}/{completude.total} à compléter
-                        </span>
                       )}
                     </td>
                     <td
