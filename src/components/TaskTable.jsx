@@ -34,6 +34,11 @@ const LARGEURS_DEFAUT = {
 
 const CLE_STOCKAGE = "taskTableColWidths";
 
+// Colonne qui absorbe les redimensionnements des autres colonnes (voir
+// demarrerRedimension) : la plus élastique (texte libre, peu de contenu
+// critique), pour que le tableau reste dans son encart au lieu de déborder.
+const COLONNE_ELASTIQUE = "commentaires";
+
 function chargerLargeurs() {
   try {
     const brut = localStorage.getItem(CLE_STOCKAGE);
@@ -127,8 +132,31 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
       const info = redimensionRef.current;
       if (!info) return;
       const deltaX = e.clientX - info.startX;
-      const nouvelle = Math.max(40, info.startWidth + deltaX);
-      setLargeurs((prev) => ({ ...prev, [info.colonne]: nouvelle }));
+
+      // Élargir une colonne prend la place sur la colonne "Commentaires"
+      // (la plus élastique, du texte libre peu contraint) plutôt que de
+      // faire grandir le tableau entier hors de son encart blanc — sauf
+      // si c'est justement Commentaires qu'on redimensionne, auquel cas
+      // elle se redimensionne simplement seule.
+      if (info.colonne === COLONNE_ELASTIQUE) {
+        const nouvelle = Math.max(60, info.startWidth + deltaX);
+        setLargeurs((prev) => ({ ...prev, [info.colonne]: nouvelle }));
+        return;
+      }
+
+      let nouvelle = Math.max(40, info.startWidth + deltaX);
+      let deltaApplique = nouvelle - info.startWidth;
+      let nouvelleElastique = info.startElastique - deltaApplique;
+      if (nouvelleElastique < 60) {
+        nouvelleElastique = 60;
+        deltaApplique = info.startElastique - 60;
+        nouvelle = info.startWidth + deltaApplique;
+      }
+      setLargeurs((prev) => ({
+        ...prev,
+        [info.colonne]: nouvelle,
+        [COLONNE_ELASTIQUE]: nouvelleElastique,
+      }));
     };
     const onUp = () => {
       if (!redimensionRef.current) return;
@@ -153,7 +181,12 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
   const demarrerRedimension = (colonne) => (e) => {
     e.preventDefault();
     e.stopPropagation();
-    redimensionRef.current = { colonne, startX: e.clientX, startWidth: largeurs[colonne] };
+    redimensionRef.current = {
+      colonne,
+      startX: e.clientX,
+      startWidth: largeurs[colonne],
+      startElastique: largeurs[COLONNE_ELASTIQUE],
+    };
   };
 
   const basculerTri = (colonne) => {

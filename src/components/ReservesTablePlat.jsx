@@ -18,6 +18,10 @@ const LARGEURS_DEFAUT = {
 
 const CLE_STOCKAGE = "reservesTableColWidths";
 
+// Colonne qui absorbe les redimensionnements des autres colonnes (voir
+// demarrerRedimension) — même logique que TaskTable.
+const COLONNE_ELASTIQUE = "remarque";
+
 function chargerLargeurs() {
   try {
     const brut = localStorage.getItem(CLE_STOCKAGE);
@@ -100,8 +104,29 @@ export default function ReservesTablePlat({
       const info = redimensionRef.current;
       if (!info) return;
       const deltaX = e.clientX - info.startX;
-      const nouvelle = Math.max(50, info.startWidth + deltaX);
-      setLargeurs((prev) => ({ ...prev, [info.colonne]: nouvelle }));
+
+      // Élargir une colonne prend la place sur "Remarque" (texte libre,
+      // la plus élastique) plutôt que de faire déborder le tableau de son
+      // encart blanc — sauf si c'est elle qu'on redimensionne directement.
+      if (info.colonne === COLONNE_ELASTIQUE) {
+        const nouvelle = Math.max(60, info.startWidth + deltaX);
+        setLargeurs((prev) => ({ ...prev, [info.colonne]: nouvelle }));
+        return;
+      }
+
+      let nouvelle = Math.max(50, info.startWidth + deltaX);
+      let deltaApplique = nouvelle - info.startWidth;
+      let nouvelleElastique = info.startElastique - deltaApplique;
+      if (nouvelleElastique < 60) {
+        nouvelleElastique = 60;
+        deltaApplique = info.startElastique - 60;
+        nouvelle = info.startWidth + deltaApplique;
+      }
+      setLargeurs((prev) => ({
+        ...prev,
+        [info.colonne]: nouvelle,
+        [COLONNE_ELASTIQUE]: nouvelleElastique,
+      }));
     };
     const onUp = () => {
       if (!redimensionRef.current) return;
@@ -126,7 +151,12 @@ export default function ReservesTablePlat({
   const demarrerRedimension = (colonne) => (e) => {
     e.preventDefault();
     e.stopPropagation();
-    redimensionRef.current = { colonne, startX: e.clientX, startWidth: largeurs[colonne] };
+    redimensionRef.current = {
+      colonne,
+      startX: e.clientX,
+      startWidth: largeurs[colonne],
+      startElastique: largeurs[COLONNE_ELASTIQUE],
+    };
   };
 
   const basculerTri = (colonne) => {
