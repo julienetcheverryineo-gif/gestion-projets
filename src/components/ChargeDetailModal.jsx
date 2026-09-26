@@ -225,10 +225,10 @@ export default function ChargeDetailModal({
               <thead>
                 <tr>
                   <th style={{ width: 22 }}></th>
-                  <th>Chantier</th>
+                  <th style={{ width: 280 }}>Chantier</th>
                   <th>Tâche</th>
-                  <th style={{ width: 50, textAlign: "center" }}>Nb</th>
-                  <th style={{ width: 90 }}>Heures</th>
+                  <th style={{ width: 60, textAlign: "center" }}>Nb</th>
+                  <th style={{ width: 110 }}>Heures</th>
                 </tr>
               </thead>
               <tbody>

@@ -1471,10 +1471,14 @@ a {
   outline: none;
 }
 
-/* Détail (dépliable et éditable) d'une case de charge du service, Planning */
-.charge-detail-modal {
-  max-width: 960px;
-  width: 96vw;
+/* Détail (dépliable et éditable) d'une case de charge du service, Planning.
+   Sélecteur à deux classes (au lieu d'une) : la règle .modal de base (plus
+   bas dans ce fichier) a la même spécificité et, à spécificité égale, c'est
+   l'ordre dans le fichier qui gagne — sans ça, max-width:420px l'emportait
+   silencieusement malgré cette règle. */
+.modal.charge-detail-modal {
+  max-width: 1700px;
+  width: 95vw;
 }
 .charge-detail-scroll {
   max-height: min(65vh, 620px);
