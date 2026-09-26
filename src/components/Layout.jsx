@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import logoIneo from "../assets/logo-ineo.png";
@@ -20,26 +21,61 @@ function actualiserSansCache() {
   window.location.href = url.toString();
 }
 
+const CLE_SIDEBAR_REDUITE = "sidebarReduite";
+
+function chargerSidebarReduite() {
+  try {
+    return localStorage.getItem(CLE_SIDEBAR_REDUITE) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function Layout() {
   const { profile, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [reduite, setReduite] = useState(chargerSidebarReduite);
 
   const handleLogout = async () => {
     await logout();
     navigate("/connexion");
   };
 
+  const basculerSidebar = () => {
+    setReduite((prev) => {
+      const nouvelle = !prev;
+      try {
+        localStorage.setItem(CLE_SIDEBAR_REDUITE, nouvelle ? "1" : "0");
+      } catch {
+        // stockage indisponible : la préférence ne sera juste pas mémorisée
+      }
+      return nouvelle;
+    });
+  };
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={"app-shell" + (reduite ? " app-shell-sidebar-reduite" : "")}>
+      <aside className={"sidebar" + (reduite ? " sidebar-reduite" : "")}>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={basculerSidebar}
+          aria-label={reduite ? "Déplier le menu" : "Réduire le menu"}
+          title={reduite ? "Déplier le menu" : "Réduire le menu"}
+        >
+          {reduite ? "»" : "«"}
+        </button>
+
         <div className="sidebar-brand">
           <div className="logo-chip">
             <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
           </div>
-          <div>
-            <div className="brand-title">Pilotage</div>
-            <div className="brand-subtitle">Automatisme &amp; GTB</div>
-          </div>
+          {!reduite && (
+            <div>
+              <div className="brand-title">Pilotage</div>
+              <div className="brand-subtitle">Automatisme &amp; GTB</div>
+            </div>
+          )}
         </div>
 
         <nav className="sidebar-nav">
@@ -48,21 +84,23 @@ export default function Layout() {
               key={item.to}
               to={item.to}
               end={item.end}
+              title={reduite ? item.label : undefined}
               className={({ isActive }) =>
                 "nav-link" + (isActive ? " nav-link-active" : "")
               }
             >
-              {item.label}
+              {reduite ? item.label.slice(0, 1) : item.label}
             </NavLink>
           ))}
           {isAdmin && (
             <NavLink
               to="/utilisateurs"
+              title={reduite ? "Utilisateurs" : undefined}
               className={({ isActive }) =>
                 "nav-link" + (isActive ? " nav-link-active" : "")
               }
             >
-              Utilisateurs
+              {reduite ? "U" : "Utilisateurs"}
             </NavLink>
           )}
         </nav>
@@ -72,18 +110,21 @@ export default function Layout() {
             className="btn-ghost btn-refresh sidebar-refresh"
             onClick={actualiserSansCache}
             aria-label="Actualiser"
+            title="Actualiser"
           >
-            ⟳ Actualiser
+            {reduite ? "⟳" : "⟳ Actualiser"}
           </button>
-          <div className="user-chip">
-            <span className="user-role-dot" data-role={profile?.role} />
-            <div>
-              <div className="user-name">{profile?.nom}</div>
-              <div className="user-role">{formatRole(profile?.role)}</div>
+          {!reduite && (
+            <div className="user-chip">
+              <span className="user-role-dot" data-role={profile?.role} />
+              <div>
+                <div className="user-name">{profile?.nom}</div>
+                <div className="user-role">{formatRole(profile?.role)}</div>
+              </div>
             </div>
-          </div>
-          <button className="btn-ghost" onClick={handleLogout}>
-            Se déconnecter
+          )}
+          <button className="btn-ghost" onClick={handleLogout} title="Se déconnecter">
+            {reduite ? "⏻" : "Se déconnecter"}
           </button>
         </div>
       </aside>

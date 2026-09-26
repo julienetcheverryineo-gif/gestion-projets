@@ -27,6 +27,7 @@ const LARGEURS_DEFAUT = {
   debut: 118,
   fin: 118,
   statut: 110,
+  avancement: 90,
   commentaires: 170,
   actions: 40,
 };
@@ -62,6 +63,8 @@ function valeurColonne(t, colonne, nomChantier) {
       return t.echeance || "";
     case "statut":
       return t.statut || "";
+    case "avancement":
+      return t.avancement ?? "";
     case "commentaires":
       return t.commentaires || "";
     default:
@@ -240,6 +243,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
           <Entete colonne="debut">Début</Entete>
           <Entete colonne="fin">Fin</Entete>
           <Entete colonne="statut">Statut</Entete>
+          <Entete colonne="avancement">Avanc.</Entete>
           <Entete colonne="commentaires">Commentaires</Entete>
           <th style={{ width: largeurs.actions }}></th>
         </tr>
@@ -253,6 +257,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
           <FiltreCell colonne="debut" />
           <FiltreCell colonne="fin" />
           <FiltreCell colonne="statut" />
+          <FiltreCell colonne="avancement" />
           <FiltreCell colonne="commentaires" />
           <th></th>
         </tr>
@@ -260,7 +265,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
       <tbody>
         {tachesTriees.length === 0 ? (
           <tr>
-            <td colSpan={12} style={{ textAlign: "center", padding: "16px 0" }}>
+            <td colSpan={13} style={{ textAlign: "center", padding: "16px 0" }}>
               <span className="simple-list-meta">Aucune tâche ne correspond aux filtres.</span>
             </td>
           </tr>
@@ -415,6 +420,26 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
                       </option>
                     ))}
                   </select>
+                </td>
+
+                <td data-label="Avanc.">
+                  {estRegitem ? (
+                    <span className="simple-list-meta">—</span>
+                  ) : (
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      className="import-edit-input task-cell-avancement"
+                      defaultValue={t.avancement ?? ""}
+                      placeholder="0"
+                      onBlur={(e) => {
+                        let v = e.target.value === "" ? null : Number(e.target.value);
+                        if (v !== null) v = Math.max(0, Math.min(100, v));
+                        if (v !== (t.avancement ?? null)) changerChamp(t, "avancement", v);
+                      }}
+                    />
+                  )}
                 </td>
 
                 <td data-label="Commentaires">

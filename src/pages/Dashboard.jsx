@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
 import { calculerAvancementChantier } from "../lib/avancement";
 import { normaliserAssignes } from "../lib/assignes";
+import { libelleChantier } from "../lib/usePlanningData";
 
 export default function Dashboard() {
   const { documents: chantiers, chargement: chargementChantiers } =
@@ -16,7 +17,8 @@ export default function Dashboard() {
   const [inclureTerminees, setInclureTerminees] = useState(false);
   const [personneOuverte, setPersonneOuverte] = useState(null);
 
-  const nomChantier = (id) => chantiers.find((c) => c.id === id)?.nom ?? "À affecter";
+  const chantierParId = (id) => chantiers.find((c) => c.id === id);
+  const nomChantier = (id) => libelleChantier(chantierParId(id));
   const compteChantier = (id) => chantiers.find((c) => c.id === id)?.compte ?? "";
 
   // --- Tâches d'équipement régulé fusionnées avec les tâches classiques ---
@@ -147,7 +149,7 @@ export default function Dashboard() {
                         <li key={c.id}>
                           <span className={"status-dot status-" + (c.statut ?? "actif")} />
                           <Link to={"/chantiers/" + c.id} className="simple-list-title">
-                            {c.nom}
+                            {nomChantier(c.id)}
                           </Link>
                           <span className="simple-list-meta">
                             {pct !== null ? "Avancement : " + pct + "%" : "Sans équipement"}
@@ -259,7 +261,14 @@ export default function Dashboard() {
                   .map((t) => (
                     <li key={t.id}>
                       <span className="status-dot status-retard" />
-                      <span className="simple-list-title">{t.titre}</span>
+                      <span className="simple-list-title">
+                        {t.chantierId ? (
+                          <Link to={"/chantiers/" + t.chantierId}>{nomChantier(t.chantierId)}</Link>
+                        ) : (
+                          "À affecter"
+                        )}
+                        {" — " + t.titre}
+                      </span>
                       <span className="simple-list-meta">
                         Échéance dépassée : {t.echeance}
                       </span>

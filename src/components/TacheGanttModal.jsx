@@ -7,6 +7,7 @@ export default function TacheGanttModal({ tache, onClose }) {
   const [echeance, setEcheance] = useState(tache.echeance || "");
   const [heuresPrevues, setHeuresPrevues] = useState(tache.heuresPrevues ?? "");
   const [statut, setStatut] = useState(tache.statut ?? "a_faire");
+  const [avancement, setAvancement] = useState(tache.avancement ?? "");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -23,6 +24,7 @@ export default function TacheGanttModal({ tache, onClose }) {
       echeance: echeance || null,
       heuresPrevues: heuresPrevues ? Number(heuresPrevues) : null,
       statut,
+      avancement: avancement !== "" ? Math.max(0, Math.min(100, Number(avancement))) : null,
     });
     setEnCours(false);
     onClose();
@@ -65,6 +67,17 @@ export default function TacheGanttModal({ tache, onClose }) {
               </select>
             </label>
           </div>
+          <label>
+            Avancement (%)
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={avancement}
+              onChange={(e) => setAvancement(e.target.value)}
+              placeholder="0"
+            />
+          </label>
           {erreur && <div className="form-error">{erreur}</div>}
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>

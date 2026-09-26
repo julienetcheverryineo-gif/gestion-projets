@@ -755,6 +755,34 @@ vues sans recharger de page ni perdre le filtre par chantier choisi :
 Consolidé, Détaillé, Par personne, Charge du service. L'onglet actif est
 en vert plein, les autres en contour.
 
+## 2026-09-26 — Planning ajustable, avancement des tâches, menu réductible, Réserves à plat
+
+- **Colonnes de titre du Planning redimensionnables** : sur les trois vues
+  Gantt (Consolidé, Détaillé, Par personne), la colonne des noms de
+  chantier/tâche/personne se redimensionne en glissant son bord droit —
+  exactement comme les colonnes des tableaux de tâches. La largeur choisie
+  est mémorisée pour toute l'appli.
+- **Avancement (%) sur les tâches** : nouveau champ éditable "Avanc." dans
+  le tableau des tâches (chantier et page Tâches) et dans la popup de
+  recalage d'une tâche depuis le Planning. Ce pourcentage se voit
+  directement sur la barre du Gantt (vues Détaillé et Par personne) sous
+  forme d'un **remplissage clair** proportionnel à l'avancement, en plus
+  de la couleur de statut.
+- **Menu de gauche réductible** : un petit bouton « « » sur le bord de la
+  barre latérale la réduit à une colonne d'icônes/initiales pour libérer
+  de la place pour le contenu principal (Planning, tableaux…). L'état
+  replié/déplié est mémorisé. Sur mobile, la barre reste en bas d'écran
+  comme avant (le bouton n'apparaît que sur desktop).
+- **Réserves "à plat"** : la page Réserves (globale) affiche maintenant un
+  vrai tableau à plat, triable et filtrable par colonne (comme pour les
+  Tâches et le Listing matériel), avec un bouton pour basculer vers la vue
+  groupée par chantier si besoin. L'onglet Réserves d'un chantier utilise
+  le même tableau (tri/filtre par colonne).
+- **Vue d'ensemble — noms de chantier** : la liste des chantiers et la
+  section "Tâches en retard" affichent maintenant "Client - Nom du
+  chantier" (et le chantier concerné pour chaque tâche en retard), pour
+  identifier immédiatement le projet concerné.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier
