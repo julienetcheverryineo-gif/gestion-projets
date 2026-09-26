@@ -260,34 +260,23 @@ export default function Planning() {
           )}
 
           {vue === "charge" && (
-            <>
-              <section className="panel">
-                <div className="panel-header">
-                  <h2>Automaticiens</h2>
-                  <span className="simple-list-meta">
-                    Vert : sous 75 % du plafond · Orange : proche · Rouge : dépassé · cliquer une
-                    case pour le détail
-                  </span>
-                </div>
-                <ChargeTable
-                  titre="Automaticien"
-                  personnes={charge.automaticiens}
-                  moisTries={charge.moisTries}
-                  onOuvrirDetail={ouvrirDetail}
-                />
-              </section>
-              <section className="panel">
-                <div className="panel-header">
-                  <h2>Électriciens</h2>
-                </div>
-                <ChargeTable
-                  titre="Électricien"
-                  personnes={charge.electriciens}
-                  moisTries={charge.moisTries}
-                  onOuvrirDetail={ouvrirDetail}
-                />
-              </section>
-            </>
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Charge du service</h2>
+                <span className="simple-list-meta">
+                  Vert : sous 75 % du plafond · Orange : proche · Rouge : dépassé · cliquer une
+                  case pour le détail
+                </span>
+              </div>
+              <ChargeTable
+                groupes={[
+                  { titre: "Automaticiens", personnes: charge.automaticiens },
+                  { titre: "Électriciens", personnes: charge.electriciens },
+                ]}
+                moisTries={charge.moisTries}
+                onOuvrirDetail={ouvrirDetail}
+              />
+            </section>
           )}
         </>
       )}

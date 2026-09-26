@@ -1210,7 +1210,21 @@ a {
   z-index: 1;
 }
 
-/* ---------- Charge automaticiens ---------- */
+/* ---------- Charge du service ---------- */
+/* Ligne d'en-tête de groupe (Automaticiens / Électriciens) à l'intérieur
+   du tableau de charge unique — garde la séparation métier visible sans
+   dupliquer les colonnes-mois ni le défilement horizontal. */
+.charge-table-groupe td {
+  background: var(--panel-raised);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
 .charge-cellule {
   text-align: center;
   padding: 6px 4px;
