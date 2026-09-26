@@ -66,8 +66,9 @@ export function exporterTachesExcel(taches, chantiers) {
 }
 
 // Relit un classeur exporté (ou modifié) par exporterTachesExcel : ne
-// retient que ID + les champs qu'on autorise à réimporter, en ignorant les
-// colonnes de repère (Chantier/Titre/Responsable), et ne renvoie que les
+// retient que ID + les champs qu'on autorise à réimporter (Début, Fin,
+// Heures prévues, Avancement, Statut, Responsable), en ignorant les
+// colonnes de simple repère (Chantier, Titre), et ne renvoie que les
 // lignes dont au moins un champ a changé par rapport à `taches` (comparaison
 // par ID).
 export function parseTachesExcel(arrayBuffer, tachesActuelles) {
@@ -78,10 +79,12 @@ export function parseTachesExcel(arrayBuffer, tachesActuelles) {
   const parId = new Map(tachesActuelles.map((t) => [t.id, t]));
   const modifications = [];
   const idsInconnus = [];
+  let lignesAvecId = 0;
 
   for (const ligne of lignes) {
     const id = String(ligne.ID || "").trim();
     if (!id) continue;
+    lignesAvecId += 1;
     const tache = parId.get(id);
     if (!tache) {
       idsInconnus.push(id);
@@ -98,19 +101,28 @@ export function parseTachesExcel(arrayBuffer, tachesActuelles) {
         : Math.max(0, Math.min(100, Number(avancementBrut)));
     const statutBrut = String(ligne["Statut"] || "").trim().toLowerCase();
     const statut = LABEL_STATUT[statutBrut] || tache.statut || "a_faire";
+    // Le responsable est saisi en texte libre séparé par virgules dans la
+    // cellule ("Romain DARANCETTE, Julien ETCHEVERRY") — comparé et
+    // réimporté sous forme de tableau, comme le fait l'appli.
+    const responsableBrut = String(ligne["Responsable"] || "").trim();
+    const assigneA = responsableBrut
+      ? responsableBrut.split(",").map((n) => n.trim()).filter(Boolean)
+      : [];
 
-    const champs = { dateDebut, echeance, heuresPrevues, avancement, statut };
+    const champs = { dateDebut, echeance, heuresPrevues, avancement, statut, assigneA };
+    const responsableActuel = normaliserAssignes(tache.assigneA);
     const aChange =
       champs.dateDebut !== (tache.dateDebut || null) ||
       champs.echeance !== (tache.echeance || null) ||
       champs.heuresPrevues !== (tache.heuresPrevues ?? null) ||
       champs.avancement !== (tache.avancement ?? null) ||
-      champs.statut !== (tache.statut || "a_faire");
+      champs.statut !== (tache.statut || "a_faire") ||
+      champs.assigneA.join(", ") !== responsableActuel.join(", ");
 
     if (aChange) {
       modifications.push({ id, titre: tache.titre, champs });
     }
   }
 
-  return { modifications, idsInconnus };
+  return { modifications, idsInconnus, lignesAvecId };
 }

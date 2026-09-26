@@ -5,16 +5,18 @@ import { parseTachesExcel } from "../lib/tachesExcel";
 
 // Réimporte un classeur Excel précédemment exporté (bouton "Exporter en
 // Excel" de la page Tâches), après que Début/Fin (et éventuellement
-// heures/avancement/statut) ont été complétés dans le tableur — bien plus
-// rapide à saisir en masse dans Excel qu'une par une dans l'appli. Seules
-// les lignes dont au moins une valeur a changé sont proposées à
-// l'enregistrement, par ID (la colonne technique du fichier, à ne pas
-// modifier) ; les colonnes Chantier/Titre/Responsable ne sont que des
-// repères et ne sont jamais réimportées.
+// Responsable/Heures/Avancement/Statut) ont été complétés dans le
+// tableur — bien plus rapide à saisir en masse dans Excel qu'une par une
+// dans l'appli. Seules les lignes dont au moins une valeur a changé sont
+// proposées à l'enregistrement, par ID (la colonne technique du fichier,
+// à ne pas modifier) ; Chantier et Titre restent de simples repères,
+// jamais réimportés. Le Responsable accepte plusieurs noms séparés par
+// une virgule.
 export default function ImportDatesTachesModal({ taches, onClose }) {
   const [nomFichier, setNomFichier] = useState("");
   const [modifications, setModifications] = useState(null);
   const [idsInconnus, setIdsInconnus] = useState([]);
+  const [lignesAvecId, setLignesAvecId] = useState(0);
   const [erreur, setErreur] = useState("");
   const [enLecture, setEnLecture] = useState(false);
   const [enImport, setEnImport] = useState(false);
@@ -28,10 +30,14 @@ export default function ImportDatesTachesModal({ taches, onClose }) {
     setNomFichier(fichier.name);
     try {
       const buffer = await fichier.arrayBuffer();
-      const { modifications: mods, idsInconnus: inconnus } = parseTachesExcel(buffer, taches);
+      const { modifications: mods, idsInconnus: inconnus, lignesAvecId: nbAvecId } = parseTachesExcel(
+        buffer,
+        taches
+      );
       setModifications(mods);
       setIdsInconnus(inconnus);
-      if (mods.length === 0 && inconnus.length === 0) {
+      setLignesAvecId(nbAvecId);
+      if (nbAvecId === 0) {
         setErreur("Aucune ligne reconnue dans ce fichier (colonne ID manquante ou vide).");
       }
     } catch (err) {
@@ -81,8 +87,9 @@ export default function ImportDatesTachesModal({ taches, onClose }) {
         <h2>Importer les dates depuis Excel</h2>
         <p className="empty-state-description" style={{ margin: "0 0 14px" }}>
           Réimportez le classeur exporté (bouton "Exporter en Excel") une fois les colonnes
-          Début / Fin (et heures / avancement / statut si besoin) complétées. La colonne ID
-          ne doit pas être modifiée — c'est elle qui identifie la tâche à mettre à jour.
+          Début / Fin / Responsable (et heures / avancement / statut si besoin) complétées. La
+          colonne ID ne doit pas être modifiée — c'est elle qui identifie la tâche à mettre à
+          jour. Chantier et Titre ne sont que des repères et ne sont jamais réimportés.
         </p>
 
         {!modifications && (
@@ -103,6 +110,7 @@ export default function ImportDatesTachesModal({ taches, onClose }) {
               <thead>
                 <tr>
                   <th>Tâche</th>
+                  <th>Responsable</th>
                   <th>Début</th>
                   <th>Fin</th>
                   <th>Heures</th>
@@ -116,6 +124,7 @@ export default function ImportDatesTachesModal({ taches, onClose }) {
                     <td data-label="Tâche" style={{ fontFamily: "var(--font-ui)" }}>
                       {m.titre}
                     </td>
+                    <td data-label="Responsable">{m.champs.assigneA.join(", ") || "—"}</td>
                     <td data-label="Début">{m.champs.dateDebut || "—"}</td>
                     <td data-label="Fin">{m.champs.echeance || "—"}</td>
                     <td data-label="Heures">{m.champs.heuresPrevues ?? "—"}</td>
@@ -130,7 +139,7 @@ export default function ImportDatesTachesModal({ taches, onClose }) {
           </div>
         )}
 
-        {modifications && modifications.length === 0 && idsInconnus.length === 0 && (
+        {modifications && modifications.length === 0 && idsInconnus.length === 0 && lignesAvecId > 0 && (
           <p className="empty-state-description">
             Aucun changement détecté par rapport aux données actuelles.
           </p>
