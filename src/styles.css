@@ -1225,6 +1225,19 @@ a {
   padding: 8px 10px;
   border-top: 1px solid var(--border);
 }
+/* Colonne des noms figée au défilement horizontal : avec un mois par
+   colonne, elle sort vite de l'écran sans ça, rendant les cases de droite
+   illisibles (on ne sait plus à qui elles appartiennent). */
+.charge-table-col-personne {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  box-shadow: 2px 0 4px rgba(46, 53, 56, 0.06);
+}
+th.charge-table-col-personne {
+  z-index: 2;
+}
 .charge-cellule {
   text-align: center;
   padding: 6px 4px;

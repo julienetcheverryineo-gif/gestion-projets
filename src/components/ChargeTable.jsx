@@ -31,7 +31,9 @@ export default function ChargeTable({ groupes, moisTries, onOuvrirDetail }) {
       <table className="data-table charge-table" style={{ tableLayout: "fixed" }}>
         <thead>
           <tr>
-            <th style={{ width: 160 }}>Personne</th>
+            <th className="charge-table-col-personne" style={{ width: 160 }}>
+              Personne
+            </th>
             {moisTries.map((m) => (
               <th key={m} style={{ width: 90 }}>
                 {libelleMois(m)}
@@ -56,7 +58,11 @@ export default function ChargeTable({ groupes, moisTries, onOuvrirDetail }) {
               ) : (
                 g.personnes.map((p) => (
                   <tr key={g.titre + "-" + p.nom}>
-                    <td data-label="Personne" style={{ fontFamily: "var(--font-ui)", fontWeight: 500 }}>
+                    <td
+                      data-label="Personne"
+                      className="charge-table-col-personne"
+                      style={{ fontFamily: "var(--font-ui)", fontWeight: 500 }}
+                    >
                       {p.nom}
                     </td>
                     {moisTries.map((m) => {
