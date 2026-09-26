@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePlanningData, joursEntre, libelleMois, arrondirHeures, PLAFOND_MENSUEL } from "../lib/usePlanningData";
 import FiltreChantier from "../components/FiltreChantier";
 import TacheGanttModal from "../components/TacheGanttModal";
@@ -77,6 +77,8 @@ export default function Planning() {
     setChantierFiltre,
     tachesGantt,
     tachesSansDatesCompletes,
+    toutesLesTaches,
+    utilisateurs,
     gantt,
     charge,
     nomChantier,
@@ -85,6 +87,15 @@ export default function Planning() {
   const [tacheEnEdition, setTacheEnEdition] = useState(null);
   const [detail, setDetail] = useState(null);
   const { largeurTitre, demarrerRedimension } = useLargeurTitre();
+
+  // Pour permettre l'édition directe depuis le détail d'une case de charge
+  // (Planning > Charge du service) : chaque entrée du détail ne contient
+  // que ce qu'il faut pour l'affichage (heures reparties sur le mois), pas
+  // la tâche complète — on la retrouve ici par id pour l'édition.
+  const tacheParId = useMemo(
+    () => new Map(toutesLesTaches.map((t) => [t.id, t])),
+    [toutesLesTaches]
+  );
 
   const ouvrirDetail = (personne, cle) => {
     setDetail({
@@ -290,6 +301,8 @@ export default function Planning() {
           libelleColonne={detail.libelleColonne}
           entrees={detail.entrees}
           nomChantier={nomChantier}
+          tacheParId={tacheParId}
+          utilisateurs={utilisateurs}
           onClose={() => setDetail(null)}
         />
       )}

@@ -1471,6 +1471,72 @@ a {
   outline: none;
 }
 
+/* Détail (dépliable et éditable) d'une case de charge du service, Planning */
+.charge-detail-modal {
+  max-width: 960px;
+  width: 96vw;
+}
+.charge-detail-scroll {
+  max-height: min(65vh, 620px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.charge-detail-table {
+  margin: 0;
+}
+.charge-detail-edit-carte {
+  background: var(--panel-raised);
+  padding: 10px 14px 12px 30px;
+  border-top: 1px solid var(--border);
+}
+.charge-detail-edit-ligne1 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-family: var(--font-ui);
+}
+.charge-detail-edit-chantier {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.charge-detail-edit-titre {
+  font-weight: 500;
+}
+.charge-detail-edit-champs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.charge-detail-edit-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 150px;
+}
+.charge-detail-edit-champ-etroit {
+  min-width: 90px;
+  flex: 0 0 90px;
+}
+.charge-detail-edit-champ span:first-child {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.charge-detail-edit-champ select,
+.charge-detail-edit-champ .import-edit-input {
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.charge-detail-edit-champ .person-multiselect-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  width: 100%;
+  text-align: left;
+}
+
 /* Zone de sélection de fichier stylée (remplace l'input natif) */
 .file-picker {
   display: flex;

@@ -109,6 +109,7 @@ export function usePlanningData() {
           const equip = regEquipements.find((r) => r.id === it.regEquipementId);
           return {
             id: it.id,
+            _source: "regitem",
             titre: it.designation,
             chantierId: equip?.chantierId ?? null,
             assigneA: it.assigneA || null,
@@ -319,6 +320,8 @@ export function usePlanningData() {
     setChantierFiltre,
     tachesGantt,
     tachesSansDatesCompletes,
+    toutesLesTaches,
+    utilisateurs,
     gantt,
     charge,
     nomChantier,
