@@ -783,6 +783,37 @@ en vert plein, les autres en contour.
   chantier" (et le chantier concerné pour chaque tâche en retard), pour
   identifier immédiatement le projet concerné.
 
+## 2026-09-26 (suite) — Menu réductible plus lisible, saisie des dates de tâche allégée
+
+- **Icônes dans le menu de gauche** : chaque entrée du menu a maintenant une
+  icône (🏠 Vue d'ensemble, 🏗️ Chantiers, ✅ Tâches, 📅 Planning, 🧰
+  Réserves, 👤 Utilisateurs). Une fois le menu réduit, seules les icônes
+  restent visibles (avec l'info-bulle du nom au survol), ce qui reste
+  lisible contrairement à la seule initiale utilisée avant.
+- **Bouton de réduction plus visible** : ce n'est plus une petite pastille
+  à peine perceptible sur le bord — c'est maintenant un bouton pleine
+  largeur "‹ Réduire le menu" en haut de la barre latérale (juste "›" une
+  fois réduit), donc bien plus facile à repérer et à cliquer.
+- **La vue s'adapte immédiatement au repli/dépli du menu** : les zones à
+  défilement horizontal (Gantt du Planning, Charge du service, tableaux
+  larges) reviennent au début de leur défilement dès que l'espace change,
+  pour profiter tout de suite de la largeur gagnée (ou reprise) sans avoir
+  à retoucher la barre de défilement soi-même.
+- **Dates de tâche plus rapides à saisir** : dans le tableau des tâches,
+  renseigner la date de début remplit désormais automatiquement la date de
+  fin avec la même valeur si elle n'est pas encore renseignée (cas le plus
+  fréquent d'une tâche d'un jour) — il suffit ensuite d'ajuster la fin
+  seulement si la tâche dure plusieurs jours.
+- **Export / import Excel des tâches** : sur la page Tâches, deux nouveaux
+  boutons "Exporter en Excel" et "Importer depuis Excel" permettent de
+  télécharger toutes les tâches dans un classeur (avec repères
+  Chantier/Titre/Responsable en lecture seule), de compléter Début / Fin /
+  Heures prévues / Avancement / Statut en masse dans Excel (copier-glisser,
+  tri, etc. — bien plus rapide que ligne par ligne dans l'appli), puis de
+  réimporter le fichier : seules les lignes réellement modifiées (par
+  rapport à l'ID technique de la tâche) sont proposées avant
+  enregistrement.
+
 ## Prochaines étapes possibles
 
 - Planning type Gantt par chantier

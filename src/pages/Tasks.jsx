@@ -5,7 +5,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import { normaliserAssignes } from "../lib/assignes";
 import { equipeChantier, electriciensChantier } from "../lib/equipe";
+import { exporterTachesExcel } from "../lib/tachesExcel";
 import TaskTable from "../components/TaskTable";
+import ImportDatesTachesModal from "../components/ImportDatesTachesModal";
 
 export default function Tasks() {
   const { isAdmin, isChefDeProjet } = useAuth();
@@ -17,6 +19,7 @@ export default function Tasks() {
   const { documents: regEquipements } = useCollection("regequipements");
   const [groupeOuvert, setGroupeOuvert] = useState(null);
   const [modeGroupement, setModeGroupement] = useState("chantier");
+  const [afficherImportDates, setAfficherImportDates] = useState(false);
 
   const tachesRegitems = useMemo(
     () =>
@@ -160,9 +163,21 @@ export default function Tasks() {
             {modeGroupement === "equipement" && "Toutes les tâches, regroupées par équipement."}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => ajouterTache({ cle: "aaffecter" })}>
-          Nouvelle tâche
-        </button>
+        <div className="header-actions-stack" style={{ display: "flex", gap: 8 }}>
+          <button
+            className="btn-accent"
+            onClick={() => exporterTachesExcel(toutesLesTaches, chantiers)}
+            title="Télécharger un classeur avec toutes les tâches, pour compléter Début/Fin en masse dans Excel"
+          >
+            Exporter en Excel
+          </button>
+          <button className="btn-accent" onClick={() => setAfficherImportDates(true)}>
+            Importer depuis Excel
+          </button>
+          <button className="btn-primary" onClick={() => ajouterTache({ cle: "aaffecter" })}>
+            Nouvelle tâche
+          </button>
+        </div>
       </header>
 
       <div className="page-tabs" style={{ marginBottom: 16 }}>
@@ -235,6 +250,13 @@ export default function Tasks() {
             );
           })}
         </div>
+      )}
+
+      {afficherImportDates && (
+        <ImportDatesTachesModal
+          taches={toutesLesTaches}
+          onClose={() => setAfficherImportDates(false)}
+        />
       )}
     </div>
   );

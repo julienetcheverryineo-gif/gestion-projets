@@ -21,7 +21,7 @@ export default function ChargeTable({ titre, personnes, moisTries, onOuvrirDetai
   }
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div className="hscroll-auto" style={{ overflowX: "auto" }}>
       <table className="data-table charge-table" style={{ tableLayout: "fixed" }}>
         <thead>
           <tr>

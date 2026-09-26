@@ -4,11 +4,11 @@ import { useAuth } from "../contexts/AuthContext";
 import logoIneo from "../assets/logo-ineo.png";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Vue d'ensemble", end: true },
-  { to: "/chantiers", label: "Chantiers" },
-  { to: "/taches", label: "Tâches" },
-  { to: "/planning", label: "Planning" },
-  { to: "/reserves", label: "Réserves" },
+  { to: "/", label: "Vue d'ensemble", end: true, icone: "🏠" },
+  { to: "/chantiers", label: "Chantiers", icone: "🏗️" },
+  { to: "/taches", label: "Tâches", icone: "✅" },
+  { to: "/planning", label: "Planning", icone: "📅" },
+  { to: "/reserves", label: "Réserves", icone: "🧰" },
 ];
 
 // Un simple reload() peut resservir une version en cache (c'est ce qui
@@ -41,6 +41,11 @@ export default function Layout() {
     navigate("/connexion");
   };
 
+  // Bascule le repli du menu, puis — une fois la transition de largeur
+  // terminée — remet à zéro le défilement horizontal des zones larges
+  // (Gantt du Planning, tableaux) qui pourraient être scrollées : l'espace
+  // gagné (ou repris) doit se voir tout de suite, sans que l'utilisateur
+  // ait à retoucher la barre de défilement pour recadrer la vue.
   const basculerSidebar = () => {
     setReduite((prev) => {
       const nouvelle = !prev;
@@ -51,21 +56,17 @@ export default function Layout() {
       }
       return nouvelle;
     });
+    window.setTimeout(() => {
+      document.querySelectorAll(".hscroll-auto, .data-table-wrapper").forEach((el) => {
+        el.scrollLeft = 0;
+      });
+      window.dispatchEvent(new Event("resize"));
+    }, 180);
   };
 
   return (
     <div className={"app-shell" + (reduite ? " app-shell-sidebar-reduite" : "")}>
       <aside className={"sidebar" + (reduite ? " sidebar-reduite" : "")}>
-        <button
-          type="button"
-          className="sidebar-toggle"
-          onClick={basculerSidebar}
-          aria-label={reduite ? "Déplier le menu" : "Réduire le menu"}
-          title={reduite ? "Déplier le menu" : "Réduire le menu"}
-        >
-          {reduite ? "»" : "«"}
-        </button>
-
         <div className="sidebar-brand">
           <div className="logo-chip">
             <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
@@ -78,6 +79,17 @@ export default function Layout() {
           )}
         </div>
 
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={basculerSidebar}
+          aria-label={reduite ? "Déplier le menu" : "Réduire le menu"}
+          title={reduite ? "Déplier le menu" : "Réduire le menu"}
+        >
+          <span className="sidebar-toggle-icone">{reduite ? "»" : "«"}</span>
+          {!reduite && <span className="sidebar-toggle-texte">Réduire le menu</span>}
+        </button>
+
         <nav className="sidebar-nav">
           {NAV_ITEMS.map((item) => (
             <NavLink
@@ -89,7 +101,10 @@ export default function Layout() {
                 "nav-link" + (isActive ? " nav-link-active" : "")
               }
             >
-              {reduite ? item.label.slice(0, 1) : item.label}
+              <span className="nav-link-icone" aria-hidden="true">
+                {item.icone}
+              </span>
+              {!reduite && <span className="nav-link-texte">{item.label}</span>}
             </NavLink>
           ))}
           {isAdmin && (
@@ -100,7 +115,10 @@ export default function Layout() {
                 "nav-link" + (isActive ? " nav-link-active" : "")
               }
             >
-              {reduite ? "U" : "Utilisateurs"}
+              <span className="nav-link-icone" aria-hidden="true">
+                👤
+              </span>
+              {!reduite && <span className="nav-link-texte">Utilisateurs</span>}
             </NavLink>
           )}
         </nav>

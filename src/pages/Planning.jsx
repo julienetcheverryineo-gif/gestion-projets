@@ -134,7 +134,7 @@ export default function Planning() {
               {!gantt ? (
                 <EmptyGantt />
               ) : (
-                <div style={{ overflowX: "auto" }}>
+                <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
                     {gantt.chantierBars.map((cb) => (
@@ -181,7 +181,7 @@ export default function Planning() {
               {!gantt ? (
                 <EmptyGantt />
               ) : (
-                <div style={{ overflowX: "auto" }}>
+                <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
                     {[...gantt.parChantier.entries()].map(([cle, groupe]) => (
@@ -378,7 +378,7 @@ function GanttParPersonne({ groupes, gantt, nomChantier, largeurTitre = 180, dem
     );
   }
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div className="hscroll-auto" style={{ overflowX: "auto" }}>
       <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
         <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
         {groupes.map((groupe) => (

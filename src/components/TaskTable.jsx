@@ -178,6 +178,13 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
     await updateDoc(doc(db, "tasks", t.id), { [champ]: valeur });
   };
 
+  // Variante multi-champs (même règle que changerChamp pour les regitems :
+  // seuls statut/assigneA y sont modifiables, donc inutilisée pour eux ici).
+  const changerChamps = async (t, champs) => {
+    if (t._source === "regitem") return;
+    await updateDoc(doc(db, "tasks", t.id), champs);
+  };
+
   // Déplace la tâche de `depuis` vers `vers` dans la liste affichée, puis
   // renumérote (0, 1, 2…) toutes les tâches "projet" de cette liste — les
   // tâches issues d'un équipement (`_source === "regitem"`) ne sont pas
@@ -395,7 +402,18 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
                         type="date"
                         className="import-edit-input"
                         value={t.dateDebut || ""}
-                        onChange={(e) => changerChamp(t, "dateDebut", e.target.value || null)}
+                        onChange={(e) => {
+                          const valeur = e.target.value || null;
+                          // Si la fin n'est pas encore renseignée, elle suit le début —
+                          // le cas le plus fréquent (tâche d'un jour) ne demande alors
+                          // plus qu'une seule saisie ; sinon on ne touche pas à une fin
+                          // déjà choisie.
+                          if (!t.echeance && valeur) {
+                            changerChamps(t, { dateDebut: valeur, echeance: valeur });
+                          } else {
+                            changerChamp(t, "dateDebut", valeur);
+                          }
+                        }}
                       />
                     </td>
                     <td data-label="Fin">
@@ -403,6 +421,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
                         type="date"
                         className="import-edit-input"
                         value={t.echeance || ""}
+                        min={t.dateDebut || undefined}
                         onChange={(e) => changerChamp(t, "echeance", e.target.value || null)}
                       />
                     </td>

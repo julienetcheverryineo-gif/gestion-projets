@@ -73,30 +73,50 @@ a {
 }
 
 .sidebar-toggle {
-  position: absolute;
-  top: 18px;
-  right: -12px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.8rem;
-  line-height: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 5;
+  gap: 8px;
+  width: 100%;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
 }
 .sidebar-toggle:hover {
-  color: var(--text);
   border-color: var(--accent);
+  color: var(--accent);
+}
+.sidebar-toggle-icone {
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-link-icone {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  width: 1.2em;
+  text-align: center;
+}
+.nav-link-texte {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-reduite {
-  width: 64px;
+  width: 68px;
   padding: 20px 8px;
 }
 .sidebar-reduite .sidebar-brand {
@@ -104,10 +124,16 @@ a {
   padding-right: 0;
   justify-content: center;
 }
+.sidebar-reduite .sidebar-toggle {
+  justify-content: center;
+  padding: 8px 0;
+}
 .sidebar-reduite .nav-link {
-  text-align: center;
-  padding: 9px 0;
-  font-weight: 600;
+  justify-content: center;
+  padding: 10px 0;
+}
+.sidebar-reduite .nav-link-icone {
+  font-size: 1.25rem;
 }
 .sidebar-reduite .sidebar-footer {
   align-items: center;
@@ -1794,12 +1820,18 @@ textarea:focus {
 
   .nav-link {
     flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
     text-align: center;
-    font-size: 0.72rem;
-    padding: 8px 2px 6px;
+    font-size: 0.68rem;
+    padding: 6px 2px 5px;
     border-left: none;
     border-top: 2px solid transparent;
     border-radius: 0;
+  }
+  .nav-link-icone {
+    font-size: 1.05rem;
   }
   .nav-link-active {
     border-left: none;
