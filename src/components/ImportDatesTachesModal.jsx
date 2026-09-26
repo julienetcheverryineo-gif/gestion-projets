@@ -105,7 +105,7 @@ export default function ImportDatesTachesModal({ taches, onClose }) {
         {enLecture && <p className="page-loading">Analyse du fichier…</p>}
 
         {modifications && modifications.length > 0 && (
-          <div style={{ maxHeight: 260, overflowY: "auto", margin: "12px 0" }}>
+          <div style={{ maxHeight: 260, overflowY: "auto", overflowX: "auto", margin: "12px 0" }}>
             <table className="data-table">
               <thead>
                 <tr>

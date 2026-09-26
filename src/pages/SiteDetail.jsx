@@ -640,6 +640,7 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
               Aucun matériel.
             </p>
           ) : (
+            <div className="hscroll-auto" style={{ overflowX: "auto" }}>
             <table className="data-table">
               <thead>
                 <tr>
@@ -720,6 +721,7 @@ function RegEquipmentCard({ reg, items, peutGerer, onEdit, onDelete }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
           {peutGerer && (
             <button className="kanban-add-inline" onClick={() => setAfficherItemForm(true)}>
@@ -932,6 +934,7 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
               Aucun équipement ajouté pour ce lot.
             </p>
           ) : (
+            <div className="hscroll-auto" style={{ overflowX: "auto" }}>
             <table className="data-table">
               <thead>
                 <tr>
@@ -981,6 +984,7 @@ function LotCard({ lot, equipements, peutGerer, onEdit, onDelete }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
           <button className="kanban-add-inline" onClick={() => setAfficherEquipForm(true)}>
             + Ajouter un équipement
@@ -1419,6 +1423,7 @@ function MaterielTablePlat({ regEquipements, regItems, peutGerer }) {
   );
 
   return (
+    <div className="hscroll-auto" style={{ overflowX: "auto" }}>
     <table className="data-table" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
@@ -1532,5 +1537,6 @@ function MaterielTablePlat({ regEquipements, regItems, peutGerer }) {
         )}
       </tbody>
     </table>
+    </div>
   );
 }

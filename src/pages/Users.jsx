@@ -100,6 +100,7 @@ export default function Users() {
       {chargement ? (
         <div className="page-loading">Chargement…</div>
       ) : (
+        <div className="hscroll-auto" style={{ overflowX: "auto" }}>
         <table className="data-table">
           <thead>
             <tr>
@@ -148,6 +149,7 @@ export default function Users() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {afficherAjout && <AddUserModal onClose={() => setAfficherAjout(false)} />}

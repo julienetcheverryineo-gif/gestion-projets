@@ -406,6 +406,7 @@ function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQu
           Aucune ligne.
         </p>
       ) : (
+        <div className="hscroll-auto" style={{ overflowX: "auto" }}>
         <table className="data-table import-edit-table">
           <thead>
             <tr>
@@ -476,6 +477,7 @@ function ImportItemTable({ titre, type, items, onChange, onDelete, onAdd, avecQu
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <button className="linkish" style={{ marginTop: 8 }} onClick={onAdd}>
         + Ajouter une ligne

@@ -202,7 +202,7 @@ export default function Dashboard() {
                         </div>
 
                         {ouvert && (
-                          <div className="lot-card-body">
+                          <div className="lot-card-body hscroll-auto" style={{ overflowX: "auto" }}>
                             <table className="data-table">
                               <thead>
                                 <tr>

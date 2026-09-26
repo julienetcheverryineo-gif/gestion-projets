@@ -238,6 +238,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
   }
 
   return (
+    <div className="hscroll-auto" style={{ overflowX: "auto" }}>
     <table className="data-table task-table-editable" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
@@ -494,5 +495,6 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
         )}
       </tbody>
     </table>
+    </div>
   );
 }

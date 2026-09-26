@@ -177,6 +177,7 @@ export default function ReservesTablePlat({
   const nbColonnes = 6 + (afficherChantier ? 1 : 0) + (peutGerer ? 1 : 0);
 
   return (
+    <div className="hscroll-auto" style={{ overflowX: "auto" }}>
     <table className="data-table" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
@@ -255,5 +256,6 @@ export default function ReservesTablePlat({
         )}
       </tbody>
     </table>
+    </div>
   );
 }
