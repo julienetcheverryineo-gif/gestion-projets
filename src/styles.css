@@ -33,6 +33,15 @@ body,
   height: 100%;
 }
 
+html,
+body {
+  /* Empêche tout scroll horizontal au niveau du document : un contenu
+     large (tableau Gantt, etc.) doit défiler dans son propre conteneur
+     (.hscroll-auto) et non entraîner toute la page, ce qui décale
+     visuellement .main-content sous la barre latérale fixe. */
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -265,6 +274,11 @@ a {
   padding: 32px 40px;
   max-width: none;
   width: 100%;
+  /* Sans min-width:0, un enfant flex ne peut pas rétrécir sous la taille
+     de son contenu : un tableau large (Gantt) le forçait à dépasser la
+     largeur de l'écran, ce qui poussait toute la page (.app-shell) à
+     défiler horizontalement plutôt que le tableau lui-même. */
+  min-width: 0;
 }
 
 /* ---------- Buttons ---------- */
