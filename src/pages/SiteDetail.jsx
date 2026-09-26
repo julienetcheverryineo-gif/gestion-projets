@@ -15,8 +15,10 @@ import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal
 import ImportDevisModal from "../components/ImportDevisModal";
 import ReservesPanel from "../components/ReservesPanel";
 import TaskTable from "../components/TaskTable";
+import ImportDatesTachesModal from "../components/ImportDatesTachesModal";
 import { estTactile } from "../lib/tactile";
 import { equipeChantier, electriciensChantier } from "../lib/equipe";
+import { exporterTachesExcel } from "../lib/tachesExcel";
 
 const STATUTS_MATERIEL = [
   { value: "a_acheter", label: "À acheter" },
@@ -67,6 +69,7 @@ export default function SiteDetail() {
   const [ongletActif, setOngletActif] = useState("taches");
   const [groupementTaches, setGroupementTaches] = useState("flat");
   const [groupeTacheOuvert, setGroupeTacheOuvert] = useState(null);
+  const [afficherImportDatesTaches, setAfficherImportDatesTaches] = useState(false);
   const [groupementMateriel, setGroupementMateriel] = useState("flat");
 
   const tachesDuChantier = useMemo(() => {
@@ -389,12 +392,22 @@ export default function SiteDetail() {
         <section className="panel">
           <div className="panel-header">
             <h2>Tâches</h2>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
                 className="btn-ghost"
                 onClick={() => setGroupementTaches(groupementTaches === "equipement" ? "flat" : "equipement")}
               >
                 {groupementTaches === "equipement" ? "Vue à plat" : "Grouper par équipement"}
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => exporterTachesExcel(tachesDuChantier, chantiers)}
+                title="Télécharger les tâches de ce chantier, pour compléter Début/Fin en masse dans Excel"
+              >
+                Exporter en Excel
+              </button>
+              <button className="btn-ghost" onClick={() => setAfficherImportDatesTaches(true)}>
+                Importer depuis Excel
               </button>
               <button
                 className="btn-ghost"
@@ -470,6 +483,13 @@ export default function SiteDetail() {
             </div>
           )}
         </section>
+      )}
+
+      {afficherImportDatesTaches && (
+        <ImportDatesTachesModal
+          taches={tachesDuChantier}
+          onClose={() => setAfficherImportDatesTaches(false)}
+        />
       )}
 
       {afficherChantierForm && (

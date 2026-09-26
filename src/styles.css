@@ -623,6 +623,10 @@ a {
   }
   .main-content {
     margin-left: 232px;
+    transition: margin-left 0.15s ease;
+  }
+  .app-shell-sidebar-reduite .main-content {
+    margin-left: 68px;
   }
 }
 
