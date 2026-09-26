@@ -4,6 +4,7 @@ import { deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
+import { normaliserAssignes } from "../lib/assignes";
 import { exporterMaterielAchats } from "../lib/exportMateriel";
 import ImportSuiviModal from "../components/ImportSuiviModal";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
@@ -126,6 +127,31 @@ export default function Sites() {
   const avancement = (chantierId) =>
     calculerAvancementChantier(chantierId, { regEquipements, regItems, taches });
 
+  // Une tâche est "bien configurée" quand titre, responsable, heures et
+  // les deux dates sont renseignés — ce sont justement les champs
+  // nécessaires au Planning (Gantt, charge) pour la prendre en compte.
+  // Les tâches issues d'un équipement régulé (sans dates par nature) ne
+  // sont pas comptées ici : le drapeau porte sur les tâches "projet".
+  const tacheEstComplete = (t) =>
+    Boolean(t.titre && t.titre.trim()) &&
+    normaliserAssignes(t.assigneA).length > 0 &&
+    t.heuresPrevues !== null &&
+    t.heuresPrevues !== undefined &&
+    t.heuresPrevues !== "" &&
+    Boolean(t.dateDebut) &&
+    Boolean(t.echeance);
+
+  const completudeTaches = (chantierId) => {
+    const tachesChantier = taches.filter((t) => t.chantierId === chantierId);
+    if (tachesChantier.length === 0) return { etat: "aucune", total: 0, incompletes: 0 };
+    const incompletes = tachesChantier.filter((t) => !tacheEstComplete(t)).length;
+    return {
+      etat: incompletes === 0 ? "completes" : "incompletes",
+      total: tachesChantier.length,
+      incompletes,
+    };
+  };
+
   const reservesOuvertes = (chantierId) =>
     reserves.filter((r) => r.chantierId === chantierId && r.statut !== "levee").length;
 
@@ -157,6 +183,10 @@ export default function Sites() {
       } else if (colonne === "reserves") {
         va = reservesOuvertes(a.id);
         vb = reservesOuvertes(b.id);
+      } else if (colonne === "taches") {
+        const rang = { incompletes: 0, aucune: 1, completes: 2 };
+        va = rang[completudeTaches(a.id).etat];
+        vb = rang[completudeTaches(b.id).etat];
       } else if (colonne === "client") {
         va = (a.client ?? "").toLowerCase();
         vb = (b.client ?? "").toLowerCase();
@@ -287,6 +317,9 @@ export default function Sites() {
                 <th className="th-tri" onClick={() => basculerTri("reserves")}>
                   Réserves{tri.colonne === "reserves" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
+                <th className="th-tri" onClick={() => basculerTri("taches")}>
+                  Tâches{tri.colonne === "taches" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
                 <th>Responsable</th>
                 <th></th>
               </tr>
@@ -295,6 +328,7 @@ export default function Sites() {
               {chantiersAffiches.map((chantier) => {
                 const pct = avancement(chantier.id);
                 const nbReserves = reservesOuvertes(chantier.id);
+                const completude = completudeTaches(chantier.id);
                 return (
                   <tr key={chantier.id}>
                     <td
@@ -333,6 +367,30 @@ export default function Sites() {
                         <span className="chantiers-reserves-alerte">{nbReserves} ouverte(s)</span>
                       ) : (
                         <span className="simple-list-meta">—</span>
+                      )}
+                    </td>
+                    <td data-label="Tâches">
+                      {completude.etat === "aucune" ? (
+                        <span className="simple-list-meta">—</span>
+                      ) : completude.etat === "completes" ? (
+                        <span
+                          className="taches-flag taches-flag-ok"
+                          title={completude.total + " tâche(s), toutes complètes (titre, responsable, heures, dates)"}
+                        >
+                          ✓ Complètes
+                        </span>
+                      ) : (
+                        <span
+                          className="taches-flag taches-flag-warn"
+                          title={
+                            completude.incompletes +
+                            " tâche(s) sur " +
+                            completude.total +
+                            " avec titre, responsable, heures ou dates manquant(s)"
+                          }
+                        >
+                          ⚠ {completude.incompletes}/{completude.total} à compléter
+                        </span>
                       )}
                     </td>
                     <td
