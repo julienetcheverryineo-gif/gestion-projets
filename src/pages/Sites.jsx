@@ -312,6 +312,14 @@ export default function Sites() {
                 >
                   ✓{tri.colonne === "taches" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
+                <th
+                  className="th-tri"
+                  style={{ width: 40, textAlign: "center" }}
+                  onClick={() => basculerTri("reserves")}
+                  title="Le chantier a-t-il des réserves ouvertes ?"
+                >
+                  🚩{tri.colonne === "reserves" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
+                </th>
                 <th className="th-tri" onClick={() => basculerTri("client")}>
                   Client{tri.colonne === "client" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
@@ -362,6 +370,20 @@ export default function Sites() {
                           }
                         >
                           ⚠
+                        </span>
+                      )}
+                    </td>
+                    <td data-label="Réserves" style={{ textAlign: "center" }}>
+                      {nbReserves > 0 ? (
+                        <span
+                          className="taches-flag-icone taches-flag-warn"
+                          title={nbReserves + " réserve(s) ouverte(s)"}
+                        >
+                          🚩
+                        </span>
+                      ) : (
+                        <span className="simple-list-meta" title="Aucune réserve ouverte">
+                          —
                         </span>
                       )}
                     </td>
