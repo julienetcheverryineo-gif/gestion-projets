@@ -1036,6 +1036,14 @@ a {
   gap: 4px;
 }
 
+/* Panneau ouvert vers le haut plutôt que vers le bas, quand la ligne est
+   en bas de tableau et qu'il n'y a pas la place en dessous (voir
+   PersonMultiSelect.jsx, basculerOuverture). */
+.person-multiselect-panel-haut {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .person-multiselect-separateur {
   font-size: 0.72rem;
   font-weight: 600;
