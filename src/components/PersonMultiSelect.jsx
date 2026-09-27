@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from "react";
 // tableau complet à chaque coche/décoche. `autresNoms` (optionnel) ajoute
 // une seconde section de noms libres sans compte applicatif (ex : les
 // électriciens affectés au chantier, souvent externes).
-// Hauteur maximale du panneau (voir .person-multiselect-panel max-height)
-// + marge, pour savoir s'il tient en dessous du bouton ou doit s'ouvrir
-// vers le haut.
-const HAUTEUR_PANNEAU_ESTIMEE = 250;
+// Hauteur maximale réelle du panneau (max-height 220px + padding/gap, voir
+// .person-multiselect-panel) plus une marge de sécurité généreuse : le
+// seuil précédent (250) collait de trop près à la hauteur réelle et
+// basculait encore trop tard dans certains cas.
+const HAUTEUR_PANNEAU_ESTIMEE = 260;
+const MARGE_SECURITE = 60;
 
 export default function PersonMultiSelect({ valeurs, utilisateurs, autresNoms = [], onChange }) {
   const [ouvert, setOuvert] = useState(false);
@@ -39,7 +41,8 @@ export default function PersonMultiSelect({ valeurs, utilisateurs, autresNoms = 
         const espaceEnDessous = window.innerHeight - rect.bottom;
         const espaceAuDessus = rect.top;
         setVersLeHaut(
-          espaceEnDessous < HAUTEUR_PANNEAU_ESTIMEE && espaceAuDessus > espaceEnDessous
+          espaceEnDessous < HAUTEUR_PANNEAU_ESTIMEE + MARGE_SECURITE &&
+            espaceAuDessus > espaceEnDessous
         );
       }
       return prochain;
