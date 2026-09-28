@@ -77,7 +77,11 @@ function LigneTacheEditable({ entree, tache, nomChantier, utilisateurs }) {
             value={tache.dateDebut || ""}
             onChange={(e) => {
               const valeur = e.target.value || null;
+              // Une tâche ne doit jamais finir avant d'avoir commencé — sinon
+              // elle disparaît silencieusement du Planning (voir TaskTable).
               if (!tache.echeance && valeur) {
+                changerChamps({ dateDebut: valeur, echeance: valeur });
+              } else if (tache.echeance && valeur && valeur > tache.echeance) {
                 changerChamps({ dateDebut: valeur, echeance: valeur });
               } else {
                 changerChamp("dateDebut", valeur);

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
+import { texteBrut } from "../lib/sanitizeHtml";
 import NotesPanel from "../components/NotesPanel";
 
 function formatDate(ts) {
@@ -105,11 +106,11 @@ export default function Notes() {
                       className="notes-synthese-ligne"
                       onClick={() => navigate(`/chantiers/${ligne.chantierId}?onglet=notes`)}
                     >
-                      <td>{ligne.nomChantier}</td>
-                      <td>{ligne.client || "—"}</td>
-                      <td>{ligne.nb}</td>
-                      <td>
-                        <span className="notes-synthese-extrait">{ligne.derniere?.texte}</span>
+                      <td data-label="Chantier">{ligne.nomChantier}</td>
+                      <td data-label="Client">{ligne.client || "—"}</td>
+                      <td data-label="Notes">{ligne.nb}</td>
+                      <td data-label="Dernière note">
+                        <span className="notes-synthese-extrait">{texteBrut(ligne.derniere?.texte)}</span>
                         <span className="simple-list-meta">
                           {formatDate(ligne.derniere?.creeLe)} · {ligne.derniere?.auteur}
                         </span>

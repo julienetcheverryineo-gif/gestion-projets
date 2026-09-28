@@ -12,6 +12,29 @@ import { useEffect, useRef, useState } from "react";
 const HAUTEUR_PANNEAU_ESTIMEE = 260;
 const MARGE_SECURITE = 60;
 
+// Le panneau est positionné en absolu, mais reste visuellement DÉCOUPÉ
+// par le premier ancêtre qui a un défilement propre (le wrapper à
+// défilement horizontal d'un tableau, la zone scrollable d'une modale...)
+// — même s'il y a de la place jusqu'en bas de l'écran, le panneau peut
+// être coupé par cet ancêtre-là. On cherche donc la fenêtre visible
+// réelle : l'intersection de tous les ancêtres qui découpent leur
+// contenu, pas seulement la fenêtre du navigateur.
+function fenetreVisible(el) {
+  let haut = 0;
+  let bas = window.innerHeight;
+  let noeud = el?.parentElement;
+  while (noeud) {
+    const style = window.getComputedStyle(noeud);
+    if (/(auto|scroll|hidden)/.test(style.overflowY + " " + style.overflow)) {
+      const r = noeud.getBoundingClientRect();
+      haut = Math.max(haut, r.top);
+      bas = Math.min(bas, r.bottom);
+    }
+    noeud = noeud.parentElement;
+  }
+  return { haut, bas };
+}
+
 export default function PersonMultiSelect({ valeurs, utilisateurs, autresNoms = [], onChange }) {
   const [ouvert, setOuvert] = useState(false);
   const [versLeHaut, setVersLeHaut] = useState(false);
@@ -38,8 +61,9 @@ export default function PersonMultiSelect({ valeurs, utilisateurs, autresNoms = 
       const prochain = !etaitOuvert;
       if (prochain && ref.current) {
         const rect = ref.current.getBoundingClientRect();
-        const espaceEnDessous = window.innerHeight - rect.bottom;
-        const espaceAuDessus = rect.top;
+        const { haut, bas } = fenetreVisible(ref.current);
+        const espaceEnDessous = bas - rect.bottom;
+        const espaceAuDessus = rect.top - haut;
         setVersLeHaut(
           espaceEnDessous < HAUTEUR_PANNEAU_ESTIMEE + MARGE_SECURITE &&
             espaceAuDessus > espaceEnDessous

@@ -441,8 +441,12 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
                           // Si la fin n'est pas encore renseignée, elle suit le début —
                           // le cas le plus fréquent (tâche d'un jour) ne demande alors
                           // plus qu'une seule saisie ; sinon on ne touche pas à une fin
-                          // déjà choisie.
+                          // déjà choisie, sauf si le nouveau début la dépasse (une tâche
+                          // ne doit jamais finir avant d'avoir commencé — sinon elle
+                          // disparaît silencieusement du Planning).
                           if (!t.echeance && valeur) {
+                            changerChamps(t, { dateDebut: valeur, echeance: valeur });
+                          } else if (t.echeance && valeur && valeur > t.echeance) {
                             changerChamps(t, { dateDebut: valeur, echeance: valeur });
                           } else {
                             changerChamp(t, "dateDebut", valeur);

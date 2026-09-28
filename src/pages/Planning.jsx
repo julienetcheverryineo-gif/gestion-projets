@@ -100,13 +100,30 @@ export default function Planning() {
     [toutesLesTaches]
   );
 
+  // On ne mémorise que l'identité (nom + mois) de la case ouverte, pas son
+  // contenu : les entrées affichées sont recalculées à chaque rendu à
+  // partir de `charge` (voir plus bas), qui elle-même se met à jour dès
+  // qu'une tâche change (écoute Firestore temps réel). Si on figeait
+  // `entrees` au moment du clic comme avant, éditer une tâche depuis la
+  // modale (heures, dates...) ne mettait à jour ni le total du groupe ni
+  // le total en haut de la modale tant qu'on ne la refermait pas.
   const ouvrirDetail = (personne, cle) => {
-    setDetail({
-      nomPersonne: personne.nom,
-      libelleColonne: cle === "nonPlanifie" ? "Non planifié" : libelleMois(cle),
-      entrees: cle === "nonPlanifie" ? personne.detailNonPlanifie : personne.detailParMois[cle] || [],
-    });
+    setDetail({ nomPersonne: personne.nom, cle });
   };
+
+  const personneDetail = detail
+    ? [...charge.automaticiens, ...charge.electriciens].find((p) => p.nom === detail.nomPersonne)
+    : null;
+  const entreesDetail = !detail || !personneDetail
+    ? []
+    : detail.cle === "nonPlanifie"
+    ? personneDetail.detailNonPlanifie
+    : personneDetail.detailParMois[detail.cle] || [];
+  const libelleColonneDetail = detail
+    ? detail.cle === "nonPlanifie"
+      ? "Non planifié"
+      : libelleMois(detail.cle)
+    : "";
 
   const automaticiensGantt = gantt?.personneGroupes.filter((g) => g.type === "automaticien") ?? [];
   const electriciensGantt = gantt?.personneGroupes.filter((g) => g.type === "electricien") ?? [];
@@ -306,8 +323,8 @@ export default function Planning() {
       {detail && (
         <ChargeDetailModal
           nomPersonne={detail.nomPersonne}
-          libelleColonne={detail.libelleColonne}
-          entrees={detail.entrees}
+          libelleColonne={libelleColonneDetail}
+          entrees={entreesDetail}
           nomChantier={nomChantier}
           tacheParId={tacheParId}
           utilisateurs={utilisateurs}
