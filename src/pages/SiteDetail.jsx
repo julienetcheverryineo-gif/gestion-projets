@@ -207,33 +207,33 @@ export default function SiteDetail() {
         )}
       </div>
 
-      <div className="page-tabs">
+      <div className="chantier-actions-bar">
         <button
-          className={"page-tab" + (ongletActif === "taches" ? " page-tab-active" : "")}
+          className={ongletActif === "taches" ? "btn-primary" : "btn-accent"}
           onClick={() => setOngletActif("taches")}
         >
           Tâches
         </button>
         <button
-          className={"page-tab" + (ongletActif === "equipements" ? " page-tab-active" : "")}
+          className={ongletActif === "equipements" ? "btn-primary" : "btn-accent"}
           onClick={() => setOngletActif("equipements")}
         >
           Listing matériel
         </button>
         <button
-          className={"page-tab" + (ongletActif === "reserves" ? " page-tab-active" : "")}
+          className={ongletActif === "reserves" ? "btn-primary" : "btn-accent"}
           onClick={() => setOngletActif("reserves")}
         >
           Réserves
         </button>
         <button
-          className={"page-tab" + (ongletActif === "autres-lots" ? " page-tab-active" : "")}
+          className={ongletActif === "autres-lots" ? "btn-primary" : "btn-accent"}
           onClick={() => setOngletActif("autres-lots")}
         >
           Autres lots
         </button>
         <button
-          className={"page-tab" + (ongletActif === "notes" ? " page-tab-active" : "")}
+          className={ongletActif === "notes" ? "btn-primary" : "btn-accent"}
           onClick={() => setOngletActif("notes")}
         >
           Notes

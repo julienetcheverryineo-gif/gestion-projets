@@ -823,41 +823,6 @@ a {
   height: 15px;
 }
 
-.reserves-filtres {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 14px;
-}
-.reserves-filtres .page-tab {
-  padding: 6px 12px;
-  font-size: 0.82rem;
-}
-
-/* ---------- Onglets de page (ex: Équipements / Chat) ---------- */
-.page-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-}
-.page-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 10px 16px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.page-tab:hover {
-  color: var(--text);
-}
-.page-tab-active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
 /* ---------- Chat de chantier ---------- */
 .chat-panel {
   display: flex;

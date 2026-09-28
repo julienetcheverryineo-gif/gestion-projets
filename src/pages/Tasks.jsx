@@ -180,21 +180,21 @@ export default function Tasks() {
         </div>
       </header>
 
-      <div className="page-tabs" style={{ marginBottom: 16 }}>
+      <div className="chantier-actions-bar">
         <button
-          className={"page-tab" + (modeGroupement === "chantier" ? " page-tab-active" : "")}
+          className={modeGroupement === "chantier" ? "btn-primary" : "btn-accent"}
           onClick={() => setModeGroupement("chantier")}
         >
           Par chantier
         </button>
         <button
-          className={"page-tab" + (modeGroupement === "responsable" ? " page-tab-active" : "")}
+          className={modeGroupement === "responsable" ? "btn-primary" : "btn-accent"}
           onClick={() => setModeGroupement("responsable")}
         >
           Par responsable
         </button>
         <button
-          className={"page-tab" + (modeGroupement === "equipement" ? " page-tab-active" : "")}
+          className={modeGroupement === "equipement" ? "btn-primary" : "btn-accent"}
           onClick={() => setModeGroupement("equipement")}
         >
           Par équipement

@@ -51,15 +51,15 @@ export default function Notes() {
         </div>
       </header>
 
-      <div className="page-tabs">
+      <div className="chantier-actions-bar">
         <button
-          className={"page-tab" + (ongletActif === "generales" ? " page-tab-active" : "")}
+          className={ongletActif === "generales" ? "btn-primary" : "btn-accent"}
           onClick={() => setOngletActif("generales")}
         >
           Générales
         </button>
         <button
-          className={"page-tab" + (ongletActif === "affaires" ? " page-tab-active" : "")}
+          className={ongletActif === "affaires" ? "btn-primary" : "btn-accent"}
           onClick={() => setOngletActif("affaires")}
         >
           Par affaire

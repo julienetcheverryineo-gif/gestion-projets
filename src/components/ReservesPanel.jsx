@@ -38,21 +38,21 @@ export default function ReservesPanel({ chantierId, peutGerer, utilisateurs }) {
         )}
       </div>
 
-      <div className="reserves-filtres">
+      <div className="chantier-actions-bar">
         <button
-          className={"page-tab" + (filtre === "ouvertes" ? " page-tab-active" : "")}
+          className={filtre === "ouvertes" ? "btn-primary" : "btn-accent"}
           onClick={() => setFiltre("ouvertes")}
         >
           Ouvertes ({ouvertes.length})
         </button>
         <button
-          className={"page-tab" + (filtre === "levees" ? " page-tab-active" : "")}
+          className={filtre === "levees" ? "btn-primary" : "btn-accent"}
           onClick={() => setFiltre("levees")}
         >
           Levées
         </button>
         <button
-          className={"page-tab" + (filtre === "toutes" ? " page-tab-active" : "")}
+          className={filtre === "toutes" ? "btn-primary" : "btn-accent"}
           onClick={() => setFiltre("toutes")}
         >
           Toutes

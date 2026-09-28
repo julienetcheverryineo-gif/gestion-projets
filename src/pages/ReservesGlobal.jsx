@@ -99,22 +99,22 @@ export default function ReservesGlobal() {
             </div>
           </div>
 
-          <div className="reserves-filtres" style={{ marginBottom: 16, justifyContent: "space-between" }}>
-            <div style={{ display: "flex", gap: 8 }}>
+          <div className="chantier-actions-bar" style={{ justifyContent: "space-between" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
-                className={"page-tab" + (filtre === "ouvertes" ? " page-tab-active" : "")}
+                className={filtre === "ouvertes" ? "btn-primary" : "btn-accent"}
                 onClick={() => setFiltre("ouvertes")}
               >
                 Ouvertes
               </button>
               <button
-                className={"page-tab" + (filtre === "levees" ? " page-tab-active" : "")}
+                className={filtre === "levees" ? "btn-primary" : "btn-accent"}
                 onClick={() => setFiltre("levees")}
               >
                 Levées
               </button>
               <button
-                className={"page-tab" + (filtre === "toutes" ? " page-tab-active" : "")}
+                className={filtre === "toutes" ? "btn-primary" : "btn-accent"}
                 onClick={() => setFiltre("toutes")}
               >
                 Toutes
