@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
 import NotesPanel from "../components/NotesPanel";
@@ -10,6 +10,7 @@ function formatDate(ts) {
 
 export default function Notes() {
   const navigate = useNavigate();
+  const [ongletActif, setOngletActif] = useState("generales");
   const { documents: chantiers } = useCollection("sites");
   const { documents: notes, chargement } = useCollection("notes");
 
@@ -46,21 +47,38 @@ export default function Notes() {
       <header className="page-header">
         <div>
           <h1>Notes</h1>
-          <p className="page-subtitle">Notes générales et synthèse des notes par affaire</p>
+          <p className="page-subtitle">Notes générales et notes par affaire</p>
         </div>
       </header>
 
-      <div className="notes-page-grille">
+      <div className="page-tabs">
+        <button
+          className={"page-tab" + (ongletActif === "generales" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("generales")}
+        >
+          Générales
+        </button>
+        <button
+          className={"page-tab" + (ongletActif === "affaires" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("affaires")}
+        >
+          Par affaire
+        </button>
+      </div>
+
+      {ongletActif === "generales" && (
         <section className="panel">
           <div className="panel-header">
             <h2>Notes générales</h2>
           </div>
           <NotesPanel texteVide="Aucune note générale pour l'instant." />
         </section>
+      )}
 
+      {ongletActif === "affaires" && (
         <section className="panel">
           <div className="panel-header">
-            <h2>Synthèse par affaire</h2>
+            <h2>Notes par affaire</h2>
             <span className="simple-list-meta">cliquer une ligne pour ouvrir les notes du chantier</span>
           </div>
           {chargement ? (
@@ -103,7 +121,7 @@ export default function Notes() {
             </div>
           )}
         </section>
-      </div>
+      )}
     </div>
   );
 }
