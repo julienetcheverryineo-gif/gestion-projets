@@ -1,4 +1,4 @@
-name: Déploiement Firebase Hosting
+name: Déploiement Firebase Hosting + règles
 
 on:
   push:
@@ -27,3 +27,16 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           projectId: appli-service
           channelId: live
+
+      # Les règles Firestore/Storage (firestore.rules, storage.rules) ne
+      # sont pas déployées par l'action ci-dessus (Hosting uniquement) —
+      # sans cette étape, une nouvelle collection (ex. "notes") resterait
+      # bloquée par les règles même après avoir mis à jour le code.
+      - name: Déployer les règles Firestore/Storage
+        run: |
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > /tmp/firebase-service-account.json
+          npx firebase-tools deploy --only firestore:rules,storage:rules \
+            --project appli-service \
+            --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-service-account.json

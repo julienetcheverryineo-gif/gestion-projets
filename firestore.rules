@@ -94,5 +94,16 @@ service cloud.firestore {
       allow update, delete: if estConnecte() &&
         (resource.data.userId == request.auth.uid || estChefOuAdmin());
     }
+
+    // Notes (par chantier si chantierId renseigné, générales sinon) :
+    // lecture pour tous les connectés, chacun ne peut créer que ses
+    // propres notes (usurpation impossible), modification/suppression par
+    // l'auteur ou un chef de projet/admin
+    match /notes/{noteId} {
+      allow read: if estConnecte();
+      allow create: if estConnecte() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if estConnecte() &&
+        (resource.data.userId == request.auth.uid || estChefOuAdmin());
+    }
   }
 }

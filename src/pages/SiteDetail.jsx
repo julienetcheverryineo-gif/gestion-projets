@@ -16,6 +16,7 @@ import ImportDevisModal from "../components/ImportDevisModal";
 import ReservesPanel from "../components/ReservesPanel";
 import TaskTable from "../components/TaskTable";
 import ImportDatesTachesModal from "../components/ImportDatesTachesModal";
+import NotesPanel from "../components/NotesPanel";
 import { estTactile } from "../lib/tactile";
 import { equipeChantier, electriciensChantier } from "../lib/equipe";
 import { exporterTachesExcel } from "../lib/tachesExcel";
@@ -228,7 +229,22 @@ export default function SiteDetail() {
         >
           Autres lots
         </button>
+        <button
+          className={"page-tab" + (ongletActif === "notes" ? " page-tab-active" : "")}
+          onClick={() => setOngletActif("notes")}
+        >
+          Notes
+        </button>
       </div>
+
+      {ongletActif === "notes" && (
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Notes</h2>
+          </div>
+          <NotesPanel chantierId={chantierId} texteVide="Aucune note pour ce chantier pour l'instant." />
+        </section>
+      )}
 
       {ongletActif === "equipements" && (
       <section className="panel">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import NotesPanel from "./NotesPanel";
 import logoIneo from "../assets/logo-ineo.png";
 
 const NAV_ITEMS = [
@@ -35,6 +36,7 @@ export default function Layout() {
   const { profile, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [reduite, setReduite] = useState(chargerSidebarReduite);
+  const [notesOuvertes, setNotesOuvertes] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -167,6 +169,36 @@ export default function Layout() {
         </div>
         <Outlet />
       </main>
+
+      {/* Notes générales : pas liées à un chantier, accessibles depuis
+          n'importe quelle page via cet onglet fixé au bord droit de
+          l'écran, plutôt qu'une page dédiée dans le menu de gauche. */}
+      <button
+        type="button"
+        className="notes-generales-onglet"
+        onClick={() => setNotesOuvertes((o) => !o)}
+      >
+        Notes
+      </button>
+      {notesOuvertes && (
+        <div className="notes-generales-fond" onClick={() => setNotesOuvertes(false)} />
+      )}
+      <aside
+        className={"notes-generales-panneau" + (notesOuvertes ? " notes-generales-panneau-ouvert" : "")}
+      >
+        <div className="notes-generales-entete">
+          <h2>Notes générales</h2>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setNotesOuvertes(false)}
+            aria-label="Fermer"
+          >
+            ×
+          </button>
+        </div>
+        <NotesPanel texteVide="Aucune note générale pour l'instant." />
+      </aside>
     </div>
   );
 }

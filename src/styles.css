@@ -2188,3 +2188,137 @@ textarea:focus {
     font-size: 16px; /* évite le zoom automatique de Safari au focus */
   }
 }
+
+/* ---------- Notes (onglet par chantier + panneau général à droite) ---------- */
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.notes-ajout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.notes-textarea,
+.note-texte-edit {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 10px 12px;
+  resize: vertical;
+}
+.notes-textarea:focus,
+.note-texte-edit:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.notes-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.note-carte {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.note-carte-entete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.note-auteur {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.note-supprimer {
+  margin-left: auto;
+  padding: 2px 8px;
+}
+.note-texte {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Onglet fixé au bord droit de l'écran, sur toutes les pages : ouvre le
+   panneau des notes générales (non liées à un chantier), sans passer par
+   une page dédiée dans le menu de gauche. */
+.notes-generales-onglet {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%) rotate(180deg);
+  writing-mode: vertical-rl;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  padding: 14px 8px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  z-index: 25;
+  box-shadow: var(--shadow);
+}
+.notes-generales-onglet:hover {
+  background: var(--accent-ink);
+}
+
+.notes-generales-fond {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 11, 0.35);
+  z-index: 29;
+}
+
+.notes-generales-panneau {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh;
+  width: min(420px, 92vw);
+  background: var(--panel);
+  border-left: 1px solid var(--ring);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+  z-index: 30;
+}
+.notes-generales-panneau-ouvert {
+  transform: translateX(0);
+}
+.notes-generales-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.notes-generales-entete h2 {
+  margin: 0;
+}
+
+@media (max-width: 860px) {
+  .notes-generales-onglet {
+    top: auto;
+    bottom: 76px;
+  }
+  .notes-generales-panneau {
+    width: 100vw;
+  }
+}
