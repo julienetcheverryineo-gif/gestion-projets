@@ -9,6 +9,7 @@ import SiteDetail from "./pages/SiteDetail";
 import Tasks from "./pages/Tasks";
 import Planning from "./pages/Planning";
 import ReservesGlobal from "./pages/ReservesGlobal";
+import Notes from "./pages/Notes";
 import Users from "./pages/Users";
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="taches" element={<Tasks />} />
             <Route path="planning" element={<Planning />} />
             <Route path="reserves" element={<ReservesGlobal />} />
+            <Route path="notes" element={<Notes />} />
             <Route
               path="utilisateurs"
               element={

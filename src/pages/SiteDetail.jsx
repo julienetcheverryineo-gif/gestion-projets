@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import {
   addDoc,
   collection,
@@ -30,6 +30,7 @@ const STATUTS_MATERIEL = [
 
 export default function SiteDetail() {
   const { chantierId } = useParams();
+  const [searchParams] = useSearchParams();
   const { isAdmin, isChefDeProjet, profile } = useAuth();
   const peutGerer = isAdmin || isChefDeProjet;
 
@@ -67,7 +68,9 @@ export default function SiteDetail() {
   const [afficherImport, setAfficherImport] = useState(false);
   const [afficherAffectationMasse, setAfficherAffectationMasse] = useState(false);
   const [afficherChantierForm, setAfficherChantierForm] = useState(false);
-  const [ongletActif, setOngletActif] = useState("taches");
+  // Permet un lien direct vers un onglet précis (ex. depuis la synthèse
+  // des notes) via ?onglet=notes, tout en gardant "taches" par défaut.
+  const [ongletActif, setOngletActif] = useState(searchParams.get("onglet") || "taches");
   const [groupementTaches, setGroupementTaches] = useState("flat");
   const [groupeTacheOuvert, setGroupeTacheOuvert] = useState(null);
   const [afficherImportDatesTaches, setAfficherImportDatesTaches] = useState(false);
