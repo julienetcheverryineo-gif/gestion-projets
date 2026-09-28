@@ -1089,10 +1089,17 @@ a {
   margin-top: 10px;
 }
 .gantt-groupe-titre {
+  width: 180px;
   font-weight: 600;
   font-size: 0.86rem;
   margin: 10px 0 4px;
-  padding-left: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--panel);
 }
 .gantt-ligne {
   display: flex;
@@ -1110,7 +1117,11 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  position: relative;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--panel);
+  box-shadow: 2px 0 4px rgba(46, 53, 56, 0.06);
 }
 .gantt-ligne-titre .col-resizer {
   right: 2px;

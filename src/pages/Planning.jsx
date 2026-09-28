@@ -197,7 +197,7 @@ export default function Planning() {
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
                     {[...gantt.parChantier.entries()].map(([cle, groupe]) => (
                       <div key={cle} className="gantt-groupe">
-                        <div className="gantt-groupe-titre" style={{ paddingLeft: largeurTitre }}>
+                        <div className="gantt-groupe-titre" style={{ width: largeurTitre }} title={groupe.nom}>
                           {groupe.nom}
                         </div>
                         {groupe.taches.map((t) => (
@@ -385,7 +385,7 @@ function GanttParPersonne({ groupes, gantt, nomChantier, largeurTitre = 180, dem
         <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
         {groupes.map((groupe) => (
           <div key={groupe.nom} className="gantt-groupe">
-            <div className="gantt-groupe-titre" style={{ paddingLeft: largeurTitre }}>
+            <div className="gantt-groupe-titre" style={{ width: largeurTitre }} title={groupe.nom}>
               {groupe.nom}
             </div>
             {groupe.taches.map((t, i) => (
