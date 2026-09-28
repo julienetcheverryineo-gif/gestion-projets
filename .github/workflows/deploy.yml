@@ -28,14 +28,16 @@ jobs:
           projectId: appli-service
           channelId: live
 
-      # Les règles Firestore/Storage (firestore.rules, storage.rules) ne
-      # sont pas déployées par l'action ci-dessus (Hosting uniquement) —
-      # sans cette étape, une nouvelle collection (ex. "notes") resterait
-      # bloquée par les règles même après avoir mis à jour le code.
-      - name: Déployer les règles Firestore/Storage
+      # Les règles Firestore (firestore.rules) ne sont pas déployées par
+      # l'action ci-dessus (Hosting uniquement) — sans cette étape, une
+      # nouvelle collection (ex. "notes") resterait bloquée par les règles
+      # même après avoir mis à jour le code. Le projet n'utilise pas
+      # Firebase Storage (pas de storage.rules dans le repo), donc on ne
+      # déploie que les règles Firestore.
+      - name: Déployer les règles Firestore
         run: |
           echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > /tmp/firebase-service-account.json
-          npx firebase-tools deploy --only firestore:rules,storage:rules \
+          npx firebase-tools deploy --only firestore:rules \
             --project appli-service \
             --non-interactive
         env:
