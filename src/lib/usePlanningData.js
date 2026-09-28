@@ -201,6 +201,8 @@ export function usePlanningData() {
       return {
         cle,
         nom: groupe.nom,
+        debut,
+        fin,
         left: joursEntre(debutTimeline, debut) * pxParJour,
         largeur: Math.max(6, (joursEntre(debut, fin) + 1) * pxParJour),
         heuresTotal,

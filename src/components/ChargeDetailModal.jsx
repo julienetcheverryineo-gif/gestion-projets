@@ -3,6 +3,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { arrondirHeures } from "../lib/usePlanningData";
 import { normaliserAssignes } from "../lib/assignes";
+import { formatStatutTache, formatDateCourte } from "../lib/formatage";
 import PersonMultiSelect from "./PersonMultiSelect";
 
 const STATUTS_TASK = [
@@ -10,23 +11,6 @@ const STATUTS_TASK = [
   { value: "en_cours", label: "En cours" },
   { value: "termine", label: "Terminé" },
 ];
-
-function formatStatutTache(statut) {
-  switch (statut) {
-    case "en_cours":
-      return "En cours";
-    case "termine":
-      return "Terminé";
-    default:
-      return "À faire";
-  }
-}
-
-function formatDateCourte(v) {
-  if (!v) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
-  return m ? m[3] + "/" + m[2] : v;
-}
 
 // Un même chantier génère souvent plusieurs tâches au titre identique
 // (une par équipement régulé, par exemple "Programmation CTA" répétée

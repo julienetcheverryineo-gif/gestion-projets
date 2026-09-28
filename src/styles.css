@@ -1000,6 +1000,7 @@ a {
   box-shadow: var(--shadow);
   padding: 8px;
   min-width: 180px;
+  max-width: min(280px, 92vw);
   max-height: 220px;
   overflow-y: auto;
   display: flex;
@@ -1198,6 +1199,56 @@ a {
   width: 2px;
   background: var(--danger);
   z-index: 1;
+}
+
+/* ---------- Planning (mobile) : liste de cartes à la place du Gantt ----- */
+.planning-mobile-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.planning-mobile-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.planning-mobile-groupe-titre {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+.planning-mobile-carte {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+.planning-mobile-carte-en_cours {
+  border-left-color: var(--tache);
+}
+.planning-mobile-carte-termine {
+  border-left-color: var(--accent);
+}
+.planning-mobile-carte-titre {
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+.planning-mobile-carte-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.planning-mobile-carte-statut {
+  margin-left: auto;
+  font-weight: 500;
 }
 
 /* ---------- Charge du service ---------- */
@@ -2141,13 +2192,13 @@ textarea:focus {
   .lot-card-header > div:first-child {
     width: 100%;
   }
-  .page-tabs {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    flex-wrap: nowrap;
-  }
-  .page-tab {
-    flex-shrink: 0;
+  /* Les groupes de boutons d'onglets/filtres passent à la ligne plutôt
+     que de déborder ou de nécessiter un défilement caché ; chaque bouton
+     garde une bonne zone de tap. */
+  .chantier-actions-bar .btn-primary,
+  .chantier-actions-bar .btn-accent {
+    padding: 8px 12px;
+    font-size: 0.84rem;
   }
   .chat-panel {
     height: calc(100vh - 260px);

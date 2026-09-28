@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePlanningData, joursEntre, libelleMois, arrondirHeures, PLAFOND_MENSUEL } from "../lib/usePlanningData";
+import { useEcranEtroit } from "../lib/useEcranEtroit";
 import FiltreChantier from "../components/FiltreChantier";
 import TacheGanttModal from "../components/TacheGanttModal";
 import ChargeTable from "../components/ChargeTable";
 import ChargeDetailModal from "../components/ChargeDetailModal";
+import { ConsolideMobile, DetailleMobile, ParPersonneMobile } from "../components/PlanningMobile";
 
 const VUES = [
   { cle: "consolide", label: "Consolidé" },
@@ -87,6 +89,7 @@ export default function Planning() {
   const [tacheEnEdition, setTacheEnEdition] = useState(null);
   const [detail, setDetail] = useState(null);
   const { largeurTitre, demarrerRedimension } = useLargeurTitre();
+  const ecranEtroit = useEcranEtroit();
 
   // Pour permettre l'édition directe depuis le détail d'une case de charge
   // (Planning > Charge du service) : chaque entrée du détail ne contient
@@ -144,6 +147,8 @@ export default function Planning() {
               </div>
               {!gantt ? (
                 <EmptyGantt />
+              ) : ecranEtroit ? (
+                <ConsolideMobile chantierBars={gantt.chantierBars} />
               ) : (
                 <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
@@ -191,6 +196,8 @@ export default function Planning() {
               </div>
               {!gantt ? (
                 <EmptyGantt />
+              ) : ecranEtroit ? (
+                <DetailleMobile parChantier={gantt.parChantier} onCliquerTache={setTacheEnEdition} />
               ) : (
                 <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
@@ -228,6 +235,12 @@ export default function Planning() {
                 </div>
                 {!gantt ? (
                   <EmptyGantt />
+                ) : ecranEtroit ? (
+                  <ParPersonneMobile
+                    groupes={automaticiensGantt}
+                    nomChantier={nomChantier}
+                    onCliquerTache={setTacheEnEdition}
+                  />
                 ) : (
                   <GanttParPersonne
                     groupes={automaticiensGantt}
@@ -245,6 +258,12 @@ export default function Planning() {
                 </div>
                 {!gantt ? (
                   <EmptyGantt />
+                ) : ecranEtroit ? (
+                  <ParPersonneMobile
+                    groupes={electriciensGantt}
+                    nomChantier={nomChantier}
+                    onCliquerTache={setTacheEnEdition}
+                  />
                 ) : (
                   <GanttParPersonne
                     groupes={electriciensGantt}

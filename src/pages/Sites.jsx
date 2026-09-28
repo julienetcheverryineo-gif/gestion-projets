@@ -373,7 +373,7 @@ export default function Sites() {
                         </span>
                       )}
                     </td>
-                    <td data-label="Réserves" style={{ textAlign: "center" }}>
+                    <td data-label="Réserve ouverte" style={{ textAlign: "center" }}>
                       {nbReserves > 0 ? (
                         <span
                           className="taches-flag-icone taches-flag-warn"
