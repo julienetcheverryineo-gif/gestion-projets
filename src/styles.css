@@ -634,6 +634,12 @@ a {
     height: 100vh;
     height: 100dvh;
     overflow-y: auto;
+    /* Sans ça, overflow-y:auto fait basculer overflow-x sur "auto" aussi
+       (comportement par défaut du navigateur) : le moindre débordement
+       d'un pixel (icônes, padding) faisait alors apparaître un ascenseur
+       horizontal en bas de la colonne réduite — jamais voulu, la barre
+       latérale n'a rien à faire défiler horizontalement. */
+    overflow-x: hidden;
   }
   .main-content {
     margin-left: 232px;
