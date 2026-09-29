@@ -21,7 +21,11 @@ const BOUTONS = [
 
 export default function RichTextEditor({ value, onChange, placeholder, autoFocus }) {
   const ref = useRef(null);
-  const derniereValeurEmise = useRef(value || "");
+  // null (jamais une chaîne réelle) pour forcer le premier passage de
+  // l'effet ci-dessous à s'exécuter au montage, même quand `value` est
+  // déjà une chaîne (note existante) — sinon le contenu initial ne serait
+  // jamais recopié dans la zone d'édition et celle-ci s'afficherait vide.
+  const derniereValeurEmise = useRef(null);
 
   // On ne réécrit le contenu du contentEditable que quand la valeur
   // change de l'EXTÉRIEUR (ex : on annule une édition, ou on ouvre une
