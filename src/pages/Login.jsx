@@ -1,15 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import logoIneo from "../assets/logo-ineo.png";
 
 export default function Login() {
-  const { login, compteDesactive } = useAuth();
+  const { user, login, compteDesactive } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
+
+  // Ne pas naviguer juste après la résolution de login() : à ce moment-là,
+  // AuthContext n'a pas encore fini de charger le profil Firestore (c'est
+  // asynchrone, dans onAuthStateChanged), donc `user` est encore `null` et
+  // ProtectedRoute nous aurait renvoyés direct vers /connexion — obligeant
+  // à se reconnecter une seconde fois pour que ça "prenne". On navigue
+  // plutôt dès que le contexte confirme que l'utilisateur est authentifié.
+  useEffect(() => {
+    if (user) navigate("/", { replace: true });
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,7 +27,6 @@ export default function Login() {
     setEnCours(true);
     try {
       await login(email, password);
-      navigate("/");
     } catch (err) {
       setErreur("Identifiants incorrects. Vérifiez votre e-mail et votre mot de passe.");
     } finally {

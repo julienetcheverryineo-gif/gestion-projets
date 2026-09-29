@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserSessionPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
@@ -23,6 +23,14 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Persistance de session plutôt que persistance locale (par défaut) :
+// la connexion ne survit qu'à l'onglet/l'application ouverte. Fermer
+// complètement le navigateur ou l'appli (PWA) déconnecte l'utilisateur —
+// il devra ressaisir ses identifiants à la prochaine ouverture. Appelé
+// avant tout login (au chargement du module), donc sans risque de
+// course avec un login déclenché juste après.
+setPersistence(auth, browserSessionPersistence).catch(() => {});
 
 // Analytics ne fonctionne pas dans tous les environnements (ex: iOS PWA en
 // mode standalone) : on l'active seulement si le navigateur le supporte.
