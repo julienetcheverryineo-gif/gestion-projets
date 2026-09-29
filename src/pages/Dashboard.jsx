@@ -54,6 +54,7 @@ export default function Dashboard() {
       (it) => it.statut !== "teste" && it.statut !== "fait"
     ).length;
     const reservesOuvertes = reserves.filter((r) => r.statut !== "levee").length;
+    const reservesEnRetard = reserves.filter((r) => estReserveEnRetard(r)).length;
     const heuresPrevues = toutesLesTaches.reduce(
       (s, t) => s + Number(t.heuresPrevues || 0),
       0
@@ -64,6 +65,7 @@ export default function Dashboard() {
       tachesEnCours,
       pointsRestants,
       reservesOuvertes,
+      reservesEnRetard,
       heuresPrevues,
     };
   }, [chantiers, toutesLesTaches, regItems, reserves]);
@@ -118,6 +120,11 @@ export default function Dashboard() {
               label="Réserves ouvertes"
               valeur={stats.reservesOuvertes}
               alerte={stats.reservesOuvertes > 0}
+            />
+            <StatCard
+              label="Réserves en retard"
+              valeur={stats.reservesEnRetard}
+              alerte={stats.reservesEnRetard > 0}
             />
             <StatCard label="Points restants" valeur={stats.pointsRestants} />
             <StatCard label="Heures prévues" valeur={stats.heuresPrevues} />
@@ -277,6 +284,39 @@ export default function Dashboard() {
               </ul>
             </section>
           )}
+
+          {stats.reservesEnRetard > 0 && (
+            <section className="panel panel-alert">
+              <div className="panel-header">
+                <h2>Réserves en retard</h2>
+                <Link to="/reserves" className="link">
+                  Voir toutes les réserves
+                </Link>
+              </div>
+              <ul className="simple-list">
+                {reserves
+                  .filter((r) => estReserveEnRetard(r))
+                  .slice(0, 8)
+                  .map((r) => (
+                    <li key={r.id}>
+                      <span className="status-dot status-retard" />
+                      <span className="simple-list-title">
+                        {r.chantierId ? (
+                          <Link to={"/chantiers/" + r.chantierId}>{nomChantier(r.chantierId)}</Link>
+                        ) : (
+                          "À affecter"
+                        )}
+                        {" — " + (r.designation || "Réserve")}
+                      </span>
+                      <span className="simple-list-meta">
+                        Échéance dépassée : {r.dateEcheance}
+                        {r.responsable ? " · " + r.responsable : ""}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
     </div>
@@ -286,6 +326,11 @@ export default function Dashboard() {
 function estEnRetard(tache) {
   if (!tache.echeance || tache.statut === "termine") return false;
   return new Date(tache.echeance) < new Date(new Date().toDateString());
+}
+
+function estReserveEnRetard(reserve) {
+  if (!reserve.dateEcheance || reserve.statut === "levee") return false;
+  return new Date(reserve.dateEcheance) < new Date(new Date().toDateString());
 }
 
 function formatStatutTache(statut) {
