@@ -1127,6 +1127,13 @@ a {
 .gantt-ligne-titre .col-resizer {
   right: 2px;
 }
+.gantt-ligne-titre-cliquable {
+  cursor: pointer;
+}
+.gantt-ligne-titre-cliquable:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
 .gantt-piste {
   position: relative;
   height: 22px;

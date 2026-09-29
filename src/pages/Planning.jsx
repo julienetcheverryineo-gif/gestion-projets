@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePlanningData, joursEntre, libelleMois, arrondirHeures, PLAFOND_MENSUEL } from "../lib/usePlanningData";
 import { useEcranEtroit } from "../lib/useEcranEtroit";
 import FiltreChantier from "../components/FiltreChantier";
@@ -90,6 +91,14 @@ export default function Planning() {
   const [detail, setDetail] = useState(null);
   const { largeurTitre, demarrerRedimension } = useLargeurTitre();
   const ecranEtroit = useEcranEtroit();
+  const navigate = useNavigate();
+
+  // Gantt consolidé : cliquer le nom du chantier ou sa barre ouvre sa
+  // fiche — sauf pour le groupe "aaffecter" (tâches sans chantier), qui
+  // n'a pas de fiche à ouvrir.
+  const ouvrirChantierDepuisGantt = (cle) => {
+    if (cle && cle !== "aaffecter") navigate("/chantiers/" + cle);
+  };
 
   // Pour permettre l'édition directe depuis le détail d'une case de charge
   // (Planning > Charge du service) : chaque entrée du détail ne contient
@@ -165,35 +174,51 @@ export default function Planning() {
               {!gantt ? (
                 <EmptyGantt />
               ) : ecranEtroit ? (
-                <ConsolideMobile chantierBars={gantt.chantierBars} />
+                <ConsolideMobile chantierBars={gantt.chantierBars} onCliquerChantier={ouvrirChantierDepuisGantt} />
               ) : (
                 <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
-                    {gantt.chantierBars.map((cb) => (
-                      <div key={cb.cle} className="gantt-ligne">
-                        <div
-                          className="gantt-ligne-titre"
-                          style={{ width: largeurTitre }}
-                          title={cb.nom}
-                        >
-                          {cb.nom}
-                          <span className="col-resizer" onMouseDown={demarrerRedimension} />
-                        </div>
-                        <div className="gantt-piste" style={{ width: gantt.largeurTotale }}>
-                          {gantt.ligneAujourdHui !== null && (
-                            <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
-                          )}
+                    {gantt.chantierBars.map((cb) => {
+                      const estAffecte = cb.cle !== "aaffecter";
+                      return (
+                        <div key={cb.cle} className="gantt-ligne">
                           <div
-                            className="gantt-barre gantt-barre-chantier"
-                            style={{ left: cb.left, width: cb.largeur }}
-                            title={cb.nom + " — " + arrondirHeures(cb.heuresTotal) + " h au total"}
+                            className={"gantt-ligne-titre" + (estAffecte ? " gantt-ligne-titre-cliquable" : "")}
+                            style={{ width: largeurTitre }}
+                            title={cb.nom + (estAffecte ? " — cliquer pour ouvrir le chantier" : "")}
+                            onClick={estAffecte ? () => ouvrirChantierDepuisGantt(cb.cle) : undefined}
                           >
-                            <span className="gantt-barre-heures">{arrondirHeures(cb.heuresTotal)} h</span>
+                            {cb.nom}
+                            <span
+                              className="col-resizer"
+                              onMouseDown={demarrerRedimension}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <div className="gantt-piste" style={{ width: gantt.largeurTotale }}>
+                            {gantt.ligneAujourdHui !== null && (
+                              <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
+                            )}
+                            <button
+                              type="button"
+                              className="gantt-barre gantt-barre-chantier gantt-barre-cliquable"
+                              style={{ left: cb.left, width: cb.largeur }}
+                              title={
+                                cb.nom +
+                                " — " +
+                                arrondirHeures(cb.heuresTotal) +
+                                " h au total" +
+                                (estAffecte ? " — cliquer pour ouvrir le chantier" : "")
+                              }
+                              onClick={estAffecte ? () => ouvrirChantierDepuisGantt(cb.cle) : undefined}
+                            >
+                              <span className="gantt-barre-heures">{arrondirHeures(cb.heuresTotal)} h</span>
+                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

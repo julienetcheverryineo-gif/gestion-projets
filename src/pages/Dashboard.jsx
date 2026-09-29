@@ -256,67 +256,95 @@ export default function Dashboard() {
             </section>
           </div>
 
-          {stats.tachesEnRetard > 0 && (
-            <section className="panel panel-alert">
-              <div className="panel-header">
-                <h2>Tâches en retard</h2>
+          <section className={"panel" + (stats.tachesEnRetard > 0 ? " panel-alert" : "")}>
+            <div className="panel-header">
+              <h2>Tâches en retard</h2>
+              <Link to="/taches" className="link">
+                Voir toutes les tâches
+              </Link>
+            </div>
+            {stats.tachesEnRetard === 0 ? (
+              <p className="empty-state-description" style={{ margin: "10px 0" }}>
+                Aucune tâche en retard.
+              </p>
+            ) : (
+              <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Chantier</th>
+                      <th>Tâche</th>
+                      <th>Échéance dépassée</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {toutesLesTaches
+                      .filter((t) => estEnRetard(t))
+                      .slice(0, 8)
+                      .map((t) => (
+                        <tr key={t.id}>
+                          <td data-label="Chantier">
+                            {t.chantierId ? (
+                              <Link to={"/chantiers/" + t.chantierId}>{nomChantier(t.chantierId)}</Link>
+                            ) : (
+                              "À affecter"
+                            )}
+                          </td>
+                          <td data-label="Tâche">{t.titre}</td>
+                          <td data-label="Échéance dépassée">{t.echeance}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
-              <ul className="simple-list">
-                {toutesLesTaches
-                  .filter((t) => estEnRetard(t))
-                  .slice(0, 8)
-                  .map((t) => (
-                    <li key={t.id}>
-                      <span className="status-dot status-retard" />
-                      <span className="simple-list-title">
-                        {t.chantierId ? (
-                          <Link to={"/chantiers/" + t.chantierId}>{nomChantier(t.chantierId)}</Link>
-                        ) : (
-                          "À affecter"
-                        )}
-                        {" — " + t.titre}
-                      </span>
-                      <span className="simple-list-meta">
-                        Échéance dépassée : {t.echeance}
-                      </span>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          )}
+            )}
+          </section>
 
-          {stats.reservesEnRetard > 0 && (
-            <section className="panel panel-alert">
-              <div className="panel-header">
-                <h2>Réserves en retard</h2>
-                <Link to="/reserves" className="link">
-                  Voir toutes les réserves
-                </Link>
+          <section className={"panel" + (stats.reservesEnRetard > 0 ? " panel-alert" : "")}>
+            <div className="panel-header">
+              <h2>Réserves en retard</h2>
+              <Link to="/reserves" className="link">
+                Voir toutes les réserves
+              </Link>
+            </div>
+            {stats.reservesEnRetard === 0 ? (
+              <p className="empty-state-description" style={{ margin: "10px 0" }}>
+                Aucune réserve en retard.
+              </p>
+            ) : (
+              <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Chantier</th>
+                      <th>Désignation</th>
+                      <th>Responsable</th>
+                      <th>Échéance dépassée</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reserves
+                      .filter((r) => estReserveEnRetard(r))
+                      .slice(0, 8)
+                      .map((r) => (
+                        <tr key={r.id}>
+                          <td data-label="Chantier">
+                            {r.chantierId ? (
+                              <Link to={"/chantiers/" + r.chantierId}>{nomChantier(r.chantierId)}</Link>
+                            ) : (
+                              "À affecter"
+                            )}
+                          </td>
+                          <td data-label="Désignation">{r.designation || "—"}</td>
+                          <td data-label="Responsable">{r.responsable || "—"}</td>
+                          <td data-label="Échéance dépassée">{r.dateEcheance}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
-              <ul className="simple-list">
-                {reserves
-                  .filter((r) => estReserveEnRetard(r))
-                  .slice(0, 8)
-                  .map((r) => (
-                    <li key={r.id}>
-                      <span className="status-dot status-retard" />
-                      <span className="simple-list-title">
-                        {r.chantierId ? (
-                          <Link to={"/chantiers/" + r.chantierId}>{nomChantier(r.chantierId)}</Link>
-                        ) : (
-                          "À affecter"
-                        )}
-                        {" — " + (r.designation || "Réserve")}
-                      </span>
-                      <span className="simple-list-meta">
-                        Échéance dépassée : {r.dateEcheance}
-                        {r.responsable ? " · " + r.responsable : ""}
-                      </span>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          )}
+            )}
+          </section>
         </>
       )}
     </div>

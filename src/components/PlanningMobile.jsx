@@ -58,14 +58,25 @@ function CarteTache({ titre, tache, onClick }) {
 }
 
 // Vue "Consolidé" : une carte par chantier (période + total d'heures).
-export function ConsolideMobile({ chantierBars }) {
+// Taper la carte ouvre la fiche du chantier (sauf le groupe "aaffecter",
+// qui n'a pas de fiche).
+export function ConsolideMobile({ chantierBars, onCliquerChantier }) {
   if (chantierBars.length === 0) {
     return <p className="empty-state-description" style={{ margin: "8px 0" }}>Aucun chantier daté.</p>;
   }
   return (
     <div className="planning-mobile-liste">
       {chantierBars.map((cb) => (
-        <CartePeriode key={cb.cle} nom={cb.nom} debut={cb.debut} fin={cb.fin} heures={cb.heuresTotal} />
+        <CartePeriode
+          key={cb.cle}
+          nom={cb.nom}
+          debut={cb.debut}
+          fin={cb.fin}
+          heures={cb.heuresTotal}
+          onClick={
+            cb.cle !== "aaffecter" && onCliquerChantier ? () => onCliquerChantier(cb.cle) : undefined
+          }
+        />
       ))}
     </div>
   );
