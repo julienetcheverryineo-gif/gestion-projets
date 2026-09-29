@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { champsAvancement } from "../lib/statutTache";
 
 export default function TacheGanttModal({ tache, onClose }) {
   const [dateDebut, setDateDebut] = useState(tache.dateDebut || "");
@@ -10,6 +11,17 @@ export default function TacheGanttModal({ tache, onClose }) {
   const [avancement, setAvancement] = useState(tache.avancement ?? "");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
+
+  // Ce formulaire a son statut ET son avancement en deux champs
+  // indépendants (contrairement au tableau des tâches et au plan de
+  // charge, qui passent par lib/statutTache) : sans ce recalage, changer
+  // le % ici n'avait aucun effet sur le statut, resté tel quel — c'est le
+  // bug remonté. On applique la même règle ici, à chaque frappe.
+  const changerAvancement = (valeur) => {
+    setAvancement(valeur);
+    const maj = champsAvancement({ statut }, valeur);
+    if (maj.statut) setStatut(maj.statut);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -74,7 +86,7 @@ export default function TacheGanttModal({ tache, onClose }) {
               min="0"
               max="100"
               value={avancement}
-              onChange={(e) => setAvancement(e.target.value)}
+              onChange={(e) => changerAvancement(e.target.value)}
               placeholder="0"
             />
           </label>

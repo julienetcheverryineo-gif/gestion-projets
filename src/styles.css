@@ -1179,19 +1179,27 @@ a {
   border-right: 1px solid rgba(255, 255, 255, 0.8);
   pointer-events: none;
 }
-.gantt-barre-heures {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: #fff;
+/* Étiquette d'une barre du Gantt (heures, %, responsable...) affichée à
+   côté de la barre plutôt que dedans : texte toujours lisible sur le
+   fond de la page, quels que soient la couleur/le remplissage de la
+   barre et la longueur du texte — remplace l'ancien texte blanc dans la
+   barre (illisible dès qu'elle était courte, ou que le texte s'allongeait
+   avec le responsable). Utilisée pour les tâches comme pour les barres
+   "chantier" ci-dessous. */
+.gantt-barre-label {
+  position: absolute;
+  top: 3px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
   white-space: nowrap;
-  padding: 0 4px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-ui);
 }
 /* Barre "chantier" (Gantt consolidé, et ligne chantier dépliable de la
    vue Par personne) : piste claire + remplissage plein qui avance selon
-   l'avancement, étiquette affichée à côté plutôt que dedans — plus
-   lisible que l'ancien survol blanc translucide sur fond bleu plein,
-   surtout à faible avancement où il ne se voyait presque pas. */
+   l'avancement — plus lisible que l'ancien survol blanc translucide sur
+   fond bleu plein, surtout à faible avancement où il ne se voyait
+   presque pas. */
 .gantt-barre-chantier-track {
   position: absolute;
   top: 3px;
@@ -1214,15 +1222,6 @@ a {
   bottom: 0;
   background: #2f6fb0;
   border-radius: 4px 0 0 4px;
-}
-.gantt-barre-chantier-label {
-  position: absolute;
-  top: 3px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  white-space: nowrap;
-  font-family: var(--font-ui);
 }
 .gantt-barre-a_faire {
   background: #9aa5b1;

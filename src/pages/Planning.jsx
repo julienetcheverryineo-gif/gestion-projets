@@ -417,7 +417,7 @@ function BarreChantierAvancement({ left, largeur, avancement, label, title, onCl
         )}
       </button>
       {label && (
-        <span className="gantt-barre-chantier-label" style={{ left: left + largeur + 6 }}>
+        <span className="gantt-barre-label" style={{ left: left + largeur + 6 }}>
           {label}
         </span>
       )}
@@ -455,6 +455,18 @@ function LigneTache({
       ? Math.max(0, Math.min(100, Number(t.avancement)))
       : null;
   const responsables = afficherResponsable ? normaliserAssignes(t.assigneA) : [];
+  // Le texte allait auparavant DANS la barre, sur un fond coloré avec un
+  // survol blanc translucide pour l'avancement : illisible dès que la
+  // barre est un peu courte ou que le texte s'allonge (ajouter le
+  // responsable l'a rendu encore pire). Même traitement que pour les
+  // barres de chantier : le texte sort à côté, sur le fond de la page.
+  const label = [
+    t.heuresPrevues ? t.heuresPrevues + " h" : null,
+    avancement !== null ? avancement + "%" : null,
+    responsables.length > 0 ? responsables.join(", ") : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
   return (
     <div className="gantt-ligne">
       <div className="gantt-ligne-titre" style={{ width: largeurTitre }} title={titre}>
@@ -486,16 +498,12 @@ function LigneTache({
           {avancement !== null && (
             <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
           )}
-          {(t.heuresPrevues || avancement !== null || responsables.length > 0) && (
-            <span className="gantt-barre-heures">
-              {t.heuresPrevues ? t.heuresPrevues + " h" : ""}
-              {avancement !== null ? (t.heuresPrevues ? " — " : "") + avancement + "%" : ""}
-              {responsables.length > 0
-                ? (t.heuresPrevues || avancement !== null ? " — " : "") + responsables.join(", ")
-                : ""}
-            </span>
-          )}
         </button>
+        {label && (
+          <span className="gantt-barre-label" style={{ left: left + largeur + 6 }}>
+            {label}
+          </span>
+        )}
       </div>
     </div>
   );

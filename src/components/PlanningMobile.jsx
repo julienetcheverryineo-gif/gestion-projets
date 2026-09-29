@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatStatutTache, formatDateCourte } from "../lib/formatage";
 import { arrondirHeures } from "../lib/usePlanningData";
+import { normaliserAssignes } from "../lib/assignes";
 
 // Remplace le Gantt (barres sur une frise de plusieurs mois) par une
 // liste de cartes sur petit écran : faire défiler une frise au pixel
@@ -41,11 +42,12 @@ function CartePeriode({ nom, debut, fin, heures, avancement, personnesEnCours, o
   );
 }
 
-function CarteTache({ titre, tache, onClick }) {
+function CarteTache({ titre, tache, afficherResponsable, onClick }) {
   const avancement =
     tache.avancement !== null && tache.avancement !== undefined
       ? Math.max(0, Math.min(100, Number(tache.avancement)))
       : null;
+  const responsables = afficherResponsable ? normaliserAssignes(tache.assigneA) : [];
   return (
     <button
       type="button"
@@ -60,6 +62,11 @@ function CarteTache({ titre, tache, onClick }) {
         {tache.heuresPrevues ? <span>{tache.heuresPrevues} h</span> : null}
         <span className="planning-mobile-carte-statut">{formatStatutTache(tache.statut)}</span>
       </div>
+      {responsables.length > 0 && (
+        <div className="planning-mobile-carte-meta">
+          <span>{responsables.join(", ")}</span>
+        </div>
+      )}
       {avancement !== null && (
         <div className="progress-bar" style={{ marginTop: 6 }}>
           <div className="progress-bar-fill" style={{ width: avancement + "%" }} />
@@ -108,7 +115,13 @@ export function DetailleMobile({ parChantier, onCliquerTache }) {
         <div key={cle} className="planning-mobile-groupe">
           <div className="planning-mobile-groupe-titre">{groupe.nom}</div>
           {groupe.taches.map((t) => (
-            <CarteTache key={t.id} titre={t.titre} tache={t} onClick={() => onCliquerTache(t)} />
+            <CarteTache
+              key={t.id}
+              titre={t.titre}
+              tache={t}
+              afficherResponsable
+              onClick={() => onCliquerTache(t)}
+            />
           ))}
         </div>
       ))}
