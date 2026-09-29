@@ -1187,11 +1187,42 @@ a {
   padding: 0 4px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
 }
-.gantt-barre-chantier {
+/* Barre "chantier" (Gantt consolidé, et ligne chantier dépliable de la
+   vue Par personne) : piste claire + remplissage plein qui avance selon
+   l'avancement, étiquette affichée à côté plutôt que dedans — plus
+   lisible que l'ancien survol blanc translucide sur fond bleu plein,
+   surtout à faible avancement où il ne se voyait presque pas. */
+.gantt-barre-chantier-track {
+  position: absolute;
+  top: 3px;
+  height: 16px;
+  border: none;
+  padding: 0;
+  border-radius: 4px;
+  background: #dbe6f2;
+  cursor: pointer;
+  overflow: hidden;
+}
+.gantt-barre-chantier-track:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.gantt-barre-chantier-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
   background: #2f6fb0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 4px 0 0 4px;
+}
+.gantt-barre-chantier-label {
+  position: absolute;
+  top: 3px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-family: var(--font-ui);
 }
 .gantt-barre-a_faire {
   background: #9aa5b1;

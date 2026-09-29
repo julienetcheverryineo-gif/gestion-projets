@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { arrondirHeures } from "../lib/usePlanningData";
 import { normaliserAssignes } from "../lib/assignes";
 import { formatStatutTache, formatDateCourte } from "../lib/formatage";
+import { champsAvancement } from "../lib/statutTache";
 import PersonMultiSelect from "./PersonMultiSelect";
 
 const STATUTS_TASK = [
@@ -150,7 +151,7 @@ function LigneTacheEditable({ entree, tache, nomChantier, utilisateurs }) {
             onBlur={(e) => {
               let v = e.target.value === "" ? null : Number(e.target.value);
               if (v !== null) v = Math.max(0, Math.min(100, v));
-              if (v !== (tache.avancement ?? null)) changerChamp("avancement", v);
+              if (v !== (tache.avancement ?? null)) changerChamps(champsAvancement(tache, v));
             }}
           />
         </label>

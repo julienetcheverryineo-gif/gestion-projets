@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlanningData, joursEntre, libelleMois, arrondirHeures, PLAFOND_MENSUEL } from "../lib/usePlanningData";
 import { useEcranEtroit } from "../lib/useEcranEtroit";
+import { normaliserAssignes } from "../lib/assignes";
 import FiltreChantier from "../components/FiltreChantier";
 import TacheGanttModal from "../components/TacheGanttModal";
 import ChargeTable from "../components/ChargeTable";
@@ -209,10 +210,17 @@ export default function Planning() {
                             {gantt.ligneAujourdHui !== null && (
                               <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
                             )}
-                            <button
-                              type="button"
-                              className="gantt-barre gantt-barre-chantier gantt-barre-cliquable"
-                              style={{ left: cb.left, width: cb.largeur }}
+                            <BarreChantierAvancement
+                              left={cb.left}
+                              largeur={cb.largeur}
+                              avancement={cb.avancement}
+                              label={
+                                arrondirHeures(cb.heuresTotal) +
+                                " h" +
+                                (cb.personnesEnCours.length > 0
+                                  ? " / " + cb.personnesEnCours.join(", ")
+                                  : "")
+                              }
                               title={
                                 cb.nom +
                                 " — " +
@@ -225,20 +233,7 @@ export default function Planning() {
                                 (estAffecte ? " — cliquer pour ouvrir le chantier" : "")
                               }
                               onClick={estAffecte ? () => ouvrirChantierDepuisGantt(cb.cle) : undefined}
-                            >
-                              {cb.avancement !== null && (
-                                <span
-                                  className="gantt-barre-remplissage"
-                                  style={{ width: cb.avancement + "%" }}
-                                />
-                              )}
-                              <span className="gantt-barre-heures">
-                                {arrondirHeures(cb.heuresTotal)} h
-                                {cb.personnesEnCours.length > 0
-                                  ? " / " + cb.personnesEnCours.join(", ")
-                                  : ""}
-                              </span>
-                            </button>
+                            />
                           </div>
                         </div>
                       );
@@ -281,6 +276,7 @@ export default function Planning() {
                             gantt={gantt}
                             largeurTitre={largeurTitre}
                             demarrerRedimension={demarrerRedimension}
+                            afficherResponsable
                             onClick={() => setTacheEnEdition(t)}
                           />
                         ))}
@@ -400,6 +396,35 @@ function EmptyGantt() {
   );
 }
 
+// Barre "chantier" (consolidé, ou ligne dépliable de la vue Par
+// personne) : une piste claire avec un remplissage plein qui avance
+// selon l'avancement (au lieu de l'ancien survol blanc translucide sur
+// fond bleu plein, peu lisible) — l'étiquette (heures, noms...) est
+// affichée à côté, en dehors de la barre, pour rester lisible quelle
+// que soit la part remplie.
+function BarreChantierAvancement({ left, largeur, avancement, label, title, onClick }) {
+  return (
+    <>
+      <button
+        type="button"
+        className="gantt-barre-chantier-track"
+        style={{ left, width: largeur }}
+        title={title}
+        onClick={onClick}
+      >
+        {avancement !== null && (
+          <span className="gantt-barre-chantier-fill" style={{ width: avancement + "%" }} />
+        )}
+      </button>
+      {label && (
+        <span className="gantt-barre-chantier-label" style={{ left: left + largeur + 6 }}>
+          {label}
+        </span>
+      )}
+    </>
+  );
+}
+
 function EnteteMois({ gantt, largeurTitre = 180 }) {
   return (
     <div className="gantt-mois-header" style={{ marginLeft: largeurTitre }}>
@@ -414,13 +439,22 @@ function EnteteMois({ gantt, largeurTitre = 180 }) {
   );
 }
 
-function LigneTache({ titre, tache: t, gantt, largeurTitre = 180, demarrerRedimension, onClick }) {
+function LigneTache({
+  titre,
+  tache: t,
+  gantt,
+  largeurTitre = 180,
+  demarrerRedimension,
+  afficherResponsable,
+  onClick,
+}) {
   const left = joursEntre(gantt.debutTimeline, t.dateDebut) * gantt.pxParJour;
   const largeur = Math.max(6, (joursEntre(t.dateDebut, t.echeance) + 1) * gantt.pxParJour);
   const avancement =
     t.avancement !== null && t.avancement !== undefined
       ? Math.max(0, Math.min(100, Number(t.avancement)))
       : null;
+  const responsables = afficherResponsable ? normaliserAssignes(t.assigneA) : [];
   return (
     <div className="gantt-ligne">
       <div className="gantt-ligne-titre" style={{ width: largeurTitre }} title={titre}>
@@ -444,6 +478,7 @@ function LigneTache({ titre, tache: t, gantt, largeurTitre = 180, demarrerRedime
             " → " +
             t.echeance +
             (avancement !== null ? " — " + avancement + "% fait" : "") +
+            (responsables.length > 0 ? " — " + responsables.join(", ") : "") +
             " — cliquer pour recaler"
           }
           onClick={onClick}
@@ -451,10 +486,13 @@ function LigneTache({ titre, tache: t, gantt, largeurTitre = 180, demarrerRedime
           {avancement !== null && (
             <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
           )}
-          {(t.heuresPrevues || avancement !== null) && (
+          {(t.heuresPrevues || avancement !== null || responsables.length > 0) && (
             <span className="gantt-barre-heures">
               {t.heuresPrevues ? t.heuresPrevues + " h" : ""}
               {avancement !== null ? (t.heuresPrevues ? " — " : "") + avancement + "%" : ""}
+              {responsables.length > 0
+                ? (t.heuresPrevues || avancement !== null ? " — " : "") + responsables.join(", ")
+                : ""}
             </span>
           )}
         </button>
@@ -513,10 +551,11 @@ function LigneChantierPliable({ sousGroupe, gantt, largeurTitre, demarrerRedimen
         {gantt.ligneAujourdHui !== null && (
           <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
         )}
-        <button
-          type="button"
-          className="gantt-barre gantt-barre-chantier gantt-barre-cliquable"
-          style={{ left, width: largeur }}
+        <BarreChantierAvancement
+          left={left}
+          largeur={largeur}
+          avancement={avancement}
+          label={avancement !== null ? avancement + "%" : null}
           title={
             sousGroupe.nom +
             (avancement !== null ? " — " + avancement + "% fait" : "") +
@@ -525,12 +564,7 @@ function LigneChantierPliable({ sousGroupe, gantt, largeurTitre, demarrerRedimen
             " les tâches"
           }
           onClick={onBasculer}
-        >
-          {avancement !== null && (
-            <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
-          )}
-          <span className="gantt-barre-heures">{avancement !== null ? avancement + "%" : ""}</span>
-        </button>
+        />
       </div>
     </div>
   );

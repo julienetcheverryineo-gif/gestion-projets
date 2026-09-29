@@ -3,6 +3,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { normaliserAssignes } from "../lib/assignes";
 import { estTactile } from "../lib/tactile";
+import { champsAvancement } from "../lib/statutTache";
 import PersonMultiSelect from "./PersonMultiSelect";
 
 const STATUTS_TASK = [
@@ -493,7 +494,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
                       onBlur={(e) => {
                         let v = e.target.value === "" ? null : Number(e.target.value);
                         if (v !== null) v = Math.max(0, Math.min(100, v));
-                        if (v !== (t.avancement ?? null)) changerChamp(t, "avancement", v);
+                        if (v !== (t.avancement ?? null)) changerChamps(t, champsAvancement(t, v));
                       }}
                     />
                   )}

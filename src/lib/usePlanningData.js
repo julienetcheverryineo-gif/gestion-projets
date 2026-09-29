@@ -190,11 +190,19 @@ export function usePlanningData() {
       const heuresTotal = tachesDuChantier.reduce((s, t) => s + Number(t.heuresPrevues || 0), 0);
       // Qui a une tâche EN COURS sur ce chantier en ce moment — affiché à
       // côté des heures sur la barre, pour voir d'un coup d'œil qui y
-      // travaille activement sans ouvrir le détail.
+      // travaille activement sans ouvrir le détail. On se fie au statut
+      // "en cours" ET à un % d'avancement entre 0 et 100 (pas seulement
+      // au statut) : beaucoup de tâches ont un avancement renseigné sans
+      // que le statut ait suivi, donc s'en tenir au seul statut en
+      // oubliait une bonne partie des gens réellement au travail.
       const personnesEnCours = [
         ...new Set(
           tachesDuChantier
-            .filter((t) => t.statut === "en_cours")
+            .filter(
+              (t) =>
+                t.statut === "en_cours" ||
+                (t.avancement !== null && t.avancement !== undefined && t.avancement > 0 && t.avancement < 100)
+            )
             .flatMap((t) => normaliserAssignes(t.assigneA))
         ),
       ];
