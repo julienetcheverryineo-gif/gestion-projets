@@ -31,7 +31,23 @@ function grouperEntrees(entrees) {
     groupe.heures += e.heures;
     groupe.items.push(e);
   }
-  return [...parGroupe.values()].sort((a, b) => b.heures - a.heures);
+  // Triés par date de la tâche à faire la plus proche (les tâches sans
+  // date passent en dernier) — plus utile pour prioriser que le tri par
+  // heures d'avant, une fois qu'on regarde le détail.
+  return [...parGroupe.values()].sort((a, b) => {
+    const dateA = a.items.reduce(
+      (min, it) => (it.dateDebut && (!min || it.dateDebut < min) ? it.dateDebut : min),
+      null
+    );
+    const dateB = b.items.reduce(
+      (min, it) => (it.dateDebut && (!min || it.dateDebut < min) ? it.dateDebut : min),
+      null
+    );
+    if (!dateA && !dateB) return b.heures - a.heures;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateA.localeCompare(dateB);
+  });
 }
 
 // Une ligne éditable pour une tâche "projet" réelle (collection `tasks`),

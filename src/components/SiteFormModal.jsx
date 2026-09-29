@@ -4,6 +4,7 @@ import { db } from "../firebase";
 
 export const STATUTS_CHANTIER = [
   { value: "actif", label: "Actif" },
+  { value: "en_cours", label: "En cours" },
   { value: "en_pause", label: "En pause" },
   { value: "termine", label: "Terminé" },
 ];

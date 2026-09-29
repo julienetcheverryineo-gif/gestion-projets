@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
-import { calculerAvancementChantier } from "../lib/avancement";
+import { calculerAvancementChantier, useSyncStatutEnCours } from "../lib/avancement";
 import { normaliserAssignes } from "../lib/assignes";
 import { libelleChantier } from "../lib/usePlanningData";
 
@@ -16,6 +16,10 @@ export default function Dashboard() {
 
   const [inclureTerminees, setInclureTerminees] = useState(false);
   const [personneOuverte, setPersonneOuverte] = useState(null);
+
+  // Passe automatiquement un chantier "Actif" en "En cours" dès qu'une de
+  // ses tâches a démarré (voir lib/avancement.js).
+  useSyncStatutEnCours(chantiers, taches);
 
   const chantierParId = (id) => chantiers.find((c) => c.id === id);
   const nomChantier = (id) => libelleChantier(chantierParId(id));
@@ -159,7 +163,7 @@ export default function Dashboard() {
                             {nomChantier(c.id)}
                           </Link>
                           <span className="simple-list-meta">
-                            {pct !== null ? "Avancement : " + pct + "%" : "Sans équipement"}
+                            {pct !== null ? "Avancement : " + pct + "%" : "Aucune tâche datée"}
                           </span>
                         </li>
                       );

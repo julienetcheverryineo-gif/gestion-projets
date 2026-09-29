@@ -1,24 +1,15 @@
 import { useMemo, useState } from "react";
 import { useCollection } from "../lib/firestoreHooks";
 import { normaliserAssignes } from "../lib/assignes";
+import { calculerAvancementChantier } from "./avancement";
 
 export const PLAFOND_MENSUEL = 156;
-const MS_JOUR = 86400000;
 
-export function joursEntre(a, b) {
-  return Math.round((new Date(b) - new Date(a)) / MS_JOUR);
-}
-
-// Formate une Date en "AAAA-MM-JJ" à partir de ses composants LOCAUX,
-// plutôt que toISOString() (qui convertit en UTC et peut décaler d'un jour
-// selon le fuseau horaire — la France est UTC+1/+2, ce qui ferait glisser
-// minuit local vers la veille en UTC).
-export function formatDateLocale(date) {
-  const annee = date.getFullYear();
-  const mois = String(date.getMonth() + 1).padStart(2, "0");
-  const jour = String(date.getDate()).padStart(2, "0");
-  return annee + "-" + mois + "-" + jour;
-}
+// Réexportés depuis lib/dates.js (extrait à part pour éviter un import
+// circulaire avec lib/avancement.js, utilisé plus bas) — tout le reste de
+// l'appli continue de les importer d'ici, sans rien changer.
+export { joursEntre, formatDateLocale } from "./dates";
+import { joursEntre, formatDateLocale } from "./dates";
 
 function moisCle(dateStr) {
   if (!dateStr) return null;
@@ -195,9 +186,19 @@ export function usePlanningData() {
         (max, t) => (t.echeance > max ? t.echeance : max),
         groupe.taches[0].echeance
       );
-      const heuresTotal = tachesVisibles
-        .filter((t) => (t.chantierId || "aaffecter") === cle)
-        .reduce((s, t) => s + Number(t.heuresPrevues || 0), 0);
+      const tachesDuChantier = tachesVisibles.filter((t) => (t.chantierId || "aaffecter") === cle);
+      const heuresTotal = tachesDuChantier.reduce((s, t) => s + Number(t.heuresPrevues || 0), 0);
+      // Qui a une tâche EN COURS sur ce chantier en ce moment — affiché à
+      // côté des heures sur la barre, pour voir d'un coup d'œil qui y
+      // travaille activement sans ouvrir le détail.
+      const personnesEnCours = [
+        ...new Set(
+          tachesDuChantier
+            .filter((t) => t.statut === "en_cours")
+            .flatMap((t) => normaliserAssignes(t.assigneA))
+        ),
+      ];
+      const avancement = cle !== "aaffecter" ? calculerAvancementChantier(cle, { taches }) : null;
       return {
         cle,
         nom: groupe.nom,
@@ -206,6 +207,8 @@ export function usePlanningData() {
         left: joursEntre(debutTimeline, debut) * pxParJour,
         largeur: Math.max(6, (joursEntre(debut, fin) + 1) * pxParJour),
         heuresTotal,
+        personnesEnCours,
+        avancement,
       };
     });
 

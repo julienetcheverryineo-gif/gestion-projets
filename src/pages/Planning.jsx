@@ -137,6 +137,15 @@ export default function Planning() {
   const automaticiensGantt = gantt?.personneGroupes.filter((g) => g.type === "automaticien") ?? [];
   const electriciensGantt = gantt?.personneGroupes.filter((g) => g.type === "electricien") ?? [];
 
+  // Avancement de chaque chantier (déjà calculé pour les barres du Gantt
+  // consolidé) — réutilisé dans la vue "Par personne" pour remplir le
+  // trait de chaque chantier selon son avancement global, pas seulement
+  // la part de tâches de cette personne.
+  const avancementParChantier = useMemo(
+    () => new Map((gantt?.chantierBars ?? []).map((cb) => [cb.cle, cb.avancement])),
+    [gantt]
+  );
+
   return (
     <div className="page">
       <header className="page-header">
@@ -209,11 +218,26 @@ export default function Planning() {
                                 " — " +
                                 arrondirHeures(cb.heuresTotal) +
                                 " h au total" +
+                                (cb.avancement !== null ? " — " + cb.avancement + "% fait" : "") +
+                                (cb.personnesEnCours.length > 0
+                                  ? " — en cours : " + cb.personnesEnCours.join(", ")
+                                  : "") +
                                 (estAffecte ? " — cliquer pour ouvrir le chantier" : "")
                               }
                               onClick={estAffecte ? () => ouvrirChantierDepuisGantt(cb.cle) : undefined}
                             >
-                              <span className="gantt-barre-heures">{arrondirHeures(cb.heuresTotal)} h</span>
+                              {cb.avancement !== null && (
+                                <span
+                                  className="gantt-barre-remplissage"
+                                  style={{ width: cb.avancement + "%" }}
+                                />
+                              )}
+                              <span className="gantt-barre-heures">
+                                {arrondirHeures(cb.heuresTotal)} h
+                                {cb.personnesEnCours.length > 0
+                                  ? " / " + cb.personnesEnCours.join(", ")
+                                  : ""}
+                              </span>
                             </button>
                           </div>
                         </div>
@@ -281,6 +305,7 @@ export default function Planning() {
                   <ParPersonneMobile
                     groupes={automaticiensGantt}
                     nomChantier={nomChantier}
+                    avancementParChantier={avancementParChantier}
                     onCliquerTache={setTacheEnEdition}
                   />
                 ) : (
@@ -288,6 +313,7 @@ export default function Planning() {
                     groupes={automaticiensGantt}
                     gantt={gantt}
                     nomChantier={nomChantier}
+                    avancementParChantier={avancementParChantier}
                     largeurTitre={largeurTitre}
                     demarrerRedimension={demarrerRedimension}
                     onCliquerTache={setTacheEnEdition}
@@ -304,6 +330,7 @@ export default function Planning() {
                   <ParPersonneMobile
                     groupes={electriciensGantt}
                     nomChantier={nomChantier}
+                    avancementParChantier={avancementParChantier}
                     onCliquerTache={setTacheEnEdition}
                   />
                 ) : (
@@ -311,6 +338,7 @@ export default function Planning() {
                     groupes={electriciensGantt}
                     gantt={gantt}
                     nomChantier={nomChantier}
+                    avancementParChantier={avancementParChantier}
                     largeurTitre={largeurTitre}
                     demarrerRedimension={demarrerRedimension}
                     onCliquerTache={setTacheEnEdition}
@@ -423,16 +451,102 @@ function LigneTache({ titre, tache: t, gantt, largeurTitre = 180, demarrerRedime
           {avancement !== null && (
             <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
           )}
-          {t.heuresPrevues ? (
-            <span className="gantt-barre-heures">{t.heuresPrevues} h</span>
-          ) : null}
+          {(t.heuresPrevues || avancement !== null) && (
+            <span className="gantt-barre-heures">
+              {t.heuresPrevues ? t.heuresPrevues + " h" : ""}
+              {avancement !== null ? (t.heuresPrevues ? " — " : "") + avancement + "%" : ""}
+            </span>
+          )}
         </button>
       </div>
     </div>
   );
 }
 
-function GanttParPersonne({ groupes, gantt, nomChantier, largeurTitre = 180, demarrerRedimension, onCliquerTache }) {
+// Regroupe les tâches (déjà d'une seule personne) par chantier, dans
+// l'ordre de leur première apparition.
+function grouperParChantier(taches, nomChantier) {
+  const map = new Map();
+  for (const t of taches) {
+    const cle = t.chantierId || "aaffecter";
+    if (!map.has(cle)) {
+      map.set(cle, { cle, nom: t.chantierId ? nomChantier(t.chantierId) : "À affecter", taches: [] });
+    }
+    map.get(cle).taches.push(t);
+  }
+  return [...map.values()];
+}
+
+// Une ligne "chantier" dépliable dans la vue Par personne : se comporte
+// comme la barre du Gantt consolidé (même position, même remplissage
+// selon l'avancement GLOBAL du chantier — pas seulement la part de
+// tâches de cette personne), mais cliquer dessus déplie/replie le détail
+// des tâches de la personne sur ce chantier au lieu d'ouvrir la fiche.
+function LigneChantierPliable({ sousGroupe, gantt, largeurTitre, demarrerRedimension, ouvert, onBasculer }) {
+  const debut = sousGroupe.taches.reduce(
+    (min, t) => (t.dateDebut < min ? t.dateDebut : min),
+    sousGroupe.taches[0].dateDebut
+  );
+  const fin = sousGroupe.taches.reduce(
+    (max, t) => (t.echeance > max ? t.echeance : max),
+    sousGroupe.taches[0].echeance
+  );
+  const left = joursEntre(gantt.debutTimeline, debut) * gantt.pxParJour;
+  const largeur = Math.max(6, (joursEntre(debut, fin) + 1) * gantt.pxParJour);
+  const avancement = sousGroupe.avancement;
+
+  return (
+    <div className="gantt-ligne">
+      <div
+        className="gantt-ligne-titre gantt-ligne-titre-cliquable"
+        style={{ width: largeurTitre }}
+        title={sousGroupe.nom + " — cliquer pour " + (ouvert ? "replier" : "déplier") + " les tâches"}
+        onClick={onBasculer}
+      >
+        <span style={{ marginRight: 4, display: "inline-block", width: 10 }}>{ouvert ? "▾" : "▸"}</span>
+        {sousGroupe.nom}
+        {demarrerRedimension && (
+          <span className="col-resizer" onMouseDown={demarrerRedimension} onClick={(e) => e.stopPropagation()} />
+        )}
+      </div>
+      <div className="gantt-piste" style={{ width: gantt.largeurTotale }}>
+        {gantt.ligneAujourdHui !== null && (
+          <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
+        )}
+        <button
+          type="button"
+          className="gantt-barre gantt-barre-chantier gantt-barre-cliquable"
+          style={{ left, width: largeur }}
+          title={
+            sousGroupe.nom +
+            (avancement !== null ? " — " + avancement + "% fait" : "") +
+            " — cliquer pour " +
+            (ouvert ? "replier" : "déplier") +
+            " les tâches"
+          }
+          onClick={onBasculer}
+        >
+          {avancement !== null && (
+            <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
+          )}
+          <span className="gantt-barre-heures">{avancement !== null ? avancement + "%" : ""}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GanttParPersonne({
+  groupes,
+  gantt,
+  nomChantier,
+  avancementParChantier,
+  largeurTitre = 180,
+  demarrerRedimension,
+  onCliquerTache,
+}) {
+  const [chantiersOuverts, setChantiersOuverts] = useState(() => new Set());
+
   if (groupes.length === 0) {
     return (
       <p className="empty-state-description" style={{ margin: "8px 0" }}>
@@ -440,28 +554,58 @@ function GanttParPersonne({ groupes, gantt, nomChantier, largeurTitre = 180, dem
       </p>
     );
   }
+
+  const basculer = (cle) => {
+    setChantiersOuverts((actuel) => {
+      const suivant = new Set(actuel);
+      if (suivant.has(cle)) suivant.delete(cle);
+      else suivant.add(cle);
+      return suivant;
+    });
+  };
+
   return (
     <div className="hscroll-auto" style={{ overflowX: "auto" }}>
       <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
         <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
-        {groupes.map((groupe) => (
-          <div key={groupe.nom} className="gantt-groupe">
-            <div className="gantt-groupe-titre" style={{ width: largeurTitre }} title={groupe.nom}>
-              {groupe.nom}
+        {groupes.map((groupe) => {
+          const sousGroupes = grouperParChantier(groupe.taches, nomChantier);
+          return (
+            <div key={groupe.nom} className="gantt-groupe">
+              <div className="gantt-groupe-titre" style={{ width: largeurTitre }} title={groupe.nom}>
+                {groupe.nom}
+              </div>
+              {sousGroupes.map((sg) => {
+                const cleUnique = groupe.nom + "||" + sg.cle;
+                const ouvert = chantiersOuverts.has(cleUnique);
+                return (
+                  <div key={cleUnique}>
+                    <LigneChantierPliable
+                      sousGroupe={{ ...sg, avancement: avancementParChantier.get(sg.cle) ?? null }}
+                      gantt={gantt}
+                      largeurTitre={largeurTitre}
+                      demarrerRedimension={demarrerRedimension}
+                      ouvert={ouvert}
+                      onBasculer={() => basculer(cleUnique)}
+                    />
+                    {ouvert &&
+                      sg.taches.map((t, i) => (
+                        <LigneTache
+                          key={t.id + "-" + i}
+                          titre={t.titre}
+                          tache={t}
+                          gantt={gantt}
+                          largeurTitre={largeurTitre}
+                          demarrerRedimension={demarrerRedimension}
+                          onClick={() => onCliquerTache(t)}
+                        />
+                      ))}
+                  </div>
+                );
+              })}
             </div>
-            {groupe.taches.map((t, i) => (
-              <LigneTache
-                key={t.id + "-" + i}
-                titre={t.chantierId ? nomChantier(t.chantierId) : "À affecter"}
-                tache={t}
-                gantt={gantt}
-                largeurTitre={largeurTitre}
-                demarrerRedimension={demarrerRedimension}
-                onClick={() => onCliquerTache(t)}
-              />
-            ))}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

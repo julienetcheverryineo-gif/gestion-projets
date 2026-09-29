@@ -475,6 +475,9 @@ a {
 .status-actif {
   background: var(--accent);
 }
+.status-en_cours {
+  background: #2f6fb0;
+}
 .status-en_pause {
   background: var(--warn);
 }

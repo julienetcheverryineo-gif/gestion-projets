@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatStatutTache, formatDateCourte } from "../lib/formatage";
 import { arrondirHeures } from "../lib/usePlanningData";
 
@@ -8,7 +9,7 @@ import { arrondirHeures } from "../lib/usePlanningData";
 // regroupement (par chantier, par personne) et le tri chronologique,
 // juste sans la frise.
 
-function CartePeriode({ nom, debut, fin, heures, onClick }) {
+function CartePeriode({ nom, debut, fin, heures, avancement, personnesEnCours, onClick }) {
   const contenu = (
     <>
       <div className="planning-mobile-carte-titre">{nom}</div>
@@ -17,7 +18,18 @@ function CartePeriode({ nom, debut, fin, heures, onClick }) {
           {formatDateCourte(debut)} → {formatDateCourte(fin)}
         </span>
         {heures ? <span>{arrondirHeures(heures)} h</span> : null}
+        {avancement !== null && avancement !== undefined ? <span>{avancement}%</span> : null}
       </div>
+      {personnesEnCours && personnesEnCours.length > 0 && (
+        <div className="planning-mobile-carte-meta">
+          <span>En cours : {personnesEnCours.join(", ")}</span>
+        </div>
+      )}
+      {avancement !== null && avancement !== undefined && (
+        <div className="progress-bar" style={{ marginTop: 6 }}>
+          <div className="progress-bar-fill" style={{ width: avancement + "%" }} />
+        </div>
+      )}
     </>
   );
   return onClick ? (
@@ -73,6 +85,8 @@ export function ConsolideMobile({ chantierBars, onCliquerChantier }) {
           debut={cb.debut}
           fin={cb.fin}
           heures={cb.heuresTotal}
+          avancement={cb.avancement}
+          personnesEnCours={cb.personnesEnCours}
           onClick={
             cb.cle !== "aaffecter" && onCliquerChantier ? () => onCliquerChantier(cb.cle) : undefined
           }
@@ -102,27 +116,84 @@ export function DetailleMobile({ parChantier, onCliquerTache }) {
   );
 }
 
-// Vue "Par personne" : groupé par personne, une carte par tâche (titre =
-// nom du chantier, comme sur le Gantt par personne).
-export function ParPersonneMobile({ groupes, nomChantier, onCliquerTache }) {
+// Regroupe les tâches (déjà d'une seule personne) par chantier, dans
+// l'ordre de leur première apparition — même logique que côté desktop.
+function grouperParChantier(taches, nomChantier) {
+  const map = new Map();
+  for (const t of taches) {
+    const cle = t.chantierId || "aaffecter";
+    if (!map.has(cle)) {
+      map.set(cle, { cle, nom: t.chantierId ? nomChantier(t.chantierId) : "À affecter", taches: [] });
+    }
+    map.get(cle).taches.push(t);
+  }
+  return [...map.values()];
+}
+
+// Vue "Par personne" : groupé par personne, puis par chantier (carte
+// dépliable, remplie selon l'avancement global du chantier) — taper la
+// carte déplie les tâches de la personne sur ce chantier.
+export function ParPersonneMobile({ groupes, nomChantier, avancementParChantier, onCliquerTache }) {
+  const [chantiersOuverts, setChantiersOuverts] = useState(() => new Set());
+
   if (groupes.length === 0) {
     return <p className="empty-state-description" style={{ margin: "8px 0" }}>Personne n'a de tâche datée ici.</p>;
   }
+
+  const basculer = (cle) => {
+    setChantiersOuverts((actuel) => {
+      const suivant = new Set(actuel);
+      if (suivant.has(cle)) suivant.delete(cle);
+      else suivant.add(cle);
+      return suivant;
+    });
+  };
+
   return (
     <div className="planning-mobile-liste">
-      {groupes.map((groupe) => (
-        <div key={groupe.nom} className="planning-mobile-groupe">
-          <div className="planning-mobile-groupe-titre">{groupe.nom}</div>
-          {groupe.taches.map((t, i) => (
-            <CarteTache
-              key={t.id + "-" + i}
-              titre={t.chantierId ? nomChantier(t.chantierId) : "À affecter"}
-              tache={t}
-              onClick={() => onCliquerTache(t)}
-            />
-          ))}
-        </div>
-      ))}
+      {groupes.map((groupe) => {
+        const sousGroupes = grouperParChantier(groupe.taches, nomChantier);
+        return (
+          <div key={groupe.nom} className="planning-mobile-groupe">
+            <div className="planning-mobile-groupe-titre">{groupe.nom}</div>
+            {sousGroupes.map((sg) => {
+              const cleUnique = groupe.nom + "||" + sg.cle;
+              const ouvert = chantiersOuverts.has(cleUnique);
+              const debut = sg.taches.reduce(
+                (min, t) => (t.dateDebut < min ? t.dateDebut : min),
+                sg.taches[0].dateDebut
+              );
+              const fin = sg.taches.reduce(
+                (max, t) => (t.echeance > max ? t.echeance : max),
+                sg.taches[0].echeance
+              );
+              const heures = sg.taches.reduce((s, t) => s + Number(t.heuresPrevues || 0), 0);
+              const avancement = avancementParChantier?.get(sg.cle) ?? null;
+              return (
+                <div key={cleUnique}>
+                  <CartePeriode
+                    nom={(ouvert ? "▾ " : "▸ ") + sg.nom}
+                    debut={debut}
+                    fin={fin}
+                    heures={heures}
+                    avancement={avancement}
+                    onClick={() => basculer(cleUnique)}
+                  />
+                  {ouvert &&
+                    sg.taches.map((t, i) => (
+                      <CarteTache
+                        key={t.id + "-" + i}
+                        titre={t.titre}
+                        tache={t}
+                        onClick={() => onCliquerTache(t)}
+                      />
+                    ))}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 }

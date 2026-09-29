@@ -8,7 +8,7 @@ import { normaliserAssignes } from "../lib/assignes";
 import { exporterMaterielAchats } from "../lib/exportMateriel";
 import ImportSuiviModal from "../components/ImportSuiviModal";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
-import { calculerAvancementChantier } from "../lib/avancement";
+import { calculerAvancementChantier, useSyncStatutEnCours } from "../lib/avancement";
 
 export default function Sites() {
   const { isAdmin, isChefDeProjet } = useAuth();
@@ -31,6 +31,10 @@ export default function Sites() {
   const [recherche, setRecherche] = useState("");
   const [filtreStatut, setFiltreStatut] = useState("actifs");
   const [tri, setTri] = useState({ colonne: "client", sens: 1 });
+
+  // Passe automatiquement un chantier "Actif" en "En cours" dès qu'une de
+  // ses tâches a démarré (voir lib/avancement.js).
+  useSyncStatutEnCours(chantiers, taches);
 
   const supprimer = async (id) => {
     if (
