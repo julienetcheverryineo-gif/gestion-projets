@@ -1179,13 +1179,29 @@ a {
   border-right: 1px solid rgba(255, 255, 255, 0.8);
   pointer-events: none;
 }
-/* Étiquette d'une barre du Gantt (heures, %, responsable...) affichée à
-   côté de la barre plutôt que dedans : texte toujours lisible sur le
-   fond de la page, quels que soient la couleur/le remplissage de la
-   barre et la longueur du texte — remplace l'ancien texte blanc dans la
-   barre (illisible dès qu'elle était courte, ou que le texte s'allongeait
-   avec le responsable). Utilisée pour les tâches comme pour les barres
-   "chantier" ci-dessous. */
+/* Étiquette DANS la barre d'une tâche (heures, %, responsable...) :
+   c'est le cas normal, tant que le texte tient dans la largeur de la
+   barre (voir estimerLargeurTexte dans lib/texte.js). Un ombrage léger
+   garde le texte lisible quelle que soit la couleur de la barre
+   (à faire/en cours/terminé) et par-dessus le remplissage d'avancement. */
+.gantt-barre-label-interne {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0 5px;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-ui);
+  pointer-events: none;
+}
+/* Étiquette affichée à côté de la barre plutôt que dedans : seulement
+   quand le texte est trop long pour tenir dans la barre (repli), pour
+   rester lisible plutôt que d'être coupé. Utilisée aussi pour les
+   barres "chantier" ci-dessous, qui restent toujours en dehors (leur
+   remplissage partiel rend le texte dedans peu lisible quelle que soit
+   la longueur). */
 .gantt-barre-label {
   position: absolute;
   top: 3px;

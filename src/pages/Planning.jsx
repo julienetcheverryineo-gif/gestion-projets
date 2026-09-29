@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { usePlanningData, joursEntre, libelleMois, arrondirHeures, PLAFOND_MENSUEL } from "../lib/usePlanningData";
 import { useEcranEtroit } from "../lib/useEcranEtroit";
 import { normaliserAssignes } from "../lib/assignes";
+import { estimerLargeurTexte } from "../lib/texte";
 import FiltreChantier from "../components/FiltreChantier";
 import TacheGanttModal from "../components/TacheGanttModal";
 import ChargeTable from "../components/ChargeTable";
@@ -455,11 +456,6 @@ function LigneTache({
       ? Math.max(0, Math.min(100, Number(t.avancement)))
       : null;
   const responsables = afficherResponsable ? normaliserAssignes(t.assigneA) : [];
-  // Le texte allait auparavant DANS la barre, sur un fond coloré avec un
-  // survol blanc translucide pour l'avancement : illisible dès que la
-  // barre est un peu courte ou que le texte s'allonge (ajouter le
-  // responsable l'a rendu encore pire). Même traitement que pour les
-  // barres de chantier : le texte sort à côté, sur le fond de la page.
   const label = [
     t.heuresPrevues ? t.heuresPrevues + " h" : null,
     avancement !== null ? avancement + "%" : null,
@@ -467,6 +463,10 @@ function LigneTache({
   ]
     .filter(Boolean)
     .join(" — ");
+  // Le texte reste DANS la barre (comme avant), en blanc, tant qu'il y
+  // tient ; il ne sort à côté (sur le fond de la page) que si la barre
+  // est trop courte pour l'accueillir sans être coupé.
+  const labelTientDedans = !label || estimerLargeurTexte(label) <= largeur - 10;
   return (
     <div className="gantt-ligne">
       <div className="gantt-ligne-titre" style={{ width: largeurTitre }} title={titre}>
@@ -498,8 +498,11 @@ function LigneTache({
           {avancement !== null && (
             <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
           )}
+          {label && labelTientDedans && (
+            <span className="gantt-barre-label-interne">{label}</span>
+          )}
         </button>
-        {label && (
+        {label && !labelTientDedans && (
           <span className="gantt-barre-label" style={{ left: left + largeur + 6 }}>
             {label}
           </span>
