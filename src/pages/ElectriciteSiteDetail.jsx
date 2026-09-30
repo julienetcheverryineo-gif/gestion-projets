@@ -16,10 +16,13 @@ import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectric
 const LARGEUR_NUMERO = 22;
 const LARGEUR_UNITE = 36;
 const LARGEUR_QTE = 68;
-// Légèrement resserrée (était 460) pour laisser plus de place aux colonnes
-// de type FO/MO sur les écrans de portable classiques (1366-1600px), où
-// le total des colonnes figées + fixes ne laissait quasiment aucune marge.
-const LARGEUR_DESIGNATION = 420;
+// Resserrée nettement (était 460, puis 420) : avec 8 colonnes fixes en
+// plus des 2 colonnes de type, le total dépassait encore la largeur
+// disponible sur un écran de portable classique (jusqu'à ~1536px de
+// large, voire plus selon la mise à l'échelle Windows), et provoquait un
+// ascenseur horizontal permanent quelle que soit la largeur des colonnes
+// de type. Texte complet toujours disponible en infobulle.
+const LARGEUR_DESIGNATION = 260;
 const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
 // Largeurs fixes des colonnes Matériel puis Main d'œuvre (dans l'ordre du
 // tableau), hors colonne de type FO/MO (menu déroulant) : celle-ci occupe
@@ -28,12 +31,14 @@ const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNIT
 // écran large plutôt que de laisser un vide à droite du tableau — avec un
 // plancher pour rester lisible (texte tronqué, complet en infobulle et
 // dans la liste déroulante) quand l'espace manque. Les colonnes % avanc.
-// (saisies) gardent 100px ; les autres (valeurs courtes, "18,0 €") sont
-// resserrées pour libérer de la place au profit des colonnes de type.
-const LARGEUR_MIN_TYPE_LIGNE = 48;
+// (saisies) gardent 90px ; les autres (valeurs courtes, "18,0 €") sont
+// resserrées au maximum pour libérer de la place au profit des colonnes
+// de type, l'objectif n°1 restant de ne jamais faire apparaître
+// d'ascenseur horizontal.
+const LARGEUR_MIN_TYPE_LIGNE = 40;
 const LARGEUR_MAX_TYPE_LIGNE = 260;
-const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 95, 105, 105];
-const LARGEURS_COLONNES_MO_FIXES = [100, 80, 95, 105];
+const LARGEURS_COLONNES_MATERIEL_FIXES = [90, 70, 80, 80];
+const LARGEURS_COLONNES_MO_FIXES = [90, 60, 70, 80];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
@@ -326,14 +331,23 @@ export default function ElectriciteSiteDetail() {
   );
   const largeurTableLignes =
     LARGEUR_ENTETE_FIGEE + SOMME_LARGEURS_FIXES_LIGNES + largeurTypeLigne * 2;
+  // Construites à partir des MÊMES constantes que SOMME_LARGEURS_FIXES_LIGNES
+  // ci-dessus (et non d'une liste écrite en dur séparément) : un
+  // décalage entre les deux avait fait tourner tout le calcul de largeur
+  // dans le vide — le <colgroup> utilisait encore d'anciennes largeurs
+  // plus généreuses que celles utilisées pour calculer l'espace
+  // disponible, donc le tableau rendu dépassait toujours la largeur
+  // annoncée par largeurTableLignes, d'où l'ascenseur qui persistait.
   const largeursColonnesMateriel = [
-    100,
-    110,
+    ...LARGEURS_COLONNES_MATERIEL_FIXES.slice(0, 2),
     largeurTypeLigne,
-    120,
-    120,
+    ...LARGEURS_COLONNES_MATERIEL_FIXES.slice(2),
   ];
-  const largeursColonnesMo = [100, 90, largeurTypeLigne, 110, 120];
+  const largeursColonnesMo = [
+    ...LARGEURS_COLONNES_MO_FIXES.slice(0, 2),
+    largeurTypeLigne,
+    ...LARGEURS_COLONNES_MO_FIXES.slice(2),
+  ];
 
   const { documents: chantiers } = useCollection("sites");
   const chantier = chantiers.find((c) => c.id === chantierId);
@@ -713,34 +727,40 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-etroite" style={{ width: LARGEUR_QTE }}>
                         Qté
                       </th>
-                      <th className="elec-col-materiel elec-col-saisie" style={{ width: 100 }}>
+                      <th
+                        className="elec-col-materiel elec-col-saisie"
+                        style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[0] }}
+                      >
                         % avanc. FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 95 }}>
+                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[1] }}>
                         Coût unit.
                       </th>
                       <th className="elec-col-materiel" style={{ width: largeurTypeLigne }}>
                         FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 105 }}>
+                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[2] }}>
                         Coût total FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 105 }}>
+                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[3] }}>
                         Matériel avanc.
                       </th>
-                      <th className="elec-col-mo elec-col-saisie" style={{ width: 100 }}>
+                      <th
+                        className="elec-col-mo elec-col-saisie"
+                        style={{ width: LARGEURS_COLONNES_MO_FIXES[0] }}
+                      >
                         % avanc. MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: 80 }}>
+                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[1] }}>
                         Temps unit.
                       </th>
                       <th className="elec-col-mo" style={{ width: largeurTypeLigne }}>
                         MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: 95 }}>
+                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[2] }}>
                         Temps total
                       </th>
-                      <th className="elec-col-mo" style={{ width: 105 }}>
+                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[3] }}>
                         Heure avanc.
                       </th>
                     </tr>
