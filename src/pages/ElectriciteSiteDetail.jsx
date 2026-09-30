@@ -18,14 +18,17 @@ const LARGEUR_UNITE = 36;
 const LARGEUR_QTE = 68;
 const LARGEUR_DESIGNATION = 460;
 const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
-// Largeurs des colonnes Matériel puis Main d'œuvre (dans l'ordre du tableau).
-// Les colonnes de type FO/MO (menu déroulant) sont volontairement étroites
-// — texte tronqué, complet dans la liste déroulante et en infobulle — pour
-// que le tableau tienne sur un écran large sans ascenseur horizontal.
-const LARGEUR_TYPE_FO = 56;
-const LARGEUR_TYPE_MO = 56;
-const LARGEURS_COLONNES_MATERIEL = [100, 110, LARGEUR_TYPE_FO, 120, 120];
-const LARGEURS_COLONNES_MO = [100, 90, LARGEUR_TYPE_MO, 110, 120];
+// Largeurs fixes des colonnes Matériel puis Main d'œuvre (dans l'ordre du
+// tableau), hors colonne de type FO/MO (menu déroulant) : celle-ci occupe
+// tout l'espace qui reste disponible sur la page (voir largeurTypeLigne
+// dans le composant), pour profiter du repli du menu latéral ou d'un
+// écran large plutôt que de laisser un vide à droite du tableau — avec un
+// plancher pour rester lisible (texte tronqué, complet en infobulle et
+// dans la liste déroulante) quand l'espace manque.
+const LARGEUR_MIN_TYPE_LIGNE = 56;
+const LARGEUR_MAX_TYPE_LIGNE = 220;
+const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 110, 120, 120];
+const LARGEURS_COLONNES_MO_FIXES = [100, 90, 110, 120];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
@@ -37,11 +40,11 @@ const LARGEURS_COLONNES_MO = [100, 90, LARGEUR_TYPE_MO, 110, 120];
 // se comprime pour tenir dans son conteneur dès qu'il est plus étroit
 // que la somme des colonnes (au lieu de garder ses largeurs et de
 // déclencher le défilement horizontal du wrapper) : on fixe donc aussi
-// une largeur explicite sur la table, égale à cette somme.
-const LARGEUR_TABLE_LIGNES =
-  LARGEUR_ENTETE_FIGEE +
-  LARGEURS_COLONNES_MATERIEL.reduce((a, b) => a + b, 0) +
-  LARGEURS_COLONNES_MO.reduce((a, b) => a + b, 0);
+// une largeur explicite sur la table, égale à cette somme (calculée dans
+// le composant, où la largeur des colonnes de type est connue).
+const SOMME_LARGEURS_FIXES_LIGNES =
+  LARGEURS_COLONNES_MATERIEL_FIXES.reduce((a, b) => a + b, 0) +
+  LARGEURS_COLONNES_MO_FIXES.reduce((a, b) => a + b, 0);
 
 // Largeur des colonnes fixes du tableau Récap (tout sauf Type de FO, qui
 // reçoit le même traitement que Désignation ci-dessus).
@@ -262,11 +265,12 @@ export default function ElectriciteSiteDetail() {
   const { isAdmin, profile } = useAuth();
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
 
-  // Largeur réelle de la page, mesurée en continu (redimensionnement de
-  // la fenêtre, repli du menu latéral...) : Type de FO, dans les tableaux
-  // Récap / synthèse uniquement, s'en sert pour occuper tout l'espace
-  // disponible plutôt que de laisser un vide à droite. Le tableau des
-  // lignes de devis, lui, garde une largeur de Désignation fixe.
+  // Largeur réelle de la page, mesurée en continu (redimensionnement de la
+  // fenêtre, repli du menu latéral...) : la colonne Type de FO des
+  // tableaux Récap / synthèse, et les colonnes Type de FO/MO du tableau
+  // des lignes de devis, s'en servent pour occuper tout l'espace
+  // disponible plutôt que de laisser un vide à droite (avec un plancher
+  // pour rester lisibles). Désignation, elle, garde une largeur fixe.
   const pageRef = useRef(null);
   const [largeurPage, setLargeurPage] = useState(1200);
   useEffect(() => {
@@ -285,6 +289,26 @@ export default function ElectriciteSiteDetail() {
     LARGEUR_MIN_COL_TYPE,
     largeurPage - 40 - SOMME_LARGEURS_RECAP_FIXES
   );
+  // Le tableau des lignes de devis est dans un .data-table-wrapper (16px
+  // de padding de chaque côté) ; les deux colonnes de type (FO, MO) se
+  // partagent l'espace restant à parts égales.
+  const largeurTypeLigne = Math.min(
+    LARGEUR_MAX_TYPE_LIGNE,
+    Math.max(
+      LARGEUR_MIN_TYPE_LIGNE,
+      (largeurPage - 32 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
+    )
+  );
+  const largeurTableLignes =
+    LARGEUR_ENTETE_FIGEE + SOMME_LARGEURS_FIXES_LIGNES + largeurTypeLigne * 2;
+  const largeursColonnesMateriel = [
+    100,
+    110,
+    largeurTypeLigne,
+    120,
+    120,
+  ];
+  const largeursColonnesMo = [100, 90, largeurTypeLigne, 110, 120];
 
   const { documents: chantiers } = useCollection("sites");
   const chantier = chantiers.find((c) => c.id === chantierId);
@@ -500,13 +524,13 @@ export default function ElectriciteSiteDetail() {
               className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
               onClick={() => setRecapActif(recapActif === "fo" ? null : "fo")}
             >
-              📊 Récap FO
+              🗄️ Bilan Fournitures
             </button>
             <button
               className={recapActif === "mo" ? "btn-primary" : "btn-ghost"}
               onClick={() => setRecapActif(recapActif === "mo" ? null : "mo")}
             >
-              📊 Récap MO
+              👷 Bilan Main d'œuvre
             </button>
           </div>
 
@@ -613,16 +637,16 @@ export default function ElectriciteSiteDetail() {
               </div>
 
               <div className="data-table-wrapper elec-lignes-wrapper">
-                <table className="data-table elec-lignes-table" style={{ width: LARGEUR_TABLE_LIGNES }}>
+                <table className="data-table elec-lignes-table" style={{ width: largeurTableLignes }}>
                   <colgroup>
                     <col style={{ width: LARGEUR_NUMERO }} />
                     <col style={{ width: LARGEUR_DESIGNATION }} />
                     <col style={{ width: LARGEUR_UNITE }} />
                     <col style={{ width: LARGEUR_QTE }} />
-                    {LARGEURS_COLONNES_MATERIEL.map((l, i) => (
+                    {largeursColonnesMateriel.map((l, i) => (
                       <col key={"mat-" + i} style={{ width: l }} />
                     ))}
-                    {LARGEURS_COLONNES_MO.map((l, i) => (
+                    {largeursColonnesMo.map((l, i) => (
                       <col key={"mo-" + i} style={{ width: l }} />
                     ))}
                   </colgroup>
@@ -668,7 +692,7 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-materiel" style={{ width: 110 }}>
                         Coût unit.
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 220 }}>
+                      <th className="elec-col-materiel" style={{ width: largeurTypeLigne }}>
                         FO
                       </th>
                       <th className="elec-col-materiel" style={{ width: 120 }}>
@@ -683,7 +707,7 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-mo" style={{ width: 90 }}>
                         Temps unit.
                       </th>
-                      <th className="elec-col-mo" style={{ width: 220 }}>
+                      <th className="elec-col-mo" style={{ width: largeurTypeLigne }}>
                         MO
                       </th>
                       <th className="elec-col-mo" style={{ width: 110 }}>
