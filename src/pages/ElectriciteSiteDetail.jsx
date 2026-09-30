@@ -13,7 +13,15 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 // Référence n'est pas affichée — elle ne sert pas sur ce projet — mais
 // reste importée et stockée, affichée en infobulle sur la désignation.)
 const LARGEUR_NUMERO = 20;
-const LARGEUR_DESIGNATION = 320;
+const LARGEUR_DESIGNATION = 420;
+const LARGEUR_UNITE = 60;
+const LARGEUR_QTE = 55;
+// Avec table-layout:fixed, les largeurs de colonnes sont fixées par la
+// PREMIÈRE ligne d'en-tête : la cellule fusionnée (N°+Désignation+Unité+Qté)
+// doit donc porter la somme des 4 largeurs, pas seulement N°+Désignation —
+// sinon le navigateur répartit sa largeur (trop petite) sur les 4 colonnes
+// et écrase la Désignation.
+const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
 
 // "4  [Automatisme & Contrôle]" → "4 · Automatisme & Contrôle" : le numéro
 // ET le type, comme dans le devis, affichés en tout petit (voir
@@ -214,7 +222,7 @@ export default function ElectriciteSiteDetail() {
                       <th
                         colSpan={4}
                         className="elec-th-figee"
-                        style={{ left: 0, width: LARGEUR_NUMERO + LARGEUR_DESIGNATION }}
+                        style={{ left: 0, width: LARGEUR_ENTETE_FIGEE }}
                       />
                       <th colSpan={5} className="elec-groupe elec-groupe-materiel">
                         Matériel
@@ -233,8 +241,8 @@ export default function ElectriciteSiteDetail() {
                       >
                         Désignation
                       </th>
-                      <th style={{ width: 60 }}>Unité</th>
-                      <th style={{ width: 55 }}>Qté</th>
+                      <th style={{ width: LARGEUR_UNITE }}>Unité</th>
+                      <th style={{ width: LARGEUR_QTE }}>Qté</th>
                       <th className="elec-col-materiel elec-col-saisie" style={{ width: 90 }}>
                         % avanc. FO
                       </th>
