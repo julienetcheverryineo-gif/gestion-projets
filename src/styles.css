@@ -587,15 +587,15 @@ table.table-recap {
   table-layout: fixed;
 }
 .table-recap .col-type {
-  width: 280px;
+  width: 420px;
 }
 .table-recap .col-num {
-  width: 140px;
+  width: 170px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .table-recap .col-avancement {
-  width: 190px;
+  width: 240px;
 }
 .table-recap th,
 .table-recap td {
@@ -1621,8 +1621,25 @@ th.charge-table-col-personne {
   margin-bottom: 16px;
 }
 .chantier-actions-bar-recap {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+}
+
+/* Barre d'onglets du chantier Électricité (récap + devis) : boutons et
+   espacements resserrés — ce n'est qu'une navigation secondaire, elle ne
+   doit pas prendre plus de place que les tableaux qu'elle commande. */
+.elec-toolbar {
+  margin-bottom: 8px;
+}
+.elec-toolbar .chantier-actions-bar {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.elec-toolbar .btn-primary,
+.elec-toolbar .btn-ghost,
+.elec-toolbar .btn-accent {
+  padding: 5px 11px;
+  font-size: 0.8rem;
 }
 
 .tache-heures-input {

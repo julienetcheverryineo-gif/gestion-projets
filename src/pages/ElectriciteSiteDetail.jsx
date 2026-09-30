@@ -304,6 +304,7 @@ export default function ElectriciteSiteDetail() {
         </div>
       ) : (
         <>
+        <div className="elec-toolbar">
           {/* Toujours au même endroit, au-dessus des onglets devis (qui
               peuvent être nombreux et passer à la ligne) : les deux
               récapitulatifs restent faciles à retrouver. */}
@@ -312,13 +313,13 @@ export default function ElectriciteSiteDetail() {
               className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
               onClick={() => setRecapActif(recapActif === "fo" ? null : "fo")}
             >
-              📊 Récap Avancement FO
+              📊 Récap FO
             </button>
             <button
               className={recapActif === "mo" ? "btn-primary" : "btn-ghost"}
               onClick={() => setRecapActif(recapActif === "mo" ? null : "mo")}
             >
-              📊 Récap Avancement MO
+              📊 Récap MO
             </button>
           </div>
 
@@ -338,6 +339,7 @@ export default function ElectriciteSiteDetail() {
               </button>
             ))}
           </div>
+        </div>
 
           {recapActif && (
             <>
@@ -449,34 +451,34 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-etroite" style={{ width: LARGEUR_QTE }}>
                         Qté
                       </th>
-                      <th className="elec-col-materiel elec-col-saisie" style={{ width: 90 }}>
+                      <th className="elec-col-materiel elec-col-saisie" style={{ width: 100 }}>
                         % avanc. FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 90 }}>
+                      <th className="elec-col-materiel" style={{ width: 110 }}>
                         Coût unit.
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 130 }}>
+                      <th className="elec-col-materiel" style={{ width: 220 }}>
                         FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 100 }}>
+                      <th className="elec-col-materiel" style={{ width: 120 }}>
                         Coût total FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 100 }}>
+                      <th className="elec-col-materiel" style={{ width: 120 }}>
                         Matériel avanc.
                       </th>
-                      <th className="elec-col-mo elec-col-saisie" style={{ width: 90 }}>
+                      <th className="elec-col-mo elec-col-saisie" style={{ width: 100 }}>
                         % avanc. MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: 80 }}>
+                      <th className="elec-col-mo" style={{ width: 90 }}>
                         Temps unit.
                       </th>
-                      <th className="elec-col-mo" style={{ width: 130 }}>
+                      <th className="elec-col-mo" style={{ width: 220 }}>
                         MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: 90 }}>
+                      <th className="elec-col-mo" style={{ width: 110 }}>
                         Temps total
                       </th>
-                      <th className="elec-col-mo" style={{ width: 100 }}>
+                      <th className="elec-col-mo" style={{ width: 120 }}>
                         Heure avanc.
                       </th>
                     </tr>
