@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import logoIneo from "../assets/logo-ineo.png";
 
 export default function Login() {
-  const { user, login, compteDesactive } = useAuth();
+  const { user, profile, login, compteDesactive } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,9 +17,15 @@ export default function Login() {
   // ProtectedRoute nous aurait renvoyés direct vers /connexion — obligeant
   // à se reconnecter une seconde fois pour que ça "prenne". On navigue
   // plutôt dès que le contexte confirme que l'utilisateur est authentifié.
+  // Le RA Électricité arrive directement dans l'espace Électricité ; les
+  // autres profils sur le tableau de bord Automatisme & GTB comme avant.
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user, navigate]);
+    if (user) {
+      navigate(profile?.role === "ra_electricite" ? "/electricite" : "/", {
+        replace: true,
+      });
+    }
+  }, [user, profile, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,7 +47,7 @@ export default function Login() {
           <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
         </div>
         <h1>Pilotage de projets</h1>
-        <p className="login-subtitle">Automatisme &amp; GTB</p>
+        <p className="login-subtitle">Électricité, Automatisme &amp; GTB</p>
 
         <form onSubmit={handleSubmit} className="login-form">
           <label>

@@ -16,7 +16,10 @@ import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectric
 const LARGEUR_NUMERO = 22;
 const LARGEUR_UNITE = 36;
 const LARGEUR_QTE = 68;
-const LARGEUR_DESIGNATION = 460;
+// Légèrement resserrée (était 460) pour laisser plus de place aux colonnes
+// de type FO/MO sur les écrans de portable classiques (1366-1600px), où
+// le total des colonnes figées + fixes ne laissait quasiment aucune marge.
+const LARGEUR_DESIGNATION = 420;
 const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
 // Largeurs fixes des colonnes Matériel puis Main d'œuvre (dans l'ordre du
 // tableau), hors colonne de type FO/MO (menu déroulant) : celle-ci occupe
@@ -24,11 +27,12 @@ const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNIT
 // dans le composant), pour profiter du repli du menu latéral ou d'un
 // écran large plutôt que de laisser un vide à droite du tableau — avec un
 // plancher pour rester lisible (texte tronqué, complet en infobulle et
-// dans la liste déroulante) quand l'espace manque.
-const LARGEUR_MIN_TYPE_LIGNE = 56;
-const LARGEUR_MAX_TYPE_LIGNE = 220;
-const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 110, 120, 120];
-const LARGEURS_COLONNES_MO_FIXES = [100, 90, 110, 120];
+// dans la liste déroulante) quand l'espace manque. Les colonnes % avanc.
+// (saisies) gardent 100px ; les autres (valeurs courtes, "18,0 €") sont
+// resserrées pour libérer de la place au profit des colonnes de type.
+const LARGEUR_MIN_TYPE_LIGNE = 48;
+const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 95, 105, 105];
+const LARGEURS_COLONNES_MO_FIXES = [100, 80, 95, 105];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
@@ -291,13 +295,14 @@ export default function ElectriciteSiteDetail() {
   );
   // Le tableau des lignes de devis est dans un .data-table-wrapper (16px
   // de padding de chaque côté) ; les deux colonnes de type (FO, MO) se
-  // partagent l'espace restant à parts égales.
-  const largeurTypeLigne = Math.min(
-    LARGEUR_MAX_TYPE_LIGNE,
-    Math.max(
-      LARGEUR_MIN_TYPE_LIGNE,
-      (largeurPage - 32 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
-    )
+  // partagent l'espace restant à parts égales, sans plafond : plus on
+  // libère de place (menu latéral réduit, écran large), plus elles
+  // s'agrandissent pour rester lisibles — la largeur totale du tableau
+  // (largeurTableLignes, juste en dessous) suit toujours exactement
+  // l'espace mesuré, donc ça ne fait jamais apparaître d'ascenseur.
+  const largeurTypeLigne = Math.max(
+    LARGEUR_MIN_TYPE_LIGNE,
+    (largeurPage - 32 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
   );
   const largeurTableLignes =
     LARGEUR_ENTETE_FIGEE + SOMME_LARGEURS_FIXES_LIGNES + largeurTypeLigne * 2;
@@ -325,7 +330,9 @@ export default function ElectriciteSiteDetail() {
 
   // "fo" / "mo" : un récapitulatif chantier (tous devis + détail par
   // devis) est affiché à la place du devis ouvert. null = vue normale.
-  const [recapActif, setRecapActif] = useState(null);
+  // Par défaut "fo" : à l'ouverture d'un chantier, on arrive directement
+  // sur la synthèse Fournitures plutôt que sur un devis.
+  const [recapActif, setRecapActif] = useState("fo");
 
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
@@ -524,7 +531,7 @@ export default function ElectriciteSiteDetail() {
               className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
               onClick={() => setRecapActif(recapActif === "fo" ? null : "fo")}
             >
-              🗄️ Bilan Fournitures
+              📦 Bilan Fournitures
             </button>
             <button
               className={recapActif === "mo" ? "btn-primary" : "btn-ghost"}
@@ -689,31 +696,31 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-materiel elec-col-saisie" style={{ width: 100 }}>
                         % avanc. FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 110 }}>
+                      <th className="elec-col-materiel" style={{ width: 95 }}>
                         Coût unit.
                       </th>
                       <th className="elec-col-materiel" style={{ width: largeurTypeLigne }}>
                         FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 120 }}>
+                      <th className="elec-col-materiel" style={{ width: 105 }}>
                         Coût total FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 120 }}>
+                      <th className="elec-col-materiel" style={{ width: 105 }}>
                         Matériel avanc.
                       </th>
                       <th className="elec-col-mo elec-col-saisie" style={{ width: 100 }}>
                         % avanc. MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: 90 }}>
+                      <th className="elec-col-mo" style={{ width: 80 }}>
                         Temps unit.
                       </th>
                       <th className="elec-col-mo" style={{ width: largeurTypeLigne }}>
                         MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: 110 }}>
+                      <th className="elec-col-mo" style={{ width: 95 }}>
                         Temps total
                       </th>
-                      <th className="elec-col-mo" style={{ width: 120 }}>
+                      <th className="elec-col-mo" style={{ width: 105 }}>
                         Heure avanc.
                       </th>
                     </tr>
