@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
+import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 
 // Largeurs des 2 colonnes d'identification figées (gel de volets, comme
 // dans Excel) : n°, Désignation restent visibles quand on défile vers
@@ -14,7 +15,7 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 // reste importée et stockée, affichée en infobulle sur la désignation.)
 const LARGEUR_NUMERO = 22;
 const LARGEUR_UNITE = 36;
-const LARGEUR_QTE = 40;
+const LARGEUR_QTE = 68;
 const LARGEUR_DESIGNATION = 460;
 const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
 // Largeurs des colonnes Matériel puis Main d'œuvre (dans l'ordre du tableau).
@@ -308,6 +309,46 @@ export default function ElectriciteSiteDetail() {
   const changerAvancement = async (ligne, champ, valeur) => {
     const v = Math.max(0, Math.min(100, Number(valeur) || 0));
     await updateDoc(doc(db, "elecLignes", ligne.id), { [champ]: v });
+  };
+
+  // Change le type de FO ou de MO d'une ligne (menu déroulant).
+  const changerType = async (ligne, champ, valeur) => {
+    await updateDoc(doc(db, "elecLignes", ligne.id), { [champ]: valeur });
+  };
+
+  // Arrondi à 2 décimales (quantités, coûts, temps) — évite d'accumuler
+  // des décimales flottantes à chaque recalcul en chaîne.
+  const arrondi2 = (n) => Math.round((n || 0) * 100) / 100;
+
+  // Qté, PU et PT (coût ou temps) sont liés : Qté × PU = PT. Modifier l'un
+  // des trois recalcule automatiquement les deux autres pour les garder
+  // cohérents, aussi bien côté Matériel (coûts) que côté Main d'œuvre
+  // (temps) — la quantité est commune aux deux.
+  const modifierValeurLigne = async (ligne, champ, valeurBrute) => {
+    const valeur = Math.max(0, Number(String(valeurBrute).replace(",", ".")) || 0);
+    const maj = {};
+    if (champ === "quantite") {
+      maj.quantite = valeur;
+      maj.coutTotalFo = arrondi2(valeur * (ligne.coutUnitaireFo || 0));
+      maj.tempsTotalHeures = arrondi2(valeur * (ligne.tempsUnitaire || 0));
+    } else if (champ === "coutUnitaireFo") {
+      const q = ligne.quantite || 0;
+      maj.coutUnitaireFo = valeur;
+      maj.coutTotalFo = arrondi2(q * valeur);
+    } else if (champ === "coutTotalFo") {
+      const q = ligne.quantite || 0;
+      maj.coutTotalFo = valeur;
+      maj.coutUnitaireFo = q > 0 ? arrondi2(valeur / q) : ligne.coutUnitaireFo || 0;
+    } else if (champ === "tempsUnitaire") {
+      const q = ligne.quantite || 0;
+      maj.tempsUnitaire = valeur;
+      maj.tempsTotalHeures = arrondi2(q * valeur);
+    } else if (champ === "tempsTotalHeures") {
+      const q = ligne.quantite || 0;
+      maj.tempsTotalHeures = valeur;
+      maj.tempsUnitaire = q > 0 ? arrondi2(valeur / q) : ligne.tempsUnitaire || 0;
+    }
+    await updateDoc(doc(db, "elecLignes", ligne.id), maj);
   };
 
   const supprimerDevis = async (d) => {
@@ -685,7 +726,20 @@ export default function ElectriciteSiteDetail() {
                           </td>
                           <td className="elec-col-etroite">{l.unite || "—"}</td>
                           <td className="elec-col-etroite">
-                            {l.quantite ? formatNombre(l.quantite) : "—"}
+                            <div className="elec-valeur-input">
+                              <input
+                                key={l.quantite}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                defaultValue={l.quantite || 0}
+                                disabled={!peutGerer}
+                                onBlur={(e) => modifierValeurLigne(l, "quantite", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                }}
+                              />
+                            </div>
                           </td>
                           <td className="elec-col-materiel elec-col-saisie">
                             {l.informative ? (
@@ -709,13 +763,57 @@ export default function ElectriciteSiteDetail() {
                             )}
                           </td>
                           <td className="elec-col-materiel">
-                            {l.coutUnitaireFo ? formatNombre(l.coutUnitaireFo) + " €" : "—"}
+                            <div className="elec-valeur-input">
+                              <input
+                                key={l.coutUnitaireFo}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                defaultValue={l.coutUnitaireFo || 0}
+                                disabled={!peutGerer}
+                                onBlur={(e) => modifierValeurLigne(l, "coutUnitaireFo", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                }}
+                              />
+                              <span>€</span>
+                            </div>
                           </td>
-                          <td className="elec-col-materiel elec-type-code" title={l.typeFo}>
-                            {formatTypeFo(l.typeFo)}
+                          <td className="elec-col-materiel elec-type-code">
+                            <select
+                              className="elec-type-select"
+                              value={l.typeFo || ""}
+                              disabled={!peutGerer}
+                              onChange={(e) => changerType(l, "typeFo", e.target.value)}
+                            >
+                              <option value="">—</option>
+                              {l.typeFo &&
+                                !LISTE_TYPES_FO.some(
+                                  (o) => valeurType(o.code, o.label) === l.typeFo
+                                ) && <option value={l.typeFo}>{formatTypeFo(l.typeFo)}</option>}
+                              {LISTE_TYPES_FO.map((o) => (
+                                <option key={o.code} value={valeurType(o.code, o.label)}>
+                                  {o.code} · {o.label}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="elec-col-materiel">
-                            {l.coutTotalFo ? formatNombre(l.coutTotalFo) + " €" : "—"}
+                            <div className="elec-valeur-input">
+                              <input
+                                key={l.coutTotalFo}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                defaultValue={l.coutTotalFo || 0}
+                                disabled={!peutGerer}
+                                onBlur={(e) => modifierValeurLigne(l, "coutTotalFo", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                }}
+                              />
+                              <span>€</span>
+                            </div>
                           </td>
                           <td className="elec-col-materiel">
                             {l.coutTotalFo ? formatNombre((l.coutTotalFo * pctFo) / 100) + " €" : "—"}
@@ -742,13 +840,57 @@ export default function ElectriciteSiteDetail() {
                             )}
                           </td>
                           <td className="elec-col-mo">
-                            {l.tempsUnitaire ? formatNombre(l.tempsUnitaire) + " h" : "—"}
+                            <div className="elec-valeur-input">
+                              <input
+                                key={l.tempsUnitaire}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                defaultValue={l.tempsUnitaire || 0}
+                                disabled={!peutGerer}
+                                onBlur={(e) => modifierValeurLigne(l, "tempsUnitaire", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                }}
+                              />
+                              <span>h</span>
+                            </div>
                           </td>
-                          <td className="elec-col-mo elec-type-code" title={l.typeMo}>
-                            {formatTypeFo(l.typeMo)}
+                          <td className="elec-col-mo elec-type-code">
+                            <select
+                              className="elec-type-select"
+                              value={l.typeMo || ""}
+                              disabled={!peutGerer}
+                              onChange={(e) => changerType(l, "typeMo", e.target.value)}
+                            >
+                              <option value="">—</option>
+                              {l.typeMo &&
+                                !LISTE_TYPES_MO.some(
+                                  (o) => valeurType(o.code, o.label) === l.typeMo
+                                ) && <option value={l.typeMo}>{formatTypeFo(l.typeMo)}</option>}
+                              {LISTE_TYPES_MO.map((o) => (
+                                <option key={o.code} value={valeurType(o.code, o.label)}>
+                                  {o.code} · {o.label}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="elec-col-mo">
-                            {l.tempsTotalHeures ? formatNombre(l.tempsTotalHeures) + " h" : "—"}
+                            <div className="elec-valeur-input">
+                              <input
+                                key={l.tempsTotalHeures}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                defaultValue={l.tempsTotalHeures || 0}
+                                disabled={!peutGerer}
+                                onBlur={(e) => modifierValeurLigne(l, "tempsTotalHeures", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                }}
+                              />
+                              <span>h</span>
+                            </div>
                           </td>
                           <td className="elec-col-mo">
                             {l.tempsTotalHeures

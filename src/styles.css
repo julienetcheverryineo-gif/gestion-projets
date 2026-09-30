@@ -333,6 +333,21 @@ a {
   color: var(--text);
   border-color: var(--text-muted);
 }
+.btn-ghost:disabled {
+  cursor: default;
+}
+
+/* Bouton de bascule Automatisme/Électricité correspondant à l'espace
+   actuellement affiché : mis en surbrillance plutôt que simplement grisé
+   par l'attribut disabled. */
+.btn-espace-actif,
+.btn-espace-actif:disabled {
+  background: var(--accent-dim);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  opacity: 1;
+  font-weight: 600;
+}
 
 .btn-danger {
   color: var(--danger);
@@ -776,6 +791,60 @@ th.elec-col-mo {
 }
 .elec-avancement-fait {
   border-left-color: var(--ok);
+}
+
+/* Qté, PU, PT (coût matériel ou temps MO) : mêmes cases de saisie que les
+   % avancement, sans code couleur puisqu'il n'y a pas de notion
+   d'avancement ici. */
+.elec-valeur-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  background: var(--panel);
+}
+.elec-valeur-input input {
+  width: 52px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  padding: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.elec-valeur-input input::-webkit-outer-spin-button,
+.elec-valeur-input input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+.elec-valeur-input span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+/* Menu déroulant du type de FO/MO : même gabarit discret que l'ancien
+   texte (.elec-type-code hérite déjà de la petite taille de police). */
+.elec-type-select {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.elec-type-select:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--panel);
+}
+.elec-type-select:disabled {
+  cursor: default;
+  opacity: 1;
+  -webkit-text-fill-color: currentColor;
 }
 
 .elec-col-etroite {

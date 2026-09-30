@@ -149,14 +149,6 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
-          <button
-            className="btn-ghost btn-refresh sidebar-refresh"
-            onClick={actualiserSansCache}
-            aria-label="Actualiser"
-            title="Actualiser"
-          >
-            {reduite ? "⟳" : "⟳ Actualiser"}
-          </button>
           {!reduite && (
             <div className="user-chip">
               <span className="user-role-dot" data-role={profile?.role} />
@@ -168,17 +160,17 @@ export default function Layout() {
           )}
           {peutBasculerEspaces && (
             <button
-              className="btn-ghost"
+              className={"btn-ghost" + (!enEspaceElectricite ? " btn-espace-actif" : "")}
               onClick={() => navigate("/")}
               disabled={!enEspaceElectricite}
               title="Basculer vers l'espace Automatisme & GTB"
             >
-              {reduite ? "🏗️" : "🏗️ Automatisme & GTB"}
+              {reduite ? "💻" : "💻 Automatisme & GTB"}
             </button>
           )}
           {peutBasculerEspaces && (
             <button
-              className="btn-ghost"
+              className={"btn-ghost" + (enEspaceElectricite ? " btn-espace-actif" : "")}
               onClick={() => navigate("/electricite")}
               disabled={enEspaceElectricite}
               title="Basculer vers l'espace Électricité"
@@ -186,6 +178,14 @@ export default function Layout() {
               {reduite ? "⚡" : "⚡ Électricité"}
             </button>
           )}
+          <button
+            className="btn-ghost btn-refresh sidebar-refresh"
+            onClick={actualiserSansCache}
+            aria-label="Actualiser"
+            title="Actualiser"
+          >
+            {reduite ? "⟳" : "⟳ Actualiser"}
+          </button>
           <button className="btn-ghost" onClick={handleLogout} title="Se déconnecter">
             {reduite ? "⏻" : "Se déconnecter"}
           </button>
