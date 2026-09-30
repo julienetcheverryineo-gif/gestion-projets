@@ -12,19 +12,26 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 // les colonnes Matériel / Main d'œuvre, très nombreuses. (La colonne
 // Référence n'est pas affichée — elle ne sert pas sur ce projet — mais
 // reste importée et stockée, affichée en infobulle sur la désignation.)
-const LARGEUR_NUMERO = 30;
-const LARGEUR_DESIGNATION = 260;
+const LARGEUR_NUMERO = 20;
+const LARGEUR_DESIGNATION = 320;
 
-// "4  [Automatisme & Contrôle]" → "4" : seul le numéro de type de FO/MO
-// du devis est affiché, en tout petit (voir .elec-type-code).
+// "4  [Automatisme & Contrôle]" → "4 · Automatisme & Contrôle" : le numéro
+// ET le type, comme dans le devis, affichés en tout petit (voir
+// .elec-type-code).
 function formatTypeFo(texte) {
   if (!texte) return "—";
-  const m = texte.match(/^\s*(\d+)/);
-  return m ? m[1] : texte;
+  const m = texte.match(/^\s*(\d+)\s*\[?\s*([^\]]*?)\s*\]?\s*$/);
+  if (!m) return texte.trim();
+  const [, numero, label] = m;
+  return label ? numero + " · " + label : numero;
 }
 
+// Arrondi à 1 chiffre après la virgule, jamais plus.
 function formatNombre(n) {
-  return Math.round(n).toLocaleString("fr-FR");
+  return (Math.round((n || 0) * 10) / 10).toLocaleString("fr-FR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 }
 
 function classeAvancement(pct) {
@@ -59,9 +66,9 @@ export default function ElectriciteSiteDetail() {
     .filter((l) => devisOuvert && l.devisId === devisOuvert.id)
     .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
 
-  const changerAvancement = async (ligne, valeur) => {
+  const changerAvancement = async (ligne, champ, valeur) => {
     const v = Math.max(0, Math.min(100, Number(valeur) || 0));
-    await updateDoc(doc(db, "elecLignes", ligne.id), { avancement: v });
+    await updateDoc(doc(db, "elecLignes", ligne.id), { [champ]: v });
   };
 
   const supprimerDevis = async (d) => {
@@ -85,11 +92,12 @@ export default function ElectriciteSiteDetail() {
     .filter((l) => !l.estPoste)
     .reduce(
       (acc, l) => {
-        const pct = (l.avancement || 0) / 100;
+        const pctFo = (l.avancementFo ?? l.avancement ?? 0) / 100;
+        const pctMo = (l.avancementMo ?? l.avancement ?? 0) / 100;
         acc.budgetMateriel += l.coutTotalFo || 0;
-        acc.realiseMateriel += (l.coutTotalFo || 0) * pct;
+        acc.realiseMateriel += (l.coutTotalFo || 0) * pctFo;
         acc.heuresPrevues += l.tempsTotalHeures || 0;
-        acc.heuresRealisees += (l.tempsTotalHeures || 0) * pct;
+        acc.heuresRealisees += (l.tempsTotalHeures || 0) * pctMo;
         return acc;
       },
       { budgetMateriel: 0, realiseMateriel: 0, heuresPrevues: 0, heuresRealisees: 0 }
@@ -176,8 +184,7 @@ export default function ElectriciteSiteDetail() {
                       />
                     </div>
                     <div className="simple-list-meta" style={{ marginTop: 4 }}>
-                      {Math.round(synthese.realiseMateriel).toLocaleString("fr-FR")} € /{" "}
-                      {Math.round(synthese.budgetMateriel).toLocaleString("fr-FR")} €
+                      {formatNombre(synthese.realiseMateriel)} € / {formatNombre(synthese.budgetMateriel)} €
                     </div>
                   </div>
                   <div>
@@ -194,7 +201,7 @@ export default function ElectriciteSiteDetail() {
                       />
                     </div>
                     <div className="simple-list-meta" style={{ marginTop: 4 }}>
-                      {Math.round(synthese.heuresRealisees)} h / {Math.round(synthese.heuresPrevues)} h
+                      {formatNombre(synthese.heuresRealisees)} h / {formatNombre(synthese.heuresPrevues)} h
                     </div>
                   </div>
                 </div>
@@ -205,18 +212,14 @@ export default function ElectriciteSiteDetail() {
                   <thead>
                     <tr className="elec-entete-groupes">
                       <th
-                        colSpan={2}
+                        colSpan={4}
                         className="elec-th-figee"
                         style={{ left: 0, width: LARGEUR_NUMERO + LARGEUR_DESIGNATION }}
                       />
-                      <th style={{ width: 60 }} />
-                      <th colSpan={2} className="elec-groupe elec-groupe-saisie">
-                        Saisie
-                      </th>
-                      <th colSpan={4} className="elec-groupe elec-groupe-materiel">
+                      <th colSpan={5} className="elec-groupe elec-groupe-materiel">
                         Matériel
                       </th>
-                      <th colSpan={4} className="elec-groupe elec-groupe-mo">
+                      <th colSpan={5} className="elec-groupe elec-groupe-mo">
                         Main d'œuvre
                       </th>
                     </tr>
@@ -231,16 +234,14 @@ export default function ElectriciteSiteDetail() {
                         Désignation
                       </th>
                       <th style={{ width: 60 }}>Unité</th>
-                      <th className="elec-col-saisie" style={{ width: 110 }}>
-                        % avancement
-                      </th>
-                      <th className="elec-col-saisie" style={{ width: 55 }}>
-                        Qté
+                      <th style={{ width: 55 }}>Qté</th>
+                      <th className="elec-col-materiel elec-col-saisie" style={{ width: 90 }}>
+                        % avanc. FO
                       </th>
                       <th className="elec-col-materiel" style={{ width: 90 }}>
                         Coût unit.
                       </th>
-                      <th className="elec-col-materiel elec-col-etroite" style={{ width: 56 }}>
+                      <th className="elec-col-materiel" style={{ width: 130 }}>
                         FO
                       </th>
                       <th className="elec-col-materiel" style={{ width: 100 }}>
@@ -249,10 +250,13 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-materiel" style={{ width: 100 }}>
                         Matériel avanc.
                       </th>
+                      <th className="elec-col-mo elec-col-saisie" style={{ width: 90 }}>
+                        % avanc. MO
+                      </th>
                       <th className="elec-col-mo" style={{ width: 80 }}>
                         Temps unit.
                       </th>
-                      <th className="elec-col-mo elec-col-etroite" style={{ width: 56 }}>
+                      <th className="elec-col-mo" style={{ width: 130 }}>
                         MO
                       </th>
                       <th className="elec-col-mo" style={{ width: 90 }}>
@@ -265,11 +269,12 @@ export default function ElectriciteSiteDetail() {
                   </thead>
                   <tbody>
                     {lignes.map((l) => {
-                      const pct = l.avancement || 0;
+                      const pctFo = l.avancementFo ?? l.avancement ?? 0;
+                      const pctMo = l.avancementMo ?? l.avancement ?? 0;
                       if (l.estPoste) {
                         return (
                           <tr key={l.id} className="elec-ligne-poste">
-                            <td colSpan={13} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
+                            <td colSpan={14} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
                               {l.code ? l.code + " — " : ""}
                               {l.designation}
                             </td>
@@ -298,48 +303,65 @@ export default function ElectriciteSiteDetail() {
                             {l.designation}
                           </td>
                           <td>{l.unite || "—"}</td>
-                          <td className="elec-col-saisie">
+                          <td>{l.quantite ? formatNombre(l.quantite) : "—"}</td>
+                          <td className="elec-col-materiel elec-col-saisie">
                             {l.informative ? (
                               "—"
                             ) : (
-                              <div className={"elec-avancement-input " + classeAvancement(pct)}>
+                              <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
                                 <input
                                   type="number"
                                   min="0"
                                   max="100"
-                                  defaultValue={pct}
+                                  defaultValue={pctFo}
                                   disabled={!peutGerer}
-                                  onBlur={(e) => changerAvancement(l, e.target.value)}
+                                  onBlur={(e) => changerAvancement(l, "avancementFo", e.target.value)}
                                 />
                                 <span>%</span>
                               </div>
                             )}
                           </td>
-                          <td className="elec-col-saisie">{l.quantite || "—"}</td>
                           <td className="elec-col-materiel">
                             {l.coutUnitaireFo ? formatNombre(l.coutUnitaireFo) + " €" : "—"}
                           </td>
-                          <td className="elec-col-materiel elec-col-etroite elec-type-code" title={l.typeFo}>
+                          <td className="elec-col-materiel elec-type-code" title={l.typeFo}>
                             {formatTypeFo(l.typeFo)}
                           </td>
                           <td className="elec-col-materiel">
                             {l.coutTotalFo ? formatNombre(l.coutTotalFo) + " €" : "—"}
                           </td>
                           <td className="elec-col-materiel">
-                            {l.coutTotalFo ? formatNombre((l.coutTotalFo * pct) / 100) + " €" : "—"}
+                            {l.coutTotalFo ? formatNombre((l.coutTotalFo * pctFo) / 100) + " €" : "—"}
+                          </td>
+                          <td className="elec-col-mo elec-col-saisie">
+                            {l.informative ? (
+                              "—"
+                            ) : (
+                              <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  defaultValue={pctMo}
+                                  disabled={!peutGerer}
+                                  onBlur={(e) => changerAvancement(l, "avancementMo", e.target.value)}
+                                />
+                                <span>%</span>
+                              </div>
+                            )}
                           </td>
                           <td className="elec-col-mo">
-                            {l.tempsUnitaire ? l.tempsUnitaire + " h" : "—"}
+                            {l.tempsUnitaire ? formatNombre(l.tempsUnitaire) + " h" : "—"}
                           </td>
-                          <td className="elec-col-mo elec-col-etroite elec-type-code" title={l.typeMo}>
+                          <td className="elec-col-mo elec-type-code" title={l.typeMo}>
                             {formatTypeFo(l.typeMo)}
                           </td>
                           <td className="elec-col-mo">
-                            {l.tempsTotalHeures ? l.tempsTotalHeures + " h" : "—"}
+                            {l.tempsTotalHeures ? formatNombre(l.tempsTotalHeures) + " h" : "—"}
                           </td>
                           <td className="elec-col-mo">
                             {l.tempsTotalHeures
-                              ? formatNombre((l.tempsTotalHeures * pct) / 100) + " h"
+                              ? formatNombre((l.tempsTotalHeures * pctMo) / 100) + " h"
                               : "—"}
                           </td>
                         </tr>

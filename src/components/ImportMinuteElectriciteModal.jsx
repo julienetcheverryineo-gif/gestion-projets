@@ -78,7 +78,8 @@ export default function ImportMinuteElectriciteModal({ chantierId, nbDevisExista
             pvUnitaire: ligne.pvUnitaire || 0,
             pvTotal: ligne.pvTotal || 0,
             informative: ligne.informative || false,
-            avancement: 0,
+            avancementFo: 0,
+            avancementMo: 0,
             ordre: ligne.ordre,
             creeLe: serverTimestamp(),
           });

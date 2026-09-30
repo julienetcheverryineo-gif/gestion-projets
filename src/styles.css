@@ -643,6 +643,12 @@ thead .elec-th-figee {
 .elec-col-saisie {
   background: color-mix(in srgb, var(--warn) 6%, transparent);
 }
+/* La saisie du % d'avancement (désormais intégrée aux groupes Matériel
+   et Main d'œuvre) garde sa teinte "saisie" même combinée à ces
+   groupes : la spécificité l'emporte sur l'ordre des règles. */
+td.elec-col-saisie {
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+}
 .elec-col-materiel {
   background: color-mix(in srgb, var(--accent-dim) 45%, transparent);
 }
@@ -691,11 +697,12 @@ th.elec-col-mo {
   padding-right: 4px !important;
   text-align: center;
 }
-/* Numéro de type de FO/MO du devis (ex: "4") : juste un repère de
-   classification, affiché en tout petit pour ne pas prendre de place —
-   le libellé complet reste en infobulle au survol. */
+/* Type de FO/MO du devis (numéro + libellé, ex: "4 · Automatisme &
+   Contrôle") : un repère de classification secondaire, affiché en tout
+   petit pour ne pas prendre le pas sur les colonnes de chiffrage. */
 .elec-type-code {
   font-size: 0.68rem;
+  line-height: 1.25;
   color: var(--text-muted);
 }
 
