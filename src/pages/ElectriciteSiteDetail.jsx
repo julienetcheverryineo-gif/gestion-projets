@@ -48,6 +48,115 @@ function classeAvancement(pct) {
   return "elec-avancement-partiel";
 }
 
+function formatPct(p) {
+  return formatNombre(p * 100) + " %";
+}
+
+// Regroupe des lignes par Type de FO (même principe que les onglets
+// « Récap Avancement FO/MO » du fichier de suivi Excel : pour chaque
+// type de FO présent dans les devis, Budget/Prévu = somme du champ
+// chiffré (coût total FO ou temps total), Réalisé = ce champ × son %
+// d'avancement saisi ligne par ligne, Restant = Budget − Réalisé.
+// (Le suivi Excel regroupe aussi les heures de main d'œuvre par Type de
+// FO, pas par Type de MO — repris ici à l'identique.)
+function calculerRecap(lignes, champValeur, champAvancementPct) {
+  const groupes = new Map();
+  lignes.forEach((l) => {
+    const valeur = l[champValeur] || 0;
+    if (!valeur) return;
+    const cle = (l.typeFo || "").trim();
+    if (!groupes.has(cle)) groupes.set(cle, { cle, budget: 0, realise: 0 });
+    const g = groupes.get(cle);
+    g.budget += valeur;
+    g.realise += (valeur * (l[champAvancementPct] || 0)) / 100;
+  });
+  const parType = Array.from(groupes.values())
+    .map((g) => ({
+      libelle: g.cle ? formatTypeFo(g.cle) : "Sans type de FO",
+      numero: g.cle ? Number(g.cle.match(/^\s*(\d+)/)?.[1]) : null,
+      budget: g.budget,
+      realise: g.realise,
+      restant: g.budget - g.realise,
+      pctAvancement: g.budget > 0 ? g.realise / g.budget : 0,
+    }))
+    .sort((a, b) => {
+      if (a.numero == null) return 1;
+      if (b.numero == null) return -1;
+      return a.numero - b.numero;
+    });
+  const total = parType.reduce(
+    (acc, l) => {
+      acc.budget += l.budget;
+      acc.realise += l.realise;
+      acc.restant += l.restant;
+      return acc;
+    },
+    { budget: 0, realise: 0, restant: 0 }
+  );
+  total.pctAvancement = total.budget > 0 ? total.realise / total.budget : 0;
+  return { parType, total };
+}
+
+function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
+  return (
+    <div className="panel" style={{ marginBottom: 16 }}>
+      <div className="panel-header">
+        <h2>
+          {titre}
+          {sousTitre ? " — " + sousTitre : ""}
+        </h2>
+      </div>
+      {recap.parType.length === 0 ? (
+        <p className="simple-list-meta">Aucune donnée chiffrée pour ce périmètre.</p>
+      ) : (
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Type de FO</th>
+                <th>{libelleValeur}</th>
+                <th>Réalisé (avancement)</th>
+                <th>% avancement</th>
+                <th>Restant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recap.parType.map((l) => (
+                <tr key={l.libelle}>
+                  <td style={{ fontFamily: "var(--font-ui)" }}>{l.libelle}</td>
+                  <td>
+                    {formatNombre(l.budget)} {uniteValeur}
+                  </td>
+                  <td>
+                    {formatNombre(l.realise)} {uniteValeur}
+                  </td>
+                  <td>{formatPct(l.pctAvancement)}</td>
+                  <td>
+                    {formatNombre(l.restant)} {uniteValeur}
+                  </td>
+                </tr>
+              ))}
+              <tr style={{ fontWeight: 700 }}>
+                <td>TOTAL</td>
+                <td>
+                  {formatNombre(recap.total.budget)} {uniteValeur}
+                </td>
+                <td>
+                  {formatNombre(recap.total.realise)} {uniteValeur}
+                </td>
+                <td>{formatPct(recap.total.pctAvancement)}</td>
+                <td>
+                  {formatNombre(recap.total.restant)} {uniteValeur}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ElectriciteSiteDetail() {
   const { chantierId } = useParams();
   const { isAdmin, profile } = useAuth();
@@ -65,6 +174,10 @@ export default function ElectriciteSiteDetail() {
 
   const [devisOuvertId, setDevisOuvertId] = useState(null);
   const devisOuvert = devis.find((d) => d.id === devisOuvertId) ?? devis[0] ?? null;
+
+  // "fo" / "mo" : un récapitulatif chantier (tous devis + détail par
+  // devis) est affiché à la place du devis ouvert. null = vue normale.
+  const [recapActif, setRecapActif] = useState(null);
 
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
@@ -111,6 +224,29 @@ export default function ElectriciteSiteDetail() {
       { budgetMateriel: 0, realiseMateriel: 0, heuresPrevues: 0, heuresRealisees: 0 }
     );
 
+  // Lignes chiffrables (hors postes) de tout le chantier, tous devis
+  // confondus — pour les récapitulatifs par Type de FO.
+  const lignesChantier = toutesLignes.filter(
+    (l) => l.chantierId === chantierId && !l.estPoste
+  );
+  const champRecap = recapActif === "mo" ? "tempsTotalHeures" : "coutTotalFo";
+  const champAvancementRecap = recapActif === "mo" ? "avancementMo" : "avancementFo";
+  const uniteRecap = recapActif === "mo" ? "h" : "€";
+  const libelleValeurRecap = recapActif === "mo" ? "Heures prévues" : "Budget matériel";
+  const recapSynthese = recapActif
+    ? calculerRecap(lignesChantier, champRecap, champAvancementRecap)
+    : null;
+  const recapParDevis = recapActif
+    ? devis.map((d) => ({
+        devis: d,
+        recap: calculerRecap(
+          lignesChantier.filter((l) => l.devisId === d.id),
+          champRecap,
+          champAvancementRecap
+        ),
+      }))
+    : [];
+
   if (!chantier) {
     return <div className="page-loading">Chargement…</div>;
   }
@@ -154,15 +290,54 @@ export default function ElectriciteSiteDetail() {
             {devis.map((d) => (
               <button
                 key={d.id}
-                className={devisOuvert?.id === d.id ? "btn-primary" : "btn-accent"}
-                onClick={() => setDevisOuvertId(d.id)}
+                className={
+                  !recapActif && devisOuvert?.id === d.id ? "btn-primary" : "btn-accent"
+                }
+                onClick={() => {
+                  setRecapActif(null);
+                  setDevisOuvertId(d.id);
+                }}
               >
                 {d.nom}
               </button>
             ))}
+            <button
+              className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif(recapActif === "fo" ? null : "fo")}
+            >
+              📊 Récap Avancement FO
+            </button>
+            <button
+              className={recapActif === "mo" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif(recapActif === "mo" ? null : "mo")}
+            >
+              📊 Récap Avancement MO
+            </button>
           </div>
 
-          {devisOuvert && (
+          {recapActif && (
+            <>
+              <TableauRecap
+                titre={recapActif === "mo" ? "Récap Avancement MO" : "Récap Avancement FO"}
+                sousTitre="synthèse tous devis"
+                recap={recapSynthese}
+                uniteValeur={uniteRecap}
+                libelleValeur={libelleValeurRecap}
+              />
+              {recapParDevis.map(({ devis: d, recap }) => (
+                <TableauRecap
+                  key={d.id}
+                  titre={recapActif === "mo" ? "Récap Avancement MO" : "Récap Avancement FO"}
+                  sousTitre={"devis " + d.nom}
+                  recap={recap}
+                  uniteValeur={uniteRecap}
+                  libelleValeur={libelleValeurRecap}
+                />
+              ))}
+            </>
+          )}
+
+          {!recapActif && devisOuvert && (
             <>
               <div className="panel" style={{ marginBottom: 16 }}>
                 <div className="panel-header">
