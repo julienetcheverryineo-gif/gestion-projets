@@ -113,7 +113,7 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
           <table className="data-table table-recap">
             <thead>
               <tr>
-                <th>Type de FO</th>
+                <th className="col-type">Type de FO</th>
                 <th className="col-num">{libelleValeur}</th>
                 <th className="col-num">Réalisé (avancement)</th>
                 <th className="col-avancement">% avancement</th>
@@ -123,7 +123,9 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
             <tbody>
               {recap.parType.map((l) => (
                 <tr key={l.libelle}>
-                  <td style={{ fontFamily: "var(--font-ui)" }}>{l.libelle}</td>
+                  <td className="col-type" style={{ fontFamily: "var(--font-ui)" }}>
+                    {l.libelle}
+                  </td>
                   <td className="col-num">
                     {formatNombre(l.budget)} {uniteValeur}
                   </td>
@@ -139,7 +141,7 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
                 </tr>
               ))}
               <tr className="table-recap-total">
-                <td>TOTAL</td>
+                <td className="col-type">TOTAL</td>
                 <td className="col-num">
                   {formatNombre(recap.total.budget)} {uniteValeur}
                 </td>

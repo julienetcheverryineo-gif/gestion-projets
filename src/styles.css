@@ -575,6 +575,28 @@ a {
    colonne (plutôt que le quadrillage classique), chiffres alignés à
    droite pour une lecture en colonne, ligne TOTAL détachée par un
    filet plus marqué. */
+/* Largeurs fixes et identiques sur TOUTES les instances de ce tableau
+   (synthèse + chaque devis) : comme .data-table impose width:100%, sans
+   ça chaque tableau réétale ses colonnes sur sa propre largeur et rien
+   ne s'aligne d'un tableau à l'autre. En largeur "auto" + table-layout
+   fixed, chaque colonne garde exactement la largeur déclarée ici, donc
+   tous les tableaux Récap font la même largeur et leurs colonnes
+   tombent à la même place, page après page. */
+table.table-recap {
+  width: auto;
+  table-layout: fixed;
+}
+.table-recap .col-type {
+  width: 280px;
+}
+.table-recap .col-num {
+  width: 140px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.table-recap .col-avancement {
+  width: 190px;
+}
 .table-recap th,
 .table-recap td {
   border-right: 1px solid var(--border);
@@ -582,13 +604,6 @@ a {
 .table-recap th:last-child,
 .table-recap td:last-child {
   border-right: none;
-}
-.table-recap .col-num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.table-recap .col-avancement {
-  min-width: 160px;
 }
 .table-recap-total td {
   font-weight: 700;
