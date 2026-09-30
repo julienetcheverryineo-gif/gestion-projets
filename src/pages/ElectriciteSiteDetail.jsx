@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { doc, updateDoc, query, collection, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
@@ -275,16 +275,31 @@ export default function ElectriciteSiteDetail() {
   // des lignes de devis, s'en servent pour occuper tout l'espace
   // disponible plutôt que de laisser un vide à droite (avec un plancher
   // pour rester lisibles). Désignation, elle, garde une largeur fixe.
-  const pageRef = useRef(null);
+  // Ref *callback* (et non useRef + useEffect à dépendances vides) :
+  // tant que le chantier n'est pas chargé (plus bas, `if (!chantier)`),
+  // le <div className="page"> n'est pas encore monté, donc un effet à
+  // `[]` qui lit pageRef.current au montage du composant le trouvait
+  // toujours à `null` et l'observateur n'était jamais créé — largeurPage
+  // restait bloqué sur sa valeur de repli (1200), d'où des colonnes de
+  // type toujours collées à leur largeur plancher, quelle que soit la
+  // taille d'écran. La ref callback, elle, est rappelée par React dès
+  // que le <div> est réellement attaché au DOM (donc aussi après le
+  // premier rendu de chargement), et reconnecte l'observateur à chaque
+  // fois.
+  const observateurPageRef = useRef(null);
   const [largeurPage, setLargeurPage] = useState(1200);
-  useEffect(() => {
-    const el = pageRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return undefined;
-    const observateur = new ResizeObserver((entries) => {
-      if (entries[0]) setLargeurPage(entries[0].contentRect.width);
-    });
-    observateur.observe(el);
-    return () => observateur.disconnect();
+  const pageRef = useCallback((el) => {
+    if (observateurPageRef.current) {
+      observateurPageRef.current.disconnect();
+      observateurPageRef.current = null;
+    }
+    if (el && typeof ResizeObserver !== "undefined") {
+      const observateur = new ResizeObserver((entries) => {
+        if (entries[0]) setLargeurPage(entries[0].contentRect.width);
+      });
+      observateur.observe(el);
+      observateurPageRef.current = observateur;
+    }
   }, []);
   // Les tableaux Récap sont dans un .panel (20px de padding de chaque
   // côté) : leur largeur disponible est donc celle de la page moins ce
