@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { doc, updateDoc, query, collection, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
@@ -13,15 +13,27 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 // Référence n'est pas affichée — elle ne sert pas sur ce projet — mais
 // reste importée et stockée, affichée en infobulle sur la désignation.)
 const LARGEUR_NUMERO = 22;
-const LARGEUR_DESIGNATION = 460;
 const LARGEUR_UNITE = 36;
 const LARGEUR_QTE = 40;
-// Avec table-layout:fixed, les largeurs de colonnes sont fixées par la
-// PREMIÈRE ligne d'en-tête : la cellule fusionnée (N°+Désignation+Unité+Qté)
-// doit donc porter la somme des 4 largeurs, pas seulement N°+Désignation —
-// sinon le navigateur répartit sa largeur (trop petite) sur les 4 colonnes
-// et écrase la Désignation.
-const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
+const LARGEUR_MIN_DESIGNATION = 220;
+// Somme des largeurs des colonnes Matériel (100+110+220+120+120=670) et
+// Main d'œuvre (100+90+220+110+120=640) déclarées plus bas dans le JSX —
+// à garder synchronisée si ces largeurs changent.
+const SOMME_LARGEURS_GROUPES = 670 + 640;
+// Avec table-layout:fixed, une largeur déclarée est toujours respectée
+// à l'identique (voir plus bas pourquoi le tableau est en largeur
+// "auto") : Désignation reçoit donc sa largeur calculée en JS (tout
+// l'espace disponible en plus des autres colonnes, jamais en dessous
+// d'un minimum lisible) plutôt qu'une constante, pour occuper tout
+// l'écran quelle que soit sa taille.
+const LARGEUR_ENTETE_FIGEE_SANS_DESIGNATION = LARGEUR_NUMERO + LARGEUR_UNITE + LARGEUR_QTE;
+
+// Largeur des colonnes fixes du tableau Récap (tout sauf Type de FO, qui
+// reçoit le même traitement que Désignation ci-dessus).
+const LARGEUR_COL_NUM = 170;
+const LARGEUR_COL_AVANCEMENT = 240;
+const LARGEUR_MIN_COL_TYPE = 200;
+const SOMME_LARGEURS_RECAP_FIXES = LARGEUR_COL_NUM * 3 + LARGEUR_COL_AVANCEMENT;
 
 // "4  [Automatisme & Contrôle]" → "4 · Automatisme & Contrôle" : le numéro
 // ET le type, comme dans le devis, affichés en tout petit (voir
@@ -72,6 +84,7 @@ function calculerRecap(lignes, champValeur, champAvancementPct) {
   });
   const parType = Array.from(groupes.values())
     .map((g) => ({
+      cle: g.cle,
       libelle: g.cle ? formatTypeFo(g.cle) : "Sans type de FO",
       numero: g.cle ? Number(g.cle.match(/^\s*(\d+)/)?.[1]) : null,
       budget: g.budget,
@@ -97,7 +110,16 @@ function calculerRecap(lignes, champValeur, champAvancementPct) {
   return { parType, total };
 }
 
-function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
+function TableauRecap({
+  titre,
+  sousTitre,
+  recap,
+  uniteValeur,
+  libelleValeur,
+  modifiable,
+  onModifierGroupe,
+  largeurColType,
+}) {
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
       <div className="panel-header">
@@ -106,6 +128,12 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
           {sousTitre ? " — " + sousTitre : ""}
         </h2>
       </div>
+      {modifiable && (
+        <p className="simple-list-meta" style={{ marginBottom: 10 }}>
+          Modifiez un % ici pour l'appliquer d'un coup à toutes les lignes de ce type de FO,
+          dans tous les devis du chantier.
+        </p>
+      )}
       {recap.parType.length === 0 ? (
         <p className="simple-list-meta">Aucune donnée chiffrée pour ce périmètre.</p>
       ) : (
@@ -113,7 +141,9 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
           <table className="data-table table-recap">
             <thead>
               <tr>
-                <th className="col-type">Type de FO</th>
+                <th className="col-type" style={{ width: largeurColType }}>
+                  Type de FO
+                </th>
                 <th className="col-num">{libelleValeur}</th>
                 <th className="col-num">Réalisé (avancement)</th>
                 <th className="col-avancement">% avancement</th>
@@ -133,7 +163,14 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
                     {formatNombre(l.realise)} {uniteValeur}
                   </td>
                   <td className="col-avancement">
-                    <LigneAvancementBarre pct={l.pctAvancement} />
+                    {modifiable ? (
+                      <LigneAvancementModifiable
+                        pct={l.pctAvancement}
+                        onValider={(v) => onModifierGroupe(l.cle, l.libelle, v)}
+                      />
+                    ) : (
+                      <LigneAvancementBarre pct={l.pctAvancement} />
+                    )}
                   </td>
                   <td className="col-num">
                     {formatNombre(l.restant)} {uniteValeur}
@@ -175,10 +212,62 @@ function LigneAvancementBarre({ pct }) {
   );
 }
 
+// Saisie groupée depuis la synthèse : modifier ce % applique la même
+// valeur à toutes les lignes de ce type de FO, tous devis confondus
+// (voir onModifierGroupe dans ElectriciteSiteDetail).
+function LigneAvancementModifiable({ pct, onValider }) {
+  const pourcent = Math.max(0, Math.min(100, Math.round(pct * 1000) / 10));
+  return (
+    <div className="recap-avancement-barre recap-avancement-modifiable">
+      <div className={"elec-avancement-input " + classeAvancement(pourcent)}>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          defaultValue={pourcent}
+          onBlur={(e) => onValider(e.target.value)}
+        />
+        <span>%</span>
+      </div>
+      <div className="progress-bar">
+        <div className={"progress-bar-fill " + classeAvancement(pourcent)} style={{ width: pourcent + "%" }} />
+      </div>
+    </div>
+  );
+}
+
 export default function ElectriciteSiteDetail() {
   const { chantierId } = useParams();
   const { isAdmin, profile } = useAuth();
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
+
+  // Largeur réelle de la page, mesurée en continu (redimensionnement de
+  // la fenêtre, repli du menu latéral...) : Désignation et Type de FO
+  // (seules colonnes sans largeur fixe) s'en servent pour occuper tout
+  // l'espace disponible plutôt que de laisser un vide à droite des
+  // tableaux.
+  const pageRef = useRef(null);
+  const [largeurPage, setLargeurPage] = useState(1200);
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const observateur = new ResizeObserver((entries) => {
+      if (entries[0]) setLargeurPage(entries[0].contentRect.width);
+    });
+    observateur.observe(el);
+    return () => observateur.disconnect();
+  }, []);
+  const largeurDesignation = Math.max(
+    LARGEUR_MIN_DESIGNATION,
+    largeurPage - LARGEUR_ENTETE_FIGEE_SANS_DESIGNATION - SOMME_LARGEURS_GROUPES
+  );
+  // Les tableaux Récap sont dans un .panel (20px de padding de chaque
+  // côté) : leur largeur disponible est donc celle de la page moins ce
+  // padding.
+  const largeurColType = Math.max(
+    LARGEUR_MIN_COL_TYPE,
+    largeurPage - 40 - SOMME_LARGEURS_RECAP_FIXES
+  );
 
   const { documents: chantiers } = useCollection("sites");
   const chantier = chantiers.find((c) => c.id === chantierId);
@@ -265,12 +354,44 @@ export default function ElectriciteSiteDetail() {
       }))
     : [];
 
+  // Saisie groupée depuis la synthèse (tous devis) : applique le même %
+  // à toutes les lignes de ce type de FO, dans tous les devis du
+  // chantier — le même filtre que celui utilisé pour construire le
+  // groupe (mêmes lignes chiffrées, même Type de FO).
+  const appliquerAvancementGroupe = async (cle, libelle, valeur) => {
+    const v = Math.max(0, Math.min(100, Number(valeur) || 0));
+    const champ = champAvancementRecap;
+    const lignesCible = lignesChantier.filter(
+      (l) => (l.typeFo || "").trim() === cle && (l[champRecap] || 0) > 0
+    );
+    if (lignesCible.length === 0) return;
+    const nbDevisCibles = new Set(lignesCible.map((l) => l.devisId)).size;
+    if (
+      !confirm(
+        "Appliquer " +
+          v +
+          " % à toutes les lignes « " +
+          libelle +
+          " » ? Cela concerne " +
+          lignesCible.length +
+          " ligne(s) dans " +
+          nbDevisCibles +
+          " devis, et écrase leur valeur actuelle."
+      )
+    ) {
+      return;
+    }
+    const batch = writeBatch(db);
+    lignesCible.forEach((l) => batch.update(doc(db, "elecLignes", l.id), { [champ]: v }));
+    await batch.commit();
+  };
+
   if (!chantier) {
     return <div className="page-loading">Chargement…</div>;
   }
 
   return (
-    <div className="page">
+    <div className="page" ref={pageRef}>
       <header className="page-header page-header-actions">
         <div>
           <p className="page-subtitle">
@@ -349,6 +470,9 @@ export default function ElectriciteSiteDetail() {
                 recap={recapSynthese}
                 uniteValeur={uniteRecap}
                 libelleValeur={libelleValeurRecap}
+                modifiable={peutGerer}
+                onModifierGroupe={appliquerAvancementGroupe}
+                largeurColType={largeurColType}
               />
               {recapParDevis.map(({ devis: d, recap }) => (
                 <TableauRecap
@@ -358,6 +482,7 @@ export default function ElectriciteSiteDetail() {
                   recap={recap}
                   uniteValeur={uniteRecap}
                   libelleValeur={libelleValeurRecap}
+                  largeurColType={largeurColType}
                 />
               ))}
             </>
@@ -423,7 +548,10 @@ export default function ElectriciteSiteDetail() {
                       <th
                         colSpan={4}
                         className="elec-th-figee"
-                        style={{ left: 0, width: LARGEUR_ENTETE_FIGEE }}
+                        style={{
+                          left: 0,
+                          width: LARGEUR_ENTETE_FIGEE_SANS_DESIGNATION + largeurDesignation,
+                        }}
                       />
                       <th colSpan={5} className="elec-groupe elec-groupe-materiel">
                         Matériel
@@ -441,7 +569,7 @@ export default function ElectriciteSiteDetail() {
                       </th>
                       <th
                         className="elec-th-figee elec-th-figee-bord"
-                        style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
+                        style={{ left: LARGEUR_NUMERO, width: largeurDesignation }}
                       >
                         Désignation
                       </th>
@@ -513,7 +641,7 @@ export default function ElectriciteSiteDetail() {
                           </td>
                           <td
                             className="elec-td-figee elec-th-figee-bord"
-                            style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
+                            style={{ left: LARGEUR_NUMERO, width: largeurDesignation }}
                             title={titreDesignation}
                           >
                             {l.designation}

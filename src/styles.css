@@ -576,18 +576,15 @@ a {
    droite pour une lecture en colonne, ligne TOTAL détachée par un
    filet plus marqué. */
 /* Largeurs fixes et identiques sur TOUTES les instances de ce tableau
-   (synthèse + chaque devis) : comme .data-table impose width:100%, sans
-   ça chaque tableau réétale ses colonnes sur sa propre largeur et rien
-   ne s'aligne d'un tableau à l'autre. En largeur "auto" + table-layout
-   fixed, chaque colonne garde exactement la largeur déclarée ici, donc
-   tous les tableaux Récap font la même largeur et leurs colonnes
-   tombent à la même place, page après page. */
+   (synthèse + chaque devis), en largeur "auto" (comme le tableau des
+   lignes) pour que les largeurs déclarées soient utilisées telles
+   quelles : tous les tableaux Récap font alors la même largeur et
+   leurs colonnes tombent à la même place. Type de FO reçoit sa largeur
+   calculée en JS pour occuper tout l'espace disponible (voir
+   ElectriciteSiteDetail.jsx). */
 table.table-recap {
   width: auto;
   table-layout: fixed;
-}
-.table-recap .col-type {
-  width: 420px;
 }
 .table-recap .col-num {
   width: 170px;
@@ -625,6 +622,9 @@ table.table-recap {
   color: var(--text-muted);
   font-size: 0.82rem;
   white-space: nowrap;
+}
+.recap-avancement-modifiable .elec-avancement-input {
+  flex-shrink: 0;
 }
 .progress-bar-fill.elec-avancement-nul {
   background: var(--text-muted);
@@ -668,14 +668,14 @@ table.table-recap {
   table-layout: fixed;
 }
 /* .data-table impose width:100%, ce qui — combiné à table-layout:fixed —
-   force le navigateur à comprimer PROPORTIONNELLEMENT toutes les largeurs
-   de colonnes déclarées pour tenir dans le conteneur (c'est ce qui
-   écrasait la Désignation malgré des largeurs correctes). Ce tableau a
-   beaucoup de colonnes et doit pouvoir dépasser la largeur du conteneur,
-   avec défilement horizontal (.elec-lignes-wrapper) : on repasse donc sa
-   largeur à "auto" (sélecteur plus spécifique pour l'emporter), pour que
-   les largeurs déclarées soient utilisées telles quelles.
-   */
+   force le navigateur à comprimer (ou, si on laisse une colonne sans
+   largeur, à répartir de façon incohérente) toutes les largeurs de
+   colonnes déclarées dès que le tableau a plus d'une ligne d'en-tête
+   (cas ici, avec la ligne de groupes Matériel/Main d'œuvre). On repasse
+   donc sa largeur à "auto" pour que les largeurs déclarées soient
+   utilisées telles quelles — Désignation reçoit sa largeur calculée en
+   JS (voir ElectriciteSiteDetail.jsx) pour quand même occuper tout
+   l'espace disponible. */
 table.elec-lignes-table {
   width: auto;
 }
