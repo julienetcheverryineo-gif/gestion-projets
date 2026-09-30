@@ -1,4 +1,4 @@
-name: Déploiement Firebase Hosting + règles
+name: Déploiement Firebase Hosting
 
 on:
   push:
@@ -28,17 +28,8 @@ jobs:
           projectId: appli-service
           channelId: live
 
-      # Les règles Firestore (firestore.rules) ne sont pas déployées par
-      # l'action ci-dessus (Hosting uniquement) — sans cette étape, une
-      # nouvelle collection (ex. "notes") resterait bloquée par les règles
-      # même après avoir mis à jour le code. Le projet n'utilise pas
-      # Firebase Storage (pas de storage.rules dans le repo), donc on ne
-      # déploie que les règles Firestore.
-      - name: Déployer les règles Firestore
-        run: |
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > /tmp/firebase-service-account.json
-          npx firebase-tools deploy --only firestore:rules \
-            --project appli-service \
-            --non-interactive
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-service-account.json
+      # Les règles Firestore (firestore.rules) ne sont PAS déployées ici :
+      # le compte de service CI n'a pas les droits IAM nécessaires (étape
+      # systématiquement en échec, retirée du workflow). Quand
+      # firestore.rules change, Julien le déploie lui-même depuis sa
+      # machine avec `firebase deploy --only firestore:rules`.
