@@ -2203,6 +2203,7 @@ th.charge-table-col-personne {
 }
 
 .form-inline {
+  display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   align-items: flex-end;

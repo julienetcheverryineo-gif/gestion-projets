@@ -67,6 +67,8 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
   const [equipeElectriciens, setEquipeElectriciens] = useState(
     chantier?.equipeElectriciens ?? []
   );
+  const [dateDebut, setDateDebut] = useState(chantier?.dateDebut ?? "");
+  const [dateFin, setDateFin] = useState(chantier?.dateFin ?? "");
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
 
@@ -114,6 +116,8 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
       electriciens,
       electricienAAffecter,
       equipeElectriciens,
+      dateDebut: dateDebut || null,
+      dateFin: dateFin || null,
     };
     if (chantier) {
       await updateDoc(doc(db, "sites", chantier.id), donnees);
@@ -217,6 +221,28 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
 
           {espaceElectricite && (
             <div>
+              <div className="form-inline">
+                <label>
+                  Date de début prévue
+                  <input
+                    type="date"
+                    value={dateDebut}
+                    onChange={(e) => setDateDebut(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Date de fin prévue
+                  <input
+                    type="date"
+                    value={dateFin}
+                    onChange={(e) => setDateFin(e.target.value)}
+                  />
+                </label>
+              </div>
+              <p className="empty-state-description" style={{ margin: "-6px 0 10px" }}>
+                La date de fin prévue sert à répartir automatiquement le reste à faire
+                (main d'œuvre) dans le plan de charge Électricité.
+              </p>
               <div className="reg-subheading" style={{ marginBottom: 8 }}>
                 Électriciens (utilisateurs de l'application)
               </div>

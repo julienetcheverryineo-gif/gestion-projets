@@ -13,6 +13,7 @@ import Notes from "./pages/Notes";
 import Users from "./pages/Users";
 import ElectriciteChantiers from "./pages/ElectriciteChantiers";
 import ElectriciteSiteDetail from "./pages/ElectriciteSiteDetail";
+import ElectricitePlanDeCharge from "./pages/ElectricitePlanDeCharge";
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="notes" element={<Notes />} />
             <Route path="electricite" element={<ElectriciteChantiers />} />
             <Route path="electricite/chantiers/:chantierId" element={<ElectriciteSiteDetail />} />
+            <Route path="electricite/plan-de-charge" element={<ElectricitePlanDeCharge />} />
             <Route
               path="utilisateurs"
               element={
