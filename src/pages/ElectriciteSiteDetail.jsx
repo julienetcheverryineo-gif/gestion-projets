@@ -232,6 +232,7 @@ function LigneAvancementModifiable({ pct, onValider }) {
     <div className="recap-avancement-barre recap-avancement-modifiable">
       <div className={"elec-avancement-input " + classeAvancement(pourcent)}>
         <input
+          key={pourcent}
           type="number"
           min="0"
           max="100"
@@ -689,6 +690,7 @@ export default function ElectriciteSiteDetail() {
                             ) : (
                               <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
                                 <input
+                                  key={pctFo}
                                   type="number"
                                   min="0"
                                   max="100"
@@ -718,6 +720,7 @@ export default function ElectriciteSiteDetail() {
                             ) : (
                               <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
                                 <input
+                                  key={pctMo}
                                   type="number"
                                   min="0"
                                   max="100"
