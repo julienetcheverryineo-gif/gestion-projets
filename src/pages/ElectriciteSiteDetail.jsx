@@ -12,10 +12,10 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 // les colonnes Matériel / Main d'œuvre, très nombreuses. (La colonne
 // Référence n'est pas affichée — elle ne sert pas sur ce projet — mais
 // reste importée et stockée, affichée en infobulle sur la désignation.)
-const LARGEUR_NUMERO = 20;
-const LARGEUR_DESIGNATION = 420;
-const LARGEUR_UNITE = 60;
-const LARGEUR_QTE = 55;
+const LARGEUR_NUMERO = 22;
+const LARGEUR_DESIGNATION = 460;
+const LARGEUR_UNITE = 36;
+const LARGEUR_QTE = 40;
 // Avec table-layout:fixed, les largeurs de colonnes sont fixées par la
 // PREMIÈRE ligne d'en-tête : la cellule fusionnée (N°+Désignation+Unité+Qté)
 // doit donc porter la somme des 4 largeurs, pas seulement N°+Désignation —
@@ -232,7 +232,10 @@ export default function ElectriciteSiteDetail() {
                       </th>
                     </tr>
                     <tr>
-                      <th className="elec-th-figee" style={{ left: 0, width: LARGEUR_NUMERO }}>
+                      <th
+                        className="elec-th-figee elec-col-etroite"
+                        style={{ left: 0, width: LARGEUR_NUMERO }}
+                      >
                         N°
                       </th>
                       <th
@@ -241,8 +244,12 @@ export default function ElectriciteSiteDetail() {
                       >
                         Désignation
                       </th>
-                      <th style={{ width: LARGEUR_UNITE }}>Unité</th>
-                      <th style={{ width: LARGEUR_QTE }}>Qté</th>
+                      <th className="elec-col-etroite" style={{ width: LARGEUR_UNITE }}>
+                        Unité
+                      </th>
+                      <th className="elec-col-etroite" style={{ width: LARGEUR_QTE }}>
+                        Qté
+                      </th>
                       <th className="elec-col-materiel elec-col-saisie" style={{ width: 90 }}>
                         % avanc. FO
                       </th>
@@ -298,7 +305,7 @@ export default function ElectriciteSiteDetail() {
                       return (
                         <tr key={l.id} className={l.informative ? "elec-ligne-informative" : ""}>
                           <td
-                            className="elec-td-figee"
+                            className="elec-td-figee elec-col-etroite"
                             style={{ left: 0, width: LARGEUR_NUMERO }}
                           >
                             {l.code || ""}
@@ -310,8 +317,10 @@ export default function ElectriciteSiteDetail() {
                           >
                             {l.designation}
                           </td>
-                          <td>{l.unite || "—"}</td>
-                          <td>{l.quantite ? formatNombre(l.quantite) : "—"}</td>
+                          <td className="elec-col-etroite">{l.unite || "—"}</td>
+                          <td className="elec-col-etroite">
+                            {l.quantite ? formatNombre(l.quantite) : "—"}
+                          </td>
                           <td className="elec-col-materiel elec-col-saisie">
                             {l.informative ? (
                               "—"

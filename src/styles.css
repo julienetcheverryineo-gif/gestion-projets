@@ -601,6 +601,18 @@ a {
      et les colonnes figées suivantes se chevauchent. */
   table-layout: fixed;
 }
+/* .data-table impose width:100%, ce qui — combiné à table-layout:fixed —
+   force le navigateur à comprimer PROPORTIONNELLEMENT toutes les largeurs
+   de colonnes déclarées pour tenir dans le conteneur (c'est ce qui
+   écrasait la Désignation malgré des largeurs correctes). Ce tableau a
+   beaucoup de colonnes et doit pouvoir dépasser la largeur du conteneur,
+   avec défilement horizontal (.elec-lignes-wrapper) : on repasse donc sa
+   largeur à "auto" (sélecteur plus spécifique pour l'emporter), pour que
+   les largeurs déclarées soient utilisées telles quelles.
+   */
+table.elec-lignes-table {
+  width: auto;
+}
 .elec-th-figee,
 .elec-td-figee {
   position: sticky;
