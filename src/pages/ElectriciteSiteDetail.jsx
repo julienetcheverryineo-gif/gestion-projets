@@ -19,8 +19,13 @@ const LARGEUR_QTE = 68;
 const LARGEUR_DESIGNATION = 460;
 const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
 // Largeurs des colonnes Matériel puis Main d'œuvre (dans l'ordre du tableau).
-const LARGEURS_COLONNES_MATERIEL = [100, 110, 220, 120, 120];
-const LARGEURS_COLONNES_MO = [100, 90, 220, 110, 120];
+// Les colonnes de type FO/MO (menu déroulant) sont volontairement étroites
+// — texte tronqué, complet dans la liste déroulante et en infobulle — pour
+// que le tableau tienne sur un écran large sans ascenseur horizontal.
+const LARGEUR_TYPE_FO = 56;
+const LARGEUR_TYPE_MO = 56;
+const LARGEURS_COLONNES_MATERIEL = [100, 110, LARGEUR_TYPE_FO, 120, 120];
+const LARGEURS_COLONNES_MO = [100, 90, LARGEUR_TYPE_MO, 110, 120];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
@@ -782,6 +787,7 @@ export default function ElectriciteSiteDetail() {
                           <td className="elec-col-materiel elec-type-code">
                             <select
                               className="elec-type-select"
+                              title={formatTypeFo(l.typeFo)}
                               value={l.typeFo || ""}
                               disabled={!peutGerer}
                               onChange={(e) => changerType(l, "typeFo", e.target.value)}
@@ -859,6 +865,7 @@ export default function ElectriciteSiteDetail() {
                           <td className="elec-col-mo elec-type-code">
                             <select
                               className="elec-type-select"
+                              title={formatTypeFo(l.typeMo)}
                               value={l.typeMo || ""}
                               disabled={!peutGerer}
                               onChange={(e) => changerType(l, "typeMo", e.target.value)}

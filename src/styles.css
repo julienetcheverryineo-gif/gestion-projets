@@ -829,6 +829,7 @@ th.elec-col-mo {
    texte (.elec-type-code hérite déjà de la petite taille de police). */
 .elec-type-select {
   width: 100%;
+  max-width: 100%;
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
@@ -836,6 +837,9 @@ th.elec-col-mo {
   font-size: inherit;
   padding: 2px 0;
   cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .elec-type-select:hover:not(:disabled) {
   border-color: var(--border);
