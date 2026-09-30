@@ -4,10 +4,14 @@ import { useCollection } from "../lib/firestoreHooks";
 import { calculerAvancementChantier, useSyncStatutEnCours } from "../lib/avancement";
 import { normaliserAssignes } from "../lib/assignes";
 import { libelleChantier } from "../lib/usePlanningData";
+import { estChantierAutomatisme } from "../components/SiteFormModal";
 
 export default function Dashboard() {
-  const { documents: chantiers, chargement: chargementChantiers } =
+  const { documents: tousChantiers, chargement: chargementChantiers } =
     useCollection("sites");
+  // Comme la page Chantiers : seuls les chantiers rattachés à l'espace
+  // Automatisme & GTB apparaissent sur le tableau de bord.
+  const chantiers = tousChantiers.filter(estChantierAutomatisme);
   const { documents: taches, chargement: chargementTaches } =
     useCollection("tasks");
   const { documents: regEquipements } = useCollection("regequipements");
