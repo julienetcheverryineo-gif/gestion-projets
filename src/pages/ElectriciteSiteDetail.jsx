@@ -7,18 +7,19 @@ import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
 
-// Largeurs des 3 colonnes d'identification figées (gel de volets, comme
-// dans Excel) : n°, Référence, Désignation restent visibles quand on
-// défile vers les colonnes Matériel / Main d'œuvre, très nombreuses.
-const LARGEUR_NUMERO = 46;
-const LARGEUR_REFERENCE = 110;
+// Largeurs des 2 colonnes d'identification figées (gel de volets, comme
+// dans Excel) : n°, Désignation restent visibles quand on défile vers
+// les colonnes Matériel / Main d'œuvre, très nombreuses. (La colonne
+// Référence n'est pas affichée — elle ne sert pas sur ce projet — mais
+// reste importée et stockée, affichée en infobulle sur la désignation.)
+const LARGEUR_NUMERO = 30;
 const LARGEUR_DESIGNATION = 260;
 
-// "4  [Automatisme & Contrôle]" → "Automatisme & Contrôle" : le code
-// numérique du type de FO/MO n'apporte rien à l'affichage.
+// "4  [Automatisme & Contrôle]" → "4" : seul le numéro de type de FO/MO
+// du devis est affiché, en tout petit (voir .elec-type-code).
 function formatTypeFo(texte) {
   if (!texte) return "—";
-  const m = texte.match(/\[(.+)\]/);
+  const m = texte.match(/^\s*(\d+)/);
   return m ? m[1] : texte;
 }
 
@@ -204,9 +205,9 @@ export default function ElectriciteSiteDetail() {
                   <thead>
                     <tr className="elec-entete-groupes">
                       <th
-                        colSpan={3}
+                        colSpan={2}
                         className="elec-th-figee"
-                        style={{ left: 0, width: LARGEUR_NUMERO + LARGEUR_REFERENCE + LARGEUR_DESIGNATION }}
+                        style={{ left: 0, width: LARGEUR_NUMERO + LARGEUR_DESIGNATION }}
                       />
                       <th style={{ width: 60 }} />
                       <th colSpan={2} className="elec-groupe elec-groupe-saisie">
@@ -224,14 +225,8 @@ export default function ElectriciteSiteDetail() {
                         N°
                       </th>
                       <th
-                        className="elec-th-figee"
-                        style={{ left: LARGEUR_NUMERO, width: LARGEUR_REFERENCE }}
-                      >
-                        Référence
-                      </th>
-                      <th
                         className="elec-th-figee elec-th-figee-bord"
-                        style={{ left: LARGEUR_NUMERO + LARGEUR_REFERENCE, width: LARGEUR_DESIGNATION }}
+                        style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
                       >
                         Désignation
                       </th>
@@ -245,8 +240,8 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-materiel" style={{ width: 90 }}>
                         Coût unit.
                       </th>
-                      <th className="elec-col-materiel" style={{ width: 170 }}>
-                        Type de FO
+                      <th className="elec-col-materiel elec-col-etroite" style={{ width: 56 }}>
+                        FO
                       </th>
                       <th className="elec-col-materiel" style={{ width: 100 }}>
                         Coût total FO
@@ -257,8 +252,8 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-mo" style={{ width: 80 }}>
                         Temps unit.
                       </th>
-                      <th className="elec-col-mo" style={{ width: 150 }}>
-                        Type MO
+                      <th className="elec-col-mo elec-col-etroite" style={{ width: 56 }}>
+                        MO
                       </th>
                       <th className="elec-col-mo" style={{ width: 90 }}>
                         Temps total
@@ -274,13 +269,19 @@ export default function ElectriciteSiteDetail() {
                       if (l.estPoste) {
                         return (
                           <tr key={l.id} className="elec-ligne-poste">
-                            <td colSpan={14} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
+                            <td colSpan={13} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
                               {l.code ? l.code + " — " : ""}
                               {l.designation}
                             </td>
                           </tr>
                         );
                       }
+                      // La référence (importée mais pas affichée en colonne,
+                      // inutile sur ce projet) reste consultable en infobulle
+                      // sur la désignation.
+                      const titreDesignation = [l.reference, l.detail || l.designation]
+                        .filter(Boolean)
+                        .join(" — ");
                       return (
                         <tr key={l.id} className={l.informative ? "elec-ligne-informative" : ""}>
                           <td
@@ -290,16 +291,9 @@ export default function ElectriciteSiteDetail() {
                             {l.code || ""}
                           </td>
                           <td
-                            className="elec-td-figee"
-                            style={{ left: LARGEUR_NUMERO, width: LARGEUR_REFERENCE }}
-                            title={l.reference}
-                          >
-                            {l.reference || "—"}
-                          </td>
-                          <td
                             className="elec-td-figee elec-th-figee-bord"
-                            style={{ left: LARGEUR_NUMERO + LARGEUR_REFERENCE, width: LARGEUR_DESIGNATION }}
-                            title={l.detail || l.designation}
+                            style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
+                            title={titreDesignation}
                           >
                             {l.designation}
                           </td>
@@ -325,7 +319,7 @@ export default function ElectriciteSiteDetail() {
                           <td className="elec-col-materiel">
                             {l.coutUnitaireFo ? formatNombre(l.coutUnitaireFo) + " €" : "—"}
                           </td>
-                          <td className="elec-col-materiel" title={l.typeFo}>
+                          <td className="elec-col-materiel elec-col-etroite elec-type-code" title={l.typeFo}>
                             {formatTypeFo(l.typeFo)}
                           </td>
                           <td className="elec-col-materiel">
@@ -337,7 +331,7 @@ export default function ElectriciteSiteDetail() {
                           <td className="elec-col-mo">
                             {l.tempsUnitaire ? l.tempsUnitaire + " h" : "—"}
                           </td>
-                          <td className="elec-col-mo" title={l.typeMo}>
+                          <td className="elec-col-mo elec-col-etroite elec-type-code" title={l.typeMo}>
                             {formatTypeFo(l.typeMo)}
                           </td>
                           <td className="elec-col-mo">

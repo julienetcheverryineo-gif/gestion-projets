@@ -686,6 +686,19 @@ th.elec-col-mo {
   border-left-color: var(--ok);
 }
 
+.elec-col-etroite {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+  text-align: center;
+}
+/* Numéro de type de FO/MO du devis (ex: "4") : juste un repère de
+   classification, affiché en tout petit pour ne pas prendre de place —
+   le libellé complet reste en infobulle au survol. */
+.elec-type-code {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
 /* ---------- Lots techniques ---------- */
 .lot-list {
   display: flex;
