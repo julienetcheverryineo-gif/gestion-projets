@@ -259,6 +259,9 @@ a {
 .user-role-dot[data-role="electricien"] {
   background: var(--tache);
 }
+.user-role-dot[data-role="ra_electricite"] {
+  background: #d97706;
+}
 
 .user-name {
   font-size: 0.88rem;

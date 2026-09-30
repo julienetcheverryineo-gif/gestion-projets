@@ -13,6 +13,7 @@ const ROLES = [
   { value: "electricien", label: "Électricien" },
   { value: "chef_de_projet", label: "Chef de projet" },
   { value: "admin", label: "Administrateur" },
+  { value: "ra_electricite", label: "RA Électricité" },
 ];
 
 const MOTS_SIMPLES = [

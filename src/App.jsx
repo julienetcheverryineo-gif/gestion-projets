@@ -11,6 +11,7 @@ import Planning from "./pages/Planning";
 import ReservesGlobal from "./pages/ReservesGlobal";
 import Notes from "./pages/Notes";
 import Users from "./pages/Users";
+import ElectriciteAccueil from "./pages/ElectriciteAccueil";
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="planning" element={<Planning />} />
             <Route path="reserves" element={<ReservesGlobal />} />
             <Route path="notes" element={<Notes />} />
+            <Route path="electricite" element={<ElectriciteAccueil />} />
             <Route
               path="utilisateurs"
               element={

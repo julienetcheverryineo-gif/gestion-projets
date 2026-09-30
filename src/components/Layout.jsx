@@ -1,15 +1,24 @@
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import logoIneo from "../assets/logo-ineo.png";
 
-const NAV_ITEMS = [
+const NAV_ITEMS_AUTOMATISME = [
   { to: "/", label: "Vue d'ensemble", end: true, icone: "🏠" },
   { to: "/chantiers", label: "Chantiers", icone: "🏗️" },
   { to: "/taches", label: "Tâches", icone: "✅" },
   { to: "/planning", label: "Planning", icone: "📅" },
   { to: "/reserves", label: "Réserves", icone: "🧰" },
   { to: "/notes", label: "Notes", icone: "📝" },
+];
+
+// Le profil "RA Électricité" est cloisonné : il ne voit que l'espace
+// Électricité (encore vide, à construire), jamais les chantiers/tâches/
+// planning de l'Automatisme & GTB — et inversement, les autres profils
+// (qui continuent de pointer sur l'interface actuelle) n'ont pas accès à
+// cet espace.
+const NAV_ITEMS_ELECTRICITE = [
+  { to: "/electricite", label: "Vue d'ensemble", end: true, icone: "🏠" },
 ];
 
 // Un simple reload() peut resservir une version en cache (c'est ce qui
@@ -35,7 +44,21 @@ function chargerSidebarReduite() {
 export default function Layout() {
   const { profile, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [reduite, setReduite] = useState(chargerSidebarReduite);
+
+  const estRAElectricite = profile?.role === "ra_electricite";
+
+  // Cloisonnement entre les deux espaces : hors de son espace, chacun est
+  // renvoyé vers sa page d'accueil plutôt que de voir l'autre interface.
+  if (estRAElectricite && !location.pathname.startsWith("/electricite")) {
+    return <Navigate to="/electricite" replace />;
+  }
+  if (!estRAElectricite && location.pathname.startsWith("/electricite")) {
+    return <Navigate to="/" replace />;
+  }
+
+  const navItems = estRAElectricite ? NAV_ITEMS_ELECTRICITE : NAV_ITEMS_AUTOMATISME;
 
   const handleLogout = async () => {
     await logout();
@@ -75,7 +98,9 @@ export default function Layout() {
           {!reduite && (
             <div>
               <div className="brand-title">Pilotage</div>
-              <div className="brand-subtitle">Automatisme &amp; GTB</div>
+              <div className="brand-subtitle">
+                {estRAElectricite ? "Électricité" : "Automatisme & GTB"}
+              </div>
             </div>
           )}
         </div>
@@ -92,7 +117,7 @@ export default function Layout() {
         </button>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -108,7 +133,7 @@ export default function Layout() {
               {!reduite && <span className="nav-link-texte">{item.label}</span>}
             </NavLink>
           ))}
-          {isAdmin && (
+          {isAdmin && !estRAElectricite && (
             <NavLink
               to="/utilisateurs"
               title={reduite ? "Utilisateurs" : undefined}
@@ -182,6 +207,8 @@ function formatRole(role) {
       return "Automaticien";
     case "electricien":
       return "Électricien";
+    case "ra_electricite":
+      return "RA Électricité";
     default:
       return role ?? "";
   }
