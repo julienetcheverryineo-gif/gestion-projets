@@ -2088,7 +2088,11 @@ textarea:focus {
 .data-table td {
   padding: 9px 6px;
   border-bottom: 1px solid var(--border);
-  font-family: var(--font-mono);
+  /* La police mono (utilisée ailleurs pour des nombres courts) rendait les
+     textes longs (désignations, descriptions...) pâteux et peu lisibles
+     dans les tableaux denses — on repasse sur la police normale, plus
+     fine, comme les en-têtes. */
+  font-family: var(--font-ui);
 }
 
 /* ---------- Login ---------- */
