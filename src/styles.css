@@ -673,11 +673,11 @@ table.table-recap {
    colonnes déclarées dès que le tableau a plus d'une ligne d'en-tête
    (cas ici, avec la ligne de groupes Matériel/Main d'œuvre). On repasse
    donc sa largeur à "auto" pour que les largeurs déclarées soient
-   utilisées telles quelles — Désignation reçoit sa largeur calculée en
-   JS (voir ElectriciteSiteDetail.jsx) pour quand même occuper tout
-   l'espace disponible. */
+   utilisées telles quelles (toutes fixes, y compris Désignation — voir
+   ElectriciteSiteDetail.jsx). */
 table.elec-lignes-table {
   width: auto;
+  min-width: 0;
 }
 .elec-th-figee,
 .elec-td-figee {
@@ -746,11 +746,11 @@ th.elec-col-mo {
   border: 1px solid var(--border);
   border-left: 3px solid var(--text-muted);
   border-radius: var(--radius-sm);
-  padding: 2px 6px;
+  padding: 3px 8px;
   background: var(--panel);
 }
 .elec-avancement-input input {
-  width: 42px;
+  width: 56px;
   border: none;
   background: transparent;
   font-family: var(--font-mono);

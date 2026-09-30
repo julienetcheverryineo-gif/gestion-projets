@@ -15,18 +15,27 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 const LARGEUR_NUMERO = 22;
 const LARGEUR_UNITE = 36;
 const LARGEUR_QTE = 40;
-const LARGEUR_MIN_DESIGNATION = 220;
-// Somme des largeurs des colonnes Matériel (100+110+220+120+120=670) et
-// Main d'œuvre (100+90+220+110+120=640) déclarées plus bas dans le JSX —
-// à garder synchronisée si ces largeurs changent.
-const SOMME_LARGEURS_GROUPES = 670 + 640;
-// Avec table-layout:fixed, une largeur déclarée est toujours respectée
-// à l'identique (voir plus bas pourquoi le tableau est en largeur
-// "auto") : Désignation reçoit donc sa largeur calculée en JS (tout
-// l'espace disponible en plus des autres colonnes, jamais en dessous
-// d'un minimum lisible) plutôt qu'une constante, pour occuper tout
-// l'écran quelle que soit sa taille.
-const LARGEUR_ENTETE_FIGEE_SANS_DESIGNATION = LARGEUR_NUMERO + LARGEUR_UNITE + LARGEUR_QTE;
+const LARGEUR_DESIGNATION = 460;
+const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
+// Largeurs des colonnes Matériel puis Main d'œuvre (dans l'ordre du tableau).
+const LARGEURS_COLONNES_MATERIEL = [100, 110, 220, 120, 120];
+const LARGEURS_COLONNES_MO = [100, 90, 220, 110, 120];
+// Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
+// ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
+// la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
+// cellule avec colSpan qui porte une largeur voit celle-ci divisée à
+// parts égales entre les colonnes couvertes, et les largeurs posées sur
+// la 2e ligne sont ignorées. On contourne ça avec un <colgroup> (les
+// <col> ont priorité sur les cellules pour fixer la largeur de colonne).
+// Par ailleurs, une table en table-layout:fixed avec une largeur "auto"
+// se comprime pour tenir dans son conteneur dès qu'il est plus étroit
+// que la somme des colonnes (au lieu de garder ses largeurs et de
+// déclencher le défilement horizontal du wrapper) : on fixe donc aussi
+// une largeur explicite sur la table, égale à cette somme.
+const LARGEUR_TABLE_LIGNES =
+  LARGEUR_ENTETE_FIGEE +
+  LARGEURS_COLONNES_MATERIEL.reduce((a, b) => a + b, 0) +
+  LARGEURS_COLONNES_MO.reduce((a, b) => a + b, 0);
 
 // Largeur des colonnes fixes du tableau Récap (tout sauf Type de FO, qui
 // reçoit le même traitement que Désignation ci-dessus).
@@ -119,6 +128,8 @@ function TableauRecap({
   modifiable,
   onModifierGroupe,
   largeurColType,
+  portee,
+  devisId,
 }) {
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
@@ -130,8 +141,8 @@ function TableauRecap({
       </div>
       {modifiable && (
         <p className="simple-list-meta" style={{ marginBottom: 10 }}>
-          Modifiez un % ici pour l'appliquer d'un coup à toutes les lignes de ce type de FO,
-          dans tous les devis du chantier.
+          Modifiez un % ici pour l'appliquer d'un coup à toutes les lignes de ce type de FO
+          {portee === "devis" ? ", dans ce devis." : ", dans tous les devis du chantier."}
         </p>
       )}
       {recap.parType.length === 0 ? (
@@ -166,7 +177,7 @@ function TableauRecap({
                     {modifiable ? (
                       <LigneAvancementModifiable
                         pct={l.pctAvancement}
-                        onValider={(v) => onModifierGroupe(l.cle, l.libelle, v)}
+                        onValider={(v) => onModifierGroupe(l.cle, l.libelle, v, devisId)}
                       />
                     ) : (
                       <LigneAvancementBarre pct={l.pctAvancement} />
@@ -242,10 +253,10 @@ export default function ElectriciteSiteDetail() {
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
 
   // Largeur réelle de la page, mesurée en continu (redimensionnement de
-  // la fenêtre, repli du menu latéral...) : Désignation et Type de FO
-  // (seules colonnes sans largeur fixe) s'en servent pour occuper tout
-  // l'espace disponible plutôt que de laisser un vide à droite des
-  // tableaux.
+  // la fenêtre, repli du menu latéral...) : Type de FO, dans les tableaux
+  // Récap / synthèse uniquement, s'en sert pour occuper tout l'espace
+  // disponible plutôt que de laisser un vide à droite. Le tableau des
+  // lignes de devis, lui, garde une largeur de Désignation fixe.
   const pageRef = useRef(null);
   const [largeurPage, setLargeurPage] = useState(1200);
   useEffect(() => {
@@ -257,10 +268,6 @@ export default function ElectriciteSiteDetail() {
     observateur.observe(el);
     return () => observateur.disconnect();
   }, []);
-  const largeurDesignation = Math.max(
-    LARGEUR_MIN_DESIGNATION,
-    largeurPage - LARGEUR_ENTETE_FIGEE_SANS_DESIGNATION - SOMME_LARGEURS_GROUPES
-  );
   // Les tableaux Récap sont dans un .panel (20px de padding de chaque
   // côté) : leur largeur disponible est donc celle de la page moins ce
   // padding.
@@ -354,29 +361,38 @@ export default function ElectriciteSiteDetail() {
       }))
     : [];
 
-  // Saisie groupée depuis la synthèse (tous devis) : applique le même %
-  // à toutes les lignes de ce type de FO, dans tous les devis du
-  // chantier — le même filtre que celui utilisé pour construire le
-  // groupe (mêmes lignes chiffrées, même Type de FO).
-  const appliquerAvancementGroupe = async (cle, libelle, valeur) => {
+  // Saisie groupée : applique le même % à toutes les lignes de ce type de
+  // FO — soit dans tous les devis du chantier (depuis la synthèse), soit
+  // dans un seul devis (depuis son propre tableau Récap) — avec le même
+  // filtre que celui utilisé pour construire le groupe (mêmes lignes
+  // chiffrées, même Type de FO).
+  const appliquerAvancementGroupe = async (cle, libelle, valeur, devisId) => {
     const v = Math.max(0, Math.min(100, Number(valeur) || 0));
     const champ = champAvancementRecap;
     const lignesCible = lignesChantier.filter(
-      (l) => (l.typeFo || "").trim() === cle && (l[champRecap] || 0) > 0
+      (l) =>
+        (l.typeFo || "").trim() === cle &&
+        (l[champRecap] || 0) > 0 &&
+        (!devisId || l.devisId === devisId)
     );
     if (lignesCible.length === 0) return;
     const nbDevisCibles = new Set(lignesCible.map((l) => l.devisId)).size;
+    const portee = devisId
+      ? "Cela concerne " + lignesCible.length + " ligne(s) de ce devis"
+      : "Cela concerne " +
+        lignesCible.length +
+        " ligne(s) dans " +
+        nbDevisCibles +
+        " devis";
     if (
       !confirm(
         "Appliquer " +
           v +
           " % à toutes les lignes « " +
           libelle +
-          " » ? Cela concerne " +
-          lignesCible.length +
-          " ligne(s) dans " +
-          nbDevisCibles +
-          " devis, et écrase leur valeur actuelle."
+          " » ? " +
+          portee +
+          ", et écrase leur valeur actuelle."
       )
     ) {
       return;
@@ -473,6 +489,7 @@ export default function ElectriciteSiteDetail() {
                 modifiable={peutGerer}
                 onModifierGroupe={appliquerAvancementGroupe}
                 largeurColType={largeurColType}
+                portee="chantier"
               />
               {recapParDevis.map(({ devis: d, recap }) => (
                 <TableauRecap
@@ -483,6 +500,10 @@ export default function ElectriciteSiteDetail() {
                   uniteValeur={uniteRecap}
                   libelleValeur={libelleValeurRecap}
                   largeurColType={largeurColType}
+                  modifiable={peutGerer}
+                  onModifierGroupe={appliquerAvancementGroupe}
+                  portee="devis"
+                  devisId={d.id}
                 />
               ))}
             </>
@@ -542,7 +563,19 @@ export default function ElectriciteSiteDetail() {
               </div>
 
               <div className="data-table-wrapper elec-lignes-wrapper">
-                <table className="data-table elec-lignes-table">
+                <table className="data-table elec-lignes-table" style={{ width: LARGEUR_TABLE_LIGNES }}>
+                  <colgroup>
+                    <col style={{ width: LARGEUR_NUMERO }} />
+                    <col style={{ width: LARGEUR_DESIGNATION }} />
+                    <col style={{ width: LARGEUR_UNITE }} />
+                    <col style={{ width: LARGEUR_QTE }} />
+                    {LARGEURS_COLONNES_MATERIEL.map((l, i) => (
+                      <col key={"mat-" + i} style={{ width: l }} />
+                    ))}
+                    {LARGEURS_COLONNES_MO.map((l, i) => (
+                      <col key={"mo-" + i} style={{ width: l }} />
+                    ))}
+                  </colgroup>
                   <thead>
                     <tr className="elec-entete-groupes">
                       <th
@@ -550,7 +583,7 @@ export default function ElectriciteSiteDetail() {
                         className="elec-th-figee"
                         style={{
                           left: 0,
-                          width: LARGEUR_ENTETE_FIGEE_SANS_DESIGNATION + largeurDesignation,
+                          width: LARGEUR_ENTETE_FIGEE,
                         }}
                       />
                       <th colSpan={5} className="elec-groupe elec-groupe-materiel">
@@ -569,7 +602,7 @@ export default function ElectriciteSiteDetail() {
                       </th>
                       <th
                         className="elec-th-figee elec-th-figee-bord"
-                        style={{ left: LARGEUR_NUMERO, width: largeurDesignation }}
+                        style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
                       >
                         Désignation
                       </th>
@@ -641,7 +674,7 @@ export default function ElectriciteSiteDetail() {
                           </td>
                           <td
                             className="elec-td-figee elec-th-figee-bord"
-                            style={{ left: LARGEUR_NUMERO, width: largeurDesignation }}
+                            style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
                             title={titreDesignation}
                           >
                             {l.designation}
