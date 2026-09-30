@@ -570,6 +570,57 @@ a {
   background: var(--accent);
 }
 
+/* ---------- Électricité : récapitulatifs FO/MO ---------- */
+/* Séparation moderne des colonnes : un fin filet vertical entre chaque
+   colonne (plutôt que le quadrillage classique), chiffres alignés à
+   droite pour une lecture en colonne, ligne TOTAL détachée par un
+   filet plus marqué. */
+.table-recap th,
+.table-recap td {
+  border-right: 1px solid var(--border);
+}
+.table-recap th:last-child,
+.table-recap td:last-child {
+  border-right: none;
+}
+.table-recap .col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.table-recap .col-avancement {
+  min-width: 160px;
+}
+.table-recap-total td {
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+  background: color-mix(in srgb, var(--accent-dim) 35%, transparent);
+}
+
+.recap-avancement-barre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.recap-avancement-barre .progress-bar {
+  flex: 1;
+  min-width: 60px;
+}
+.recap-avancement-barre span {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.progress-bar-fill.elec-avancement-nul {
+  background: var(--text-muted);
+}
+.progress-bar-fill.elec-avancement-partiel {
+  background: var(--warn);
+}
+.progress-bar-fill.elec-avancement-fait {
+  background: var(--ok);
+}
+
 /* ---------- Électricité : devis & lignes ---------- */
 .elec-synthese-grid {
   display: grid;
@@ -1553,6 +1604,10 @@ th.charge-table-col-personne {
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 16px;
+}
+.chantier-actions-bar-recap {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .tache-heures-input {

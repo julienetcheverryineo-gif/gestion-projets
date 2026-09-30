@@ -110,42 +110,46 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
         <p className="simple-list-meta">Aucune donnée chiffrée pour ce périmètre.</p>
       ) : (
         <div className="data-table-wrapper">
-          <table className="data-table">
+          <table className="data-table table-recap">
             <thead>
               <tr>
                 <th>Type de FO</th>
-                <th>{libelleValeur}</th>
-                <th>Réalisé (avancement)</th>
-                <th>% avancement</th>
-                <th>Restant</th>
+                <th className="col-num">{libelleValeur}</th>
+                <th className="col-num">Réalisé (avancement)</th>
+                <th className="col-avancement">% avancement</th>
+                <th className="col-num">Restant</th>
               </tr>
             </thead>
             <tbody>
               {recap.parType.map((l) => (
                 <tr key={l.libelle}>
                   <td style={{ fontFamily: "var(--font-ui)" }}>{l.libelle}</td>
-                  <td>
+                  <td className="col-num">
                     {formatNombre(l.budget)} {uniteValeur}
                   </td>
-                  <td>
+                  <td className="col-num">
                     {formatNombre(l.realise)} {uniteValeur}
                   </td>
-                  <td>{formatPct(l.pctAvancement)}</td>
-                  <td>
+                  <td className="col-avancement">
+                    <LigneAvancementBarre pct={l.pctAvancement} />
+                  </td>
+                  <td className="col-num">
                     {formatNombre(l.restant)} {uniteValeur}
                   </td>
                 </tr>
               ))}
-              <tr style={{ fontWeight: 700 }}>
+              <tr className="table-recap-total">
                 <td>TOTAL</td>
-                <td>
+                <td className="col-num">
                   {formatNombre(recap.total.budget)} {uniteValeur}
                 </td>
-                <td>
+                <td className="col-num">
                   {formatNombre(recap.total.realise)} {uniteValeur}
                 </td>
-                <td>{formatPct(recap.total.pctAvancement)}</td>
-                <td>
+                <td className="col-avancement">
+                  <LigneAvancementBarre pct={recap.total.pctAvancement} />
+                </td>
+                <td className="col-num">
                   {formatNombre(recap.total.restant)} {uniteValeur}
                 </td>
               </tr>
@@ -153,6 +157,18 @@ function TableauRecap({ titre, sousTitre, recap, uniteValeur, libelleValeur }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function LigneAvancementBarre({ pct }) {
+  const pourcent = Math.max(0, Math.min(100, pct * 100));
+  return (
+    <div className="recap-avancement-barre">
+      <div className="progress-bar">
+        <div className={"progress-bar-fill " + classeAvancement(pourcent)} style={{ width: pourcent + "%" }} />
+      </div>
+      <span>{formatPct(pct)}</span>
     </div>
   );
 }
@@ -286,6 +302,24 @@ export default function ElectriciteSiteDetail() {
         </div>
       ) : (
         <>
+          {/* Toujours au même endroit, au-dessus des onglets devis (qui
+              peuvent être nombreux et passer à la ligne) : les deux
+              récapitulatifs restent faciles à retrouver. */}
+          <div className="chantier-actions-bar chantier-actions-bar-recap">
+            <button
+              className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif(recapActif === "fo" ? null : "fo")}
+            >
+              📊 Récap Avancement FO
+            </button>
+            <button
+              className={recapActif === "mo" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif(recapActif === "mo" ? null : "mo")}
+            >
+              📊 Récap Avancement MO
+            </button>
+          </div>
+
           <div className="chantier-actions-bar">
             {devis.map((d) => (
               <button
@@ -301,18 +335,6 @@ export default function ElectriciteSiteDetail() {
                 {d.nom}
               </button>
             ))}
-            <button
-              className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif(recapActif === "fo" ? null : "fo")}
-            >
-              📊 Récap Avancement FO
-            </button>
-            <button
-              className={recapActif === "mo" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif(recapActif === "mo" ? null : "mo")}
-            >
-              📊 Récap Avancement MO
-            </button>
           </div>
 
           {recapActif && (
