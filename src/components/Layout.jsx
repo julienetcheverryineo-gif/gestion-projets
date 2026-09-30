@@ -18,7 +18,7 @@ const NAV_ITEMS_AUTOMATISME = [
 // (qui continuent de pointer sur l'interface actuelle) n'ont pas accès à
 // cet espace.
 const NAV_ITEMS_ELECTRICITE = [
-  { to: "/electricite", label: "Vue d'ensemble", end: true, icone: "🏠" },
+  { to: "/electricite", label: "Chantiers", end: true, icone: "🏗️" },
 ];
 
 // Un simple reload() peut resservir une version en cache (c'est ce qui

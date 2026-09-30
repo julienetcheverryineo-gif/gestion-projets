@@ -1,8 +1,5 @@
 import * as XLSX from "xlsx";
-
-// Un "code" de poste : lettres, puis zéro ou plusieurs groupes ".chiffres".
-// Exemples : "A" (profondeur 0), "A.1" (profondeur 1), "A.1.1" (profondeur 2)
-const RE_CODE = /^[A-Za-z]+(\.\d+)*$/;
+import { RE_CODE, trouverLigneEntete, trouverColonne } from "./parseXlsxCommun";
 
 const LABELS = {
   numero: ["n°", "no"],
@@ -15,32 +12,6 @@ const LABELS = {
   typeMo: ["type mo", "type de mo"],
   tempsUnitaire: ["temps unitaire"],
 };
-
-function normaliser(texte) {
-  return String(texte ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-function trouverLigneEntete(rows) {
-  for (let i = 0; i < Math.min(rows.length, 10); i++) {
-    const ligne = rows[i].map(normaliser);
-    if (ligne.some((c) => LABELS.numero.includes(c))) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-function trouverColonne(entete, cles) {
-  const normalisee = entete.map(normaliser);
-  for (let c = 0; c < normalisee.length; c++) {
-    if (cles.some((cle) => normalisee[c] === cle)) return c;
-  }
-  return -1;
-}
 
 // Construit la ou les lignes d'article (matériel/tâche) à partir d'une
 // ligne brute du tableau. Une ligne qui a à la fois un code Type de FO et un
@@ -140,7 +111,7 @@ export function analyserClasseur(arrayBuffer) {
   const feuille = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(feuille, { header: 1, defval: "" });
 
-  const iEntete = trouverLigneEntete(rows);
+  const iEntete = trouverLigneEntete(rows, LABELS.numero);
   if (iEntete === -1) {
     throw new Error(
       "Impossible de détecter l'en-tête du tableau (colonne « n° » introuvable)."

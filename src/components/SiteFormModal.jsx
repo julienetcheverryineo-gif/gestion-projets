@@ -16,7 +16,16 @@ export function formatStatutChantier(statut) {
 // Formulaire chantier unifié : infos générales ET équipe en un seul endroit,
 // aussi bien à la création (l'équipe peut rester vide, à affecter plus
 // tard) qu'à la modification.
-export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
+//
+// `service` distingue les deux périmètres de l'application : "automatisme"
+// (par défaut, inchangé) propose la liste des automaticiens (utilisateurs
+// de l'appli) + des électriciens externes en texte libre, comme avant.
+// "electricite" propose à la place la liste des électriciens (utilisateurs
+// de l'appli, rôle "electricien") — l'équivalent de la liste des
+// automaticiens côté Automatisme — et enregistre le chantier avec
+// `service: "electricite"` pour qu'il n'apparaisse que dans cet espace.
+export default function SiteFormModal({ chantier, utilisateurs, service = "automatisme", onClose }) {
+  const estElectricite = service === "electricite";
   const [nom, setNom] = useState(chantier?.nom ?? "");
   const [client, setClient] = useState(chantier?.client ?? "");
   const [adresse, setAdresse] = useState(chantier?.adresse ?? "");
@@ -33,10 +42,21 @@ export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
   const [electricienAAffecter, setElectricienAAffecter] = useState(
     chantier?.electricienAAffecter ?? false
   );
+  const [equipeElectriciens, setEquipeElectriciens] = useState(
+    chantier?.equipeElectriciens ?? []
+  );
   const [enCours, setEnCours] = useState(false);
+
+  const utilisateursElectriciens = utilisateurs.filter((u) => u.role === "electricien");
 
   const basculerAutomaticien = (nomPersonne) => {
     setAutomaticiens((liste) =>
+      liste.includes(nomPersonne) ? liste.filter((n) => n !== nomPersonne) : [...liste, nomPersonne]
+    );
+  };
+
+  const basculerElectricien = (nomPersonne) => {
+    setEquipeElectriciens((liste) =>
       liste.includes(nomPersonne) ? liste.filter((n) => n !== nomPersonne) : [...liste, nomPersonne]
     );
   };
@@ -48,18 +68,30 @@ export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
       .split(",")
       .map((n) => n.trim())
       .filter(Boolean);
-    const donnees = {
-      nom,
-      client,
-      adresse,
-      statut,
-      compte,
-      ra,
-      responsableChantier,
-      automaticiens,
-      electriciens,
-      electricienAAffecter,
-    };
+    const donnees = estElectricite
+      ? {
+          nom,
+          client,
+          adresse,
+          statut,
+          compte,
+          ra,
+          responsableChantier,
+          equipeElectriciens,
+          service: "electricite",
+        }
+      : {
+          nom,
+          client,
+          adresse,
+          statut,
+          compte,
+          ra,
+          responsableChantier,
+          automaticiens,
+          electriciens,
+          electricienAAffecter,
+        };
     if (chantier) {
       await updateDoc(doc(db, "sites", chantier.id), donnees);
     } else {
@@ -130,42 +162,71 @@ export default function SiteFormModal({ chantier, utilisateurs, onClose }) {
             </label>
           </div>
 
-          <div>
-            <div className="reg-subheading" style={{ marginBottom: 8 }}>
-              Automaticiens (utilisateurs de l'application)
+          {estElectricite ? (
+            <div>
+              <div className="reg-subheading" style={{ marginBottom: 8 }}>
+                Électriciens (utilisateurs de l'application)
+              </div>
+              {utilisateursElectriciens.length === 0 ? (
+                <p className="empty-state-description" style={{ margin: 0 }}>
+                  Aucun utilisateur avec le rôle « Électricien » pour l'instant — créez-en un
+                  depuis la page Utilisateurs.
+                </p>
+              ) : (
+                <div className="team-checklist">
+                  {utilisateursElectriciens.map((u) => (
+                    <label key={u.id} className="team-checklist-item">
+                      <input
+                        type="checkbox"
+                        checked={equipeElectriciens.includes(u.nom)}
+                        onChange={() => basculerElectricien(u.nom)}
+                      />
+                      {u.nom}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="team-checklist">
-              {utilisateurs.map((u) => (
-                <label key={u.id} className="team-checklist-item">
-                  <input
-                    type="checkbox"
-                    checked={automaticiens.includes(u.nom)}
-                    onChange={() => basculerAutomaticien(u.nom)}
-                  />
-                  {u.nom}
-                </label>
-              ))}
-            </div>
-          </div>
+          ) : (
+            <>
+              <div>
+                <div className="reg-subheading" style={{ marginBottom: 8 }}>
+                  Automaticiens (utilisateurs de l'application)
+                </div>
+                <div className="team-checklist">
+                  {utilisateurs.map((u) => (
+                    <label key={u.id} className="team-checklist-item">
+                      <input
+                        type="checkbox"
+                        checked={automaticiens.includes(u.nom)}
+                        onChange={() => basculerAutomaticien(u.nom)}
+                      />
+                      {u.nom}
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-          <label>
-            Électriciens (souvent externes, sans compte — noms libres séparés par une
-            virgule)
-            <input
-              value={electriciensTexte}
-              onChange={(e) => setElectriciensTexte(e.target.value)}
-              placeholder="ex : Jean Dupont, Marc Petit"
-            />
-          </label>
-          <label className="team-checklist-item" style={{ marginTop: -6 }}>
-            <input
-              type="checkbox"
-              checked={electricienAAffecter}
-              onChange={(e) => setElectricienAAffecter(e.target.checked)}
-            />
-            Électricien à affecter (besoin identifié, personne pas encore choisie — apparaît
-            comme option dans le responsable des tâches)
-          </label>
+              <label>
+                Électriciens (souvent externes, sans compte — noms libres séparés par une
+                virgule)
+                <input
+                  value={electriciensTexte}
+                  onChange={(e) => setElectriciensTexte(e.target.value)}
+                  placeholder="ex : Jean Dupont, Marc Petit"
+                />
+              </label>
+              <label className="team-checklist-item" style={{ marginTop: -6 }}>
+                <input
+                  type="checkbox"
+                  checked={electricienAAffecter}
+                  onChange={(e) => setElectricienAAffecter(e.target.checked)}
+                />
+                Électricien à affecter (besoin identifié, personne pas encore choisie —
+                apparaît comme option dans le responsable des tâches)
+              </label>
+            </>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>

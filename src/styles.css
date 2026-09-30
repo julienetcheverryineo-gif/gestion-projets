@@ -570,6 +570,21 @@ a {
   background: var(--accent);
 }
 
+/* ---------- Électricité : devis & lignes ---------- */
+.elec-synthese-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+.elec-ligne-poste td {
+  font-weight: 600;
+  background: var(--bg);
+}
+.elec-ligne-informative td {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* ---------- Lots techniques ---------- */
 .lot-list {
   display: flex;

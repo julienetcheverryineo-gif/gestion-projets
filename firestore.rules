@@ -15,6 +15,13 @@ service cloud.firestore {
       return estConnecte() && (monRole() == 'chef_de_projet' || monRole() == 'admin');
     }
 
+    // Le profil "RA Électricité" gère son propre périmètre (chantiers
+    // service électricité, devis importés) avec les mêmes droits qu'un
+    // chef de projet côté Automatisme.
+    function estGestionnaireElec() {
+      return estConnecte() && (monRole() == 'ra_electricite' || estChefOuAdmin());
+    }
+
     // Chaque utilisateur peut lire/modifier son propre profil.
     // Seuls les chefs de projet / admins peuvent changer un rôle.
     match /users/{userId} {
@@ -58,10 +65,24 @@ service cloud.firestore {
       allow delete: if estChefOuAdmin();
     }
 
-    // Chantiers : lecture pour tous les connectés, écriture réservée aux chefs de projet/admins
+    // Chantiers : lecture pour tous les connectés, écriture réservée aux
+    // chefs de projet/admins (+ RA Électricité, pour ses chantiers
+    // service électricité).
     match /sites/{siteId} {
       allow read: if estConnecte();
-      allow create, update, delete: if estChefOuAdmin();
+      allow create, update, delete: if estGestionnaireElec();
+    }
+
+    // Devis Électricité (un onglet par minute importée) et leurs lignes :
+    // lecture pour tous les connectés, gestion réservée au RA Électricité
+    // (et aux chefs de projet/admins).
+    match /elecDevis/{devisId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estGestionnaireElec();
+    }
+    match /elecLignes/{ligneId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estGestionnaireElec();
     }
 
     // Lots techniques : lecture pour tous, gestion réservée aux chefs de projet/admins
