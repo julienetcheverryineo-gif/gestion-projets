@@ -585,6 +585,107 @@ a {
   font-style: italic;
 }
 
+/* Colonnes figées (N°, Référence, Désignation) : gel de volets comme dans
+   Excel, pour garder l'identité de la ligne visible en défilant vers les
+   colonnes Matériel / Main d'œuvre, nombreuses. */
+.elec-lignes-wrapper {
+  overflow-x: auto;
+}
+.elec-lignes-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 100%;
+  /* Indispensable pour que les largeurs déclarées (et donc les décalages
+     `left` des colonnes figées) restent exactes même quand une
+     désignation est longue — sans ça, la colonne s'élargit toute seule
+     et les colonnes figées suivantes se chevauchent. */
+  table-layout: fixed;
+}
+.elec-th-figee,
+.elec-td-figee {
+  position: sticky;
+  background: var(--panel);
+  z-index: 1;
+}
+thead .elec-th-figee {
+  z-index: 3;
+}
+.elec-th-figee-bord {
+  box-shadow: 2px 0 0 var(--ring);
+}
+
+/* En-tête de groupe (Saisie / Matériel / Main d'œuvre), coloré comme les
+   sections d'un classeur Excel — la même teinte redescend en filigrane
+   sur les colonnes du groupe pour les repérer d'un coup d'œil. */
+.elec-entete-groupes th {
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-bottom: none;
+}
+.elec-groupe {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.elec-groupe-saisie {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  color: var(--warn);
+}
+.elec-groupe-materiel {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.elec-groupe-mo {
+  background: var(--tache-dim);
+  color: var(--tache);
+}
+.elec-col-saisie {
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+}
+.elec-col-materiel {
+  background: color-mix(in srgb, var(--accent-dim) 45%, transparent);
+}
+.elec-col-mo {
+  background: color-mix(in srgb, var(--tache-dim) 45%, transparent);
+}
+th.elec-col-saisie,
+th.elec-col-materiel,
+th.elec-col-mo {
+  text-align: left;
+}
+
+.elec-avancement-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  background: var(--panel);
+}
+.elec-avancement-input input {
+  width: 42px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  padding: 0;
+}
+.elec-avancement-input span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.elec-avancement-nul {
+  border-left-color: var(--text-muted);
+}
+.elec-avancement-partiel {
+  border-left-color: var(--warn);
+}
+.elec-avancement-fait {
+  border-left-color: var(--ok);
+}
+
 /* ---------- Lots techniques ---------- */
 .lot-list {
   display: flex;
