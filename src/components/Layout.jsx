@@ -12,11 +12,10 @@ const NAV_ITEMS_AUTOMATISME = [
   { to: "/notes", label: "Notes", icone: "📝" },
 ];
 
-// Le profil "RA Électricité" est cloisonné : il ne voit que l'espace
-// Électricité (encore vide, à construire), jamais les chantiers/tâches/
-// planning de l'Automatisme & GTB — et inversement, les autres profils
-// (qui continuent de pointer sur l'interface actuelle) n'ont pas accès à
-// cet espace.
+// L'espace Électricité est réservé à l'administrateur et au RA
+// Électricité (qui peuvent basculer librement entre les deux espaces,
+// voir les boutons du pied de menu) ; les autres profils n'y ont pas
+// accès et restent sur l'Automatisme & GTB.
 const NAV_ITEMS_ELECTRICITE = [
   { to: "/electricite", label: "Chantiers", end: true, icone: "🏗️" },
 ];
@@ -48,17 +47,17 @@ export default function Layout() {
   const [reduite, setReduite] = useState(chargerSidebarReduite);
 
   const estRAElectricite = profile?.role === "ra_electricite";
+  // Administrateur et RA Électricité peuvent basculer librement entre les
+  // deux espaces (boutons dans le pied de menu) ; les autres profils
+  // restent cantonnés à l'Automatisme & GTB, comme avant.
+  const peutBasculerEspaces = isAdmin || estRAElectricite;
+  const enEspaceElectricite = location.pathname.startsWith("/electricite");
 
-  // Cloisonnement entre les deux espaces : hors de son espace, chacun est
-  // renvoyé vers sa page d'accueil plutôt que de voir l'autre interface.
-  if (estRAElectricite && !location.pathname.startsWith("/electricite")) {
-    return <Navigate to="/electricite" replace />;
-  }
-  if (!estRAElectricite && location.pathname.startsWith("/electricite")) {
+  if (enEspaceElectricite && !peutBasculerEspaces) {
     return <Navigate to="/" replace />;
   }
 
-  const navItems = estRAElectricite ? NAV_ITEMS_ELECTRICITE : NAV_ITEMS_AUTOMATISME;
+  const navItems = enEspaceElectricite ? NAV_ITEMS_ELECTRICITE : NAV_ITEMS_AUTOMATISME;
 
   const handleLogout = async () => {
     await logout();
@@ -99,7 +98,7 @@ export default function Layout() {
             <div>
               <div className="brand-title">Pilotage</div>
               <div className="brand-subtitle">
-                {estRAElectricite ? "Électricité" : "Automatisme & GTB"}
+                {enEspaceElectricite ? "Électricité" : "Automatisme & GTB"}
               </div>
             </div>
           )}
@@ -133,7 +132,7 @@ export default function Layout() {
               {!reduite && <span className="nav-link-texte">{item.label}</span>}
             </NavLink>
           ))}
-          {isAdmin && !estRAElectricite && (
+          {isAdmin && !enEspaceElectricite && (
             <NavLink
               to="/utilisateurs"
               title={reduite ? "Utilisateurs" : undefined}
@@ -166,6 +165,26 @@ export default function Layout() {
                 <div className="user-role">{formatRole(profile?.role)}</div>
               </div>
             </div>
+          )}
+          {peutBasculerEspaces && (
+            <button
+              className="btn-ghost"
+              onClick={() => navigate("/")}
+              disabled={!enEspaceElectricite}
+              title="Basculer vers l'espace Automatisme & GTB"
+            >
+              {reduite ? "🏗️" : "🏗️ Automatisme & GTB"}
+            </button>
+          )}
+          {peutBasculerEspaces && (
+            <button
+              className="btn-ghost"
+              onClick={() => navigate("/electricite")}
+              disabled={enEspaceElectricite}
+              title="Basculer vers l'espace Électricité"
+            >
+              {reduite ? "⚡" : "⚡ Électricité"}
+            </button>
           )}
           <button className="btn-ghost" onClick={handleLogout} title="Se déconnecter">
             {reduite ? "⏻" : "Se déconnecter"}

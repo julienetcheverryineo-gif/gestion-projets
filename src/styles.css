@@ -755,6 +755,14 @@ th.elec-col-mo {
   background: transparent;
   font-family: var(--font-mono);
   padding: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.elec-avancement-input input::-webkit-outer-spin-button,
+.elec-avancement-input input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
 }
 .elec-avancement-input span {
   color: var(--text-muted);

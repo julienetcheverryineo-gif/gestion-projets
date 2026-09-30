@@ -238,6 +238,9 @@ function LigneAvancementModifiable({ pct, onValider }) {
           max="100"
           defaultValue={pourcent}
           onBlur={(e) => onValider(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
         />
         <span>%</span>
       </div>
@@ -697,6 +700,9 @@ export default function ElectriciteSiteDetail() {
                                   defaultValue={pctFo}
                                   disabled={!peutGerer}
                                   onBlur={(e) => changerAvancement(l, "avancementFo", e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") e.currentTarget.blur();
+                                  }}
                                 />
                                 <span>%</span>
                               </div>
@@ -727,6 +733,9 @@ export default function ElectriciteSiteDetail() {
                                   defaultValue={pctMo}
                                   disabled={!peutGerer}
                                   onBlur={(e) => changerAvancement(l, "avancementMo", e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") e.currentTarget.blur();
+                                  }}
                                 />
                                 <span>%</span>
                               </div>
