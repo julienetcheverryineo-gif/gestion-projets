@@ -16,13 +16,11 @@ import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectric
 const LARGEUR_NUMERO = 22;
 const LARGEUR_UNITE = 36;
 const LARGEUR_QTE = 68;
-// Resserrée nettement (était 460, puis 420) : avec 8 colonnes fixes en
-// plus des 2 colonnes de type, le total dépassait encore la largeur
-// disponible sur un écran de portable classique (jusqu'à ~1536px de
-// large, voire plus selon la mise à l'échelle Windows), et provoquait un
-// ascenseur horizontal permanent quelle que soit la largeur des colonnes
-// de type. Texte complet toujours disponible en infobulle.
-const LARGEUR_DESIGNATION = 260;
+// Désignation doit rester large et lisible (c'est le texte qui identifie
+// la ligne) : elle n'est plus touchée pour essayer de gagner de la place
+// ailleurs — seules les colonnes de type FO/MO (largeurTypeLigne,
+// ci-dessous) s'adaptent à l'espace disponible.
+const LARGEUR_DESIGNATION = 460;
 const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNITE + LARGEUR_QTE;
 // Largeurs fixes des colonnes Matériel puis Main d'œuvre (dans l'ordre du
 // tableau), hors colonne de type FO/MO (menu déroulant) : celle-ci occupe
@@ -30,15 +28,12 @@ const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNIT
 // dans le composant), pour profiter du repli du menu latéral ou d'un
 // écran large plutôt que de laisser un vide à droite du tableau — avec un
 // plancher pour rester lisible (texte tronqué, complet en infobulle et
-// dans la liste déroulante) quand l'espace manque. Les colonnes % avanc.
-// (saisies) gardent 90px ; les autres (valeurs courtes, "18,0 €") sont
-// resserrées au maximum pour libérer de la place au profit des colonnes
-// de type, l'objectif n°1 restant de ne jamais faire apparaître
-// d'ascenseur horizontal.
-const LARGEUR_MIN_TYPE_LIGNE = 40;
-const LARGEUR_MAX_TYPE_LIGNE = 260;
-const LARGEURS_COLONNES_MATERIEL_FIXES = [90, 70, 80, 80];
-const LARGEURS_COLONNES_MO_FIXES = [90, 60, 70, 80];
+// dans la liste déroulante) quand l'espace manque. Ces largeurs-ci
+// doivent rester assez généreuses pour loger une saisie (nombre + unité
+// €/h) sans chevaucher la colonne suivante.
+const LARGEUR_MIN_TYPE_LIGNE = 56;
+const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 110, 120, 120];
+const LARGEURS_COLONNES_MO_FIXES = [100, 90, 110, 120];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
@@ -317,17 +312,14 @@ export default function ElectriciteSiteDetail() {
   // Le tableau des lignes de devis est dans un .data-table-wrapper (16px
   // de padding + 1px de bordure de chaque côté, d'où la marge de 40 -
   // plutôt que 32 - prise ici) ; les deux colonnes de type (FO, MO) se
-  // partagent l'espace restant à parts égales, avec un plafond (au-delà,
-  // le libellé le plus long tient déjà largement, inutile d'occuper plus
-  // de place) — la largeur totale du tableau (largeurTableLignes, juste
-  // en dessous) suit toujours l'espace mesuré, donc ça ne fait
-  // normalement pas apparaître d'ascenseur.
-  const largeurTypeLigne = Math.min(
-    LARGEUR_MAX_TYPE_LIGNE,
-    Math.max(
-      LARGEUR_MIN_TYPE_LIGNE,
-      (largeurPage - 40 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
-    )
+  // partagent tout l'espace restant à parts égales, sans plafond, pour
+  // que le tableau utilise toujours la pleine largeur disponible plutôt
+  // que de laisser un vide à droite — la largeur totale du tableau
+  // (largeurTableLignes, juste en dessous) suit toujours l'espace
+  // mesuré, donc ça ne fait normalement pas apparaître d'ascenseur.
+  const largeurTypeLigne = Math.max(
+    LARGEUR_MIN_TYPE_LIGNE,
+    (largeurPage - 40 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
   );
   const largeurTableLignes =
     LARGEUR_ENTETE_FIGEE + SOMME_LARGEURS_FIXES_LIGNES + largeurTypeLigne * 2;

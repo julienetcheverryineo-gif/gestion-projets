@@ -1722,6 +1722,15 @@ th.charge-table-col-personne {
   padding: 5px 11px;
   font-size: 0.8rem;
 }
+/* Les boutons Bilan Fournitures / Bilan Main d'œuvre gardent la taille
+   "normale" des boutons (celle des boutons Électricité/Automatisme & GTB
+   du pied de menu), plutôt que la taille resserrée des onglets de devis
+   ci-dessus — priorité à la spécificité du sélecteur sur l'ordre CSS. */
+.elec-toolbar .chantier-actions-bar-recap.chantier-actions-bar .btn-primary,
+.elec-toolbar .chantier-actions-bar-recap.chantier-actions-bar .btn-ghost {
+  padding: 8px 16px;
+  font-size: 0.88rem;
+}
 
 .tache-heures-input {
   flex-shrink: 0;
