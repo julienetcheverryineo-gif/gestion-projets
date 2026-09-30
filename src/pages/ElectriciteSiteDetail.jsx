@@ -31,6 +31,7 @@ const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNIT
 // (saisies) gardent 100px ; les autres (valeurs courtes, "18,0 €") sont
 // resserrées pour libérer de la place au profit des colonnes de type.
 const LARGEUR_MIN_TYPE_LIGNE = 48;
+const LARGEUR_MAX_TYPE_LIGNE = 260;
 const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 95, 105, 105];
 const LARGEURS_COLONNES_MO_FIXES = [100, 80, 95, 105];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
@@ -309,15 +310,19 @@ export default function ElectriciteSiteDetail() {
     largeurPage - 40 - SOMME_LARGEURS_RECAP_FIXES
   );
   // Le tableau des lignes de devis est dans un .data-table-wrapper (16px
-  // de padding de chaque côté) ; les deux colonnes de type (FO, MO) se
-  // partagent l'espace restant à parts égales, sans plafond : plus on
-  // libère de place (menu latéral réduit, écran large), plus elles
-  // s'agrandissent pour rester lisibles — la largeur totale du tableau
-  // (largeurTableLignes, juste en dessous) suit toujours exactement
-  // l'espace mesuré, donc ça ne fait jamais apparaître d'ascenseur.
-  const largeurTypeLigne = Math.max(
-    LARGEUR_MIN_TYPE_LIGNE,
-    (largeurPage - 32 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
+  // de padding + 1px de bordure de chaque côté, d'où la marge de 40 -
+  // plutôt que 32 - prise ici) ; les deux colonnes de type (FO, MO) se
+  // partagent l'espace restant à parts égales, avec un plafond (au-delà,
+  // le libellé le plus long tient déjà largement, inutile d'occuper plus
+  // de place) — la largeur totale du tableau (largeurTableLignes, juste
+  // en dessous) suit toujours l'espace mesuré, donc ça ne fait
+  // normalement pas apparaître d'ascenseur.
+  const largeurTypeLigne = Math.min(
+    LARGEUR_MAX_TYPE_LIGNE,
+    Math.max(
+      LARGEUR_MIN_TYPE_LIGNE,
+      (largeurPage - 40 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
+    )
   );
   const largeurTableLignes =
     LARGEUR_ENTETE_FIGEE + SOMME_LARGEURS_FIXES_LIGNES + largeurTypeLigne * 2;
