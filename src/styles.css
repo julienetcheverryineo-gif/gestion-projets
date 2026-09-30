@@ -2268,6 +2268,26 @@ textarea:focus {
   width: 100%;
   max-width: 420px;
 }
+/* Formulaire chantier : plus de champs qu'un modal classique (espaces,
+   RA, équipes Automatisme + Électricité pouvant s'afficher ensemble) —
+   sélecteur à deux classes pour l'emporter sur .modal (max-width:420px)
+   par spécificité plutôt que par ordre dans le fichier. */
+.modal.modal-chantier {
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+/* Les cases "Espaces" (.team-checklist-item directement dans .form-inline,
+   pas dans .team-checklist comme d'habitude) héritaient de la mise en
+   page en colonne de la règle générique ".form label" (case au-dessus du
+   texte, tout centré) : .form label (une classe + un type) est plus
+   spécifique que .team-checklist-item seule. On restaure explicitement
+   la ligne horizontale avec un sélecteur plus spécifique. */
+.form-inline .team-checklist-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
 .modal h2 {
   margin-top: 0;
   font-size: 1.05rem;

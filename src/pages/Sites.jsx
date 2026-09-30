@@ -7,7 +7,10 @@ import { useCollection } from "../lib/firestoreHooks";
 import { normaliserAssignes } from "../lib/assignes";
 import { exporterMaterielAchats } from "../lib/exportMateriel";
 import ImportSuiviModal from "../components/ImportSuiviModal";
-import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
+import SiteFormModal, {
+  formatStatutChantier,
+  estChantierAutomatisme,
+} from "../components/SiteFormModal";
 import { calculerAvancementChantier, useSyncStatutEnCours } from "../lib/avancement";
 
 export default function Sites() {
@@ -165,7 +168,8 @@ export default function Sites() {
     );
   };
 
-  const chantiersAffiches = chantiers
+  const chantiersEspace = chantiers.filter(estChantierAutomatisme);
+  const chantiersAffiches = chantiersEspace
     .filter((c) => {
       if (filtreStatut === "tous") return true;
       if (filtreStatut === "termines") return c.statut === "termine";
@@ -295,10 +299,10 @@ export default function Sites() {
       ) : chantiersAffiches.length === 0 ? (
         <div className="empty-state">
           <p className="empty-state-title">
-            {chantiers.length === 0 ? "Aucun chantier" : "Aucun résultat"}
+            {chantiersEspace.length === 0 ? "Aucun chantier" : "Aucun résultat"}
           </p>
           <p className="empty-state-description">
-            {chantiers.length === 0
+            {chantiersEspace.length === 0
               ? "Créez votre premier chantier pour commencer à suivre les lots techniques."
               : "Essayez une autre recherche ou changez le filtre de statut."}
           </p>

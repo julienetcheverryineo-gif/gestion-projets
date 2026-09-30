@@ -13,24 +13,46 @@ export function formatStatutChantier(statut) {
   return STATUTS_CHANTIER.find((s) => s.value === statut)?.label ?? statut;
 }
 
+// Un chantier peut appartenir à l'espace Automatisme & GTB et/ou à l'espace
+// Électricité (cases à cocher "Espaces" plus bas) : coché uniquement
+// Électricité, il n'apparaît que dans Chantiers Électricité, et
+// inversement ; coché les deux, il apparaît dans les deux listes. Exportées
+// pour que les pages de liste (Sites.jsx, ElectriciteChantiers.jsx)
+// filtrent avec exactement la même règle que le formulaire. Pour les
+// chantiers créés avant l'existence de ces deux cases (ancien champ
+// `service`, seul et exclusif), on retombe sur son ancienne logique.
+export function estChantierAutomatisme(chantier) {
+  if (!chantier) return true;
+  if (chantier.espaceAutomatisme !== undefined) return chantier.espaceAutomatisme;
+  return chantier.service !== "electricite";
+}
+export function estChantierElectricite(chantier) {
+  if (!chantier) return false;
+  if (chantier.espaceElectricite !== undefined) return chantier.espaceElectricite;
+  return chantier.service === "electricite";
+}
+
 // Formulaire chantier unifié : infos générales ET équipe en un seul endroit,
 // aussi bien à la création (l'équipe peut rester vide, à affecter plus
 // tard) qu'à la modification.
 //
-// `service` distingue les deux périmètres de l'application : "automatisme"
-// (par défaut, inchangé) propose la liste des automaticiens (utilisateurs
-// de l'appli) + des électriciens externes en texte libre, comme avant.
-// "electricite" propose à la place la liste des électriciens (utilisateurs
-// de l'appli, rôle "electricien") — l'équivalent de la liste des
-// automaticiens côté Automatisme — et enregistre le chantier avec
-// `service: "electricite"` pour qu'il n'apparaisse que dans cet espace.
+// `service` ne sert plus qu'à préremplir les cases Espaces pour un NOUVEAU
+// chantier selon l'endroit d'où on l'ouvre (Automatisme ou Électricité) —
+// les deux cases restent ensuite librement modifiables, dans les deux
+// sens : un chantier peut très bien être rattaché aux deux espaces à la
+// fois.
 export default function SiteFormModal({ chantier, utilisateurs, service = "automatisme", onClose }) {
-  const estElectricite = service === "electricite";
   const [nom, setNom] = useState(chantier?.nom ?? "");
   const [client, setClient] = useState(chantier?.client ?? "");
   const [adresse, setAdresse] = useState(chantier?.adresse ?? "");
   const [statut, setStatut] = useState(chantier?.statut ?? "actif");
   const [compte, setCompte] = useState(chantier?.compte ?? "");
+  const [espaceAutomatisme, setEspaceAutomatisme] = useState(
+    chantier ? estChantierAutomatisme(chantier) : service !== "electricite"
+  );
+  const [espaceElectricite, setEspaceElectricite] = useState(
+    chantier ? estChantierElectricite(chantier) : service === "electricite"
+  );
   const [ra, setRa] = useState(chantier?.ra ?? "Julien ETCHEVERRY");
   const [responsableChantier, setResponsableChantier] = useState(
     chantier?.responsableChantier ?? ""
@@ -45,6 +67,7 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
   const [equipeElectriciens, setEquipeElectriciens] = useState(
     chantier?.equipeElectriciens ?? []
   );
+  const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
 
   const utilisateursElectriciens = utilisateurs.filter((u) => u.role === "electricien");
@@ -63,35 +86,35 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!espaceAutomatisme && !espaceElectricite) {
+      setErreur("Le chantier doit appartenir à au moins un espace (Automatisme et/ou Électricité).");
+      return;
+    }
+    setErreur("");
     setEnCours(true);
     const electriciens = electriciensTexte
       .split(",")
       .map((n) => n.trim())
       .filter(Boolean);
-    const donnees = estElectricite
-      ? {
-          nom,
-          client,
-          adresse,
-          statut,
-          compte,
-          ra,
-          responsableChantier,
-          equipeElectriciens,
-          service: "electricite",
-        }
-      : {
-          nom,
-          client,
-          adresse,
-          statut,
-          compte,
-          ra,
-          responsableChantier,
-          automaticiens,
-          electriciens,
-          electricienAAffecter,
-        };
+    const donnees = {
+      nom,
+      client,
+      adresse,
+      statut,
+      compte,
+      ra,
+      responsableChantier,
+      espaceAutomatisme,
+      espaceElectricite,
+      // Conservé pour compatibilité avec l'ancien filtre exclusif (au cas
+      // où un autre endroit du code s'y fierait encore) — reflète l'espace
+      // Électricité tel qu'il était avant l'ajout des deux cases.
+      service: espaceElectricite && !espaceAutomatisme ? "electricite" : null,
+      automaticiens,
+      electriciens,
+      electricienAAffecter,
+      equipeElectriciens,
+    };
     if (chantier) {
       await updateDoc(doc(db, "sites", chantier.id), donnees);
     } else {
@@ -103,7 +126,7 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-chantier" onClick={(e) => e.stopPropagation()}>
         <h2>{chantier ? "Modifier le chantier" : "Nouveau chantier"}</h2>
         <form onSubmit={handleSubmit} className="form">
           <label>
@@ -139,12 +162,42 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
             </label>
           </div>
 
+          <div className="form-divider">Espaces</div>
+          <p className="empty-state-description" style={{ margin: "-6px 0 0" }}>
+            Un chantier n'apparaît que dans le(s) espace(s) coché(s) ci-dessous.
+          </p>
+          <div className="form-inline">
+            <label className="team-checklist-item">
+              <input
+                type="checkbox"
+                checked={espaceAutomatisme}
+                onChange={(e) => setEspaceAutomatisme(e.target.checked)}
+              />
+              💻 Automatisme &amp; GTB
+            </label>
+            <label className="team-checklist-item">
+              <input
+                type="checkbox"
+                checked={espaceElectricite}
+                onChange={(e) => setEspaceElectricite(e.target.checked)}
+              />
+              ⚡ Électricité
+            </label>
+          </div>
+
           <div className="form-divider">Équipe (facultatif, à affecter plus tard si besoin)</div>
 
           <div className="form-inline">
             <label>
               RA (responsable d'affaire)
-              <input value={ra} onChange={(e) => setRa(e.target.value)} />
+              <select value={ra} onChange={(e) => setRa(e.target.value)}>
+                <option value="">—</option>
+                {utilisateurs.map((u) => (
+                  <option key={u.id} value={u.nom}>
+                    {u.nom}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Responsable de chantier
@@ -162,7 +215,7 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
             </label>
           </div>
 
-          {estElectricite ? (
+          {espaceElectricite && (
             <div>
               <div className="reg-subheading" style={{ marginBottom: 8 }}>
                 Électriciens (utilisateurs de l'application)
@@ -187,7 +240,9 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
                 </div>
               )}
             </div>
-          ) : (
+          )}
+
+          {espaceAutomatisme && (
             <>
               <div>
                 <div className="reg-subheading" style={{ marginBottom: 8 }}>
@@ -227,6 +282,8 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
               </label>
             </>
           )}
+
+          {erreur && <div className="form-error">{erreur}</div>}
 
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>

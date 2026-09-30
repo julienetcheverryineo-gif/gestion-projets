@@ -4,19 +4,22 @@ import { doc, query, collection, where, getDocs, writeBatch } from "firebase/fir
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
-import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
+import SiteFormModal, {
+  formatStatutChantier,
+  estChantierElectricite,
+} from "../components/SiteFormModal";
 
 // Liste des chantiers du service Électricité — même principe que la page
 // Chantiers de l'Automatisme, mais son propre périmètre : seuls les
-// chantiers avec `service === "electricite"` apparaissent ici (les
-// chantiers Automatisme, sans ce champ, n'y figurent jamais).
+// chantiers rattachés à l'espace Électricité (case à cocher du formulaire)
+// apparaissent ici.
 export default function ElectriciteChantiers() {
   const { isAdmin, profile } = useAuth();
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
   const { documents: tousChantiers, chargement } = useCollection("sites");
   const { documents: tousDevis } = useCollection("elecDevis");
   const { documents: utilisateurs } = useCollection("users", "email");
-  const chantiers = tousChantiers.filter((c) => c.service === "electricite");
+  const chantiers = tousChantiers.filter(estChantierElectricite);
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
