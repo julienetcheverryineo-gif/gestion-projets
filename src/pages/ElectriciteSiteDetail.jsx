@@ -178,16 +178,20 @@ function TableauRecap({
             <tbody>
               {recap.parType.map((l) => (
                 <tr key={l.libelle}>
-                  <td className="col-type" style={{ fontFamily: "var(--font-ui)" }}>
+                  <td
+                    className="col-type"
+                    data-label="Type de FO"
+                    style={{ fontFamily: "var(--font-ui)" }}
+                  >
                     {l.libelle}
                   </td>
-                  <td className="col-num">
+                  <td className="col-num" data-label={libelleValeur}>
                     {formatNombre(l.budget)} {uniteValeur}
                   </td>
-                  <td className="col-num">
+                  <td className="col-num" data-label="Réalisé">
                     {formatNombre(l.realise)} {uniteValeur}
                   </td>
-                  <td className="col-avancement">
+                  <td className="col-avancement" data-label="% avancement">
                     {modifiable ? (
                       <LigneAvancementModifiable
                         pct={l.pctAvancement}
@@ -197,23 +201,25 @@ function TableauRecap({
                       <LigneAvancementBarre pct={l.pctAvancement} />
                     )}
                   </td>
-                  <td className="col-num">
+                  <td className="col-num" data-label="Restant">
                     {formatNombre(l.restant)} {uniteValeur}
                   </td>
                 </tr>
               ))}
               <tr className="table-recap-total">
-                <td className="col-type">TOTAL</td>
-                <td className="col-num">
+                <td className="col-type" data-label="Type de FO">
+                  TOTAL
+                </td>
+                <td className="col-num" data-label={libelleValeur}>
                   {formatNombre(recap.total.budget)} {uniteValeur}
                 </td>
-                <td className="col-num">
+                <td className="col-num" data-label="Réalisé">
                   {formatNombre(recap.total.realise)} {uniteValeur}
                 </td>
-                <td className="col-avancement">
+                <td className="col-avancement" data-label="% avancement">
                   <LigneAvancementBarre pct={recap.total.pctAvancement} />
                 </td>
-                <td className="col-num">
+                <td className="col-num" data-label="Restant">
                   {formatNombre(recap.total.restant)} {uniteValeur}
                 </td>
               </tr>
