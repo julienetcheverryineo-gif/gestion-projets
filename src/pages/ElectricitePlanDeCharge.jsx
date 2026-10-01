@@ -307,29 +307,32 @@ export default function ElectricitePlanDeCharge() {
                   </tr>
                 ))}
                 <tr>
-                  <td style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>Total</td>
-                  {totauxParColonne.map((t, i) => (
-                    <td key={i} style={{ color: "var(--text-muted)" }}>
-                      {t > 0 ? arrondi1(t) + " h" : "—"}
+                  <td data-label="Électricien" style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
+                    Total
+                  </td>
+                  {colonnesAffichees.map((col, i) => (
+                    <td key={cleColonne(col)} data-label={libelleColonne(col)} style={{ color: "var(--text-muted)" }}>
+                      {totauxParColonne[i] > 0 ? arrondi1(totauxParColonne[i]) + " h" : "—"}
                     </td>
                   ))}
-                  <td style={{ fontWeight: 600 }}>
+                  <td data-label="Total" style={{ fontWeight: 600 }}>
                     {arrondi1(totauxParColonne.reduce((a, b) => a + b, 0))} h
                   </td>
                 </tr>
                 <tr>
                   <td
+                    data-label="Électricien"
                     style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
                     title="Heures totales de la période ÷ capacité d'un électricien sur cette période (36h/semaine, jours fériés déduits)."
                   >
                     Effectif nécessaire (ETP)
                   </td>
-                  {effectifParColonne.map((e, i) => (
-                    <td key={i} style={{ color: "var(--text-muted)" }}>
-                      {e !== null ? arrondi1(e) : "—"}
+                  {colonnesAffichees.map((col, i) => (
+                    <td key={cleColonne(col)} data-label={libelleColonne(col)} style={{ color: "var(--text-muted)" }}>
+                      {effectifParColonne[i] !== null ? arrondi1(effectifParColonne[i]) : "—"}
                     </td>
                   ))}
-                  <td></td>
+                  <td data-label="Total"></td>
                 </tr>
               </tbody>
             </table>
