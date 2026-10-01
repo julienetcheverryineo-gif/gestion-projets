@@ -69,6 +69,9 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
   );
   const [dateDebut, setDateDebut] = useState(chantier?.dateDebut ?? "");
   const [dateFin, setDateFin] = useState(chantier?.dateFin ?? "");
+  const [heuresMoPrevisionnelles, setHeuresMoPrevisionnelles] = useState(
+    chantier?.heuresMoPrevisionnelles ?? ""
+  );
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
 
@@ -118,6 +121,7 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
       equipeElectriciens,
       dateDebut: dateDebut || null,
       dateFin: dateFin || null,
+      heuresMoPrevisionnelles: heuresMoPrevisionnelles !== "" ? Number(heuresMoPrevisionnelles) : null,
     };
     if (chantier) {
       await updateDoc(doc(db, "sites", chantier.id), donnees);
@@ -238,10 +242,23 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
                     onChange={(e) => setDateFin(e.target.value)}
                   />
                 </label>
+                <label>
+                  Heures MO prévues (si pas de devis importé)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={heuresMoPrevisionnelles}
+                    onChange={(e) => setHeuresMoPrevisionnelles(e.target.value)}
+                    placeholder="ex : 80"
+                  />
+                </label>
               </div>
               <p className="empty-state-description" style={{ margin: "-6px 0 10px" }}>
                 La date de fin prévue sert à répartir automatiquement le reste à faire
-                (main d'œuvre) dans le plan de charge Électricité.
+                (main d'œuvre) dans le plan de charge Électricité. Si aucun devis n'est
+                importé, le nombre d'heures MO prévues ci-dessus est utilisé à la place du
+                reste à faire calculé depuis les lignes de devis.
               </p>
               <div className="reg-subheading" style={{ marginBottom: 8 }}>
                 Électriciens (utilisateurs de l'application)

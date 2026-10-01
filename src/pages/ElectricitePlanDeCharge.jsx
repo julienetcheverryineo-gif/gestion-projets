@@ -2,21 +2,31 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
 import { estChantierElectricite } from "../components/SiteFormModal";
+import { heuresJournalieres, capaciteSemaine } from "../lib/joursOuvres";
 
 // Plan de charge Électricité — "option simple" : une seule date de fin
 // prévue par chantier (fiche chantier), pas de saisie par électricien ni
 // par ligne. Le reste à faire en main d'œuvre (Σ tempsTotalHeures × (1 -
-// avancementMo%), même formule que le Bilan Main d'œuvre du chantier) est
-// réparti automatiquement et à parts égales :
-//  - entre les semaines ISO (lundi → dimanche) allant d'aujourd'hui (ou de
-//    la date de début prévue si elle est future) jusqu'à la semaine de la
-//    date de fin prévue — ou uniquement sur la semaine en cours si cette
-//    date de fin est déjà passée ;
-//  - entre les électriciens de l'équipe affectée au chantier (ou dans un
-//    panier « À affecter » si aucune équipe n'est renseignée).
-// La vue Mois regroupe ensuite les semaines par mois de leur lundi.
-// Seuls les chantiers électricité non terminés avec une date de fin prévue
-// renseignée apparaissent ici (voir la note dans la fiche chantier).
+// avancementMo%), même formule que le Bilan Main d'œuvre du chantier —
+// ou, à défaut de devis importé, le champ « Heures MO prévues » saisi
+// directement sur la fiche chantier) est réparti automatiquement :
+//  - au prorata des jours réellement travaillés (8h lundi→jeudi, 4h le
+//    vendredi, 0h les week-ends et jours fériés — voir lib/joursOuvres)
+//    entre aujourd'hui (ou la date de début prévue si elle est future) et
+//    la date de fin prévue, de sorte qu'une semaine incomplète (jour
+//    férié, début/fin de chantier en milieu de semaine) porte moins
+//    d'heures qu'une semaine pleine ; si la date de fin est déjà passée,
+//    tout le reste à faire est ramené sur la semaine en cours ;
+//  - à parts égales entre les électriciens de l'équipe affectée au
+//    chantier (ou dans un panier « À affecter » si aucune équipe n'est
+//    renseignée).
+// La ligne « Effectif nécessaire » convertit les heures en nombre
+// d'électriciens équivalent temps plein, en comparant à la capacité
+// réelle de la période (36h/semaine, moins les jours fériés).
+// La vue Mois regroupe les semaines par mois de leur lundi.
+// Seuls les chantiers électricité non terminés avec une date de fin
+// prévue renseignée apparaissent ici (voir la note dans la fiche
+// chantier).
 
 function lundiDeLaSemaine(date) {
   const d = new Date(date);
@@ -61,6 +71,21 @@ function arrondi1(n) {
   return Math.round(n * 10) / 10;
 }
 
+// Reste à faire en main d'œuvre d'un chantier : calculé depuis les lignes
+// de devis importées (Σ temps × (1 - avancement)) quand il y en a, sinon
+// repli sur le champ « Heures MO prévues » saisi à la main sur la fiche
+// chantier (chantier déclaré sans devis importé).
+function resteAFaireChantier(chantier, toutesLignes) {
+  const lignesChantier = toutesLignes.filter((l) => l.chantierId === chantier.id && !l.estPoste);
+  if (lignesChantier.length > 0) {
+    return lignesChantier.reduce((acc, l) => {
+      const pctMo = (l.avancementMo ?? l.avancement ?? 0) / 100;
+      return acc + (l.tempsTotalHeures || 0) * Math.max(0, 1 - pctMo);
+    }, 0);
+  }
+  return Number(chantier.heuresMoPrevisionnelles || 0);
+}
+
 export default function ElectricitePlanDeCharge() {
   const { documents: tousChantiers, chargement: chargementChantiers } = useCollection("sites");
   const { documents: toutesLignes, chargement: chargementLignes } = useCollection("elecLignes");
@@ -82,12 +107,7 @@ export default function ElectricitePlanDeCharge() {
     const detail = [];
 
     for (const c of chantiersPlan) {
-      const lignesChantier = toutesLignes.filter((l) => l.chantierId === c.id && !l.estPoste);
-      const resteAFaire = lignesChantier.reduce((acc, l) => {
-        const pctMo = (l.avancementMo ?? l.avancement ?? 0) / 100;
-        return acc + (l.tempsTotalHeures || 0) * Math.max(0, 1 - pctMo);
-      }, 0);
-
+      const resteAFaire = resteAFaireChantier(c, toutesLignes);
       if (resteAFaire <= 0) continue;
 
       const dateFin = new Date(c.dateFin);
@@ -95,31 +115,53 @@ export default function ElectricitePlanDeCharge() {
       const debutEffectif =
         dateDebutSaisie && dateDebutSaisie > aujourdHui ? dateDebutSaisie : aujourdHui;
 
-      let semaines;
-      if (dateFin < aujourdHui) {
-        // Date de fin déjà dépassée : tout le reste à faire est ramené sur
-        // la semaine en cours pour rester visible plutôt que d'être perdu.
-        semaines = [semaineCourante];
-      } else {
-        const semaineDebut = lundiDeLaSemaine(debutEffectif);
-        const semaineFin = lundiDeLaSemaine(dateFin);
-        semaines = [];
-        for (let s = new Date(semaineDebut); s <= semaineFin; s = ajouterJours(s, 7)) {
-          semaines.push(new Date(s));
+      // cle de semaine -> heures de CE chantier sur cette semaine, au
+      // prorata des jours réellement travaillés (voir en-tête du fichier).
+      const heuresParSemaineChantier = new Map();
+      const dateFinDepassee = dateFin < aujourdHui;
+
+      if (dateFinDepassee) {
+        heuresParSemaineChantier.set(cleSemaine(semaineCourante), resteAFaire);
+        if (!semainesVues.has(cleSemaine(semaineCourante))) {
+          semainesVues.set(cleSemaine(semaineCourante), semaineCourante);
         }
-        if (semaines.length === 0) semaines = [semaineDebut];
+      } else {
+        let totalCapaciteJours = 0;
+        const joursValides = [];
+        for (let d = new Date(debutEffectif); d <= dateFin; d = ajouterJours(d, 1)) {
+          const h = heuresJournalieres(d);
+          if (h > 0) {
+            totalCapaciteJours += h;
+            joursValides.push({ date: new Date(d), heures: h });
+          }
+        }
+        if (totalCapaciteJours === 0) {
+          // Pas un seul jour travaillé dans l'intervalle (ex : chantier sur
+          // un seul jour férié / week-end) : on reporte tout sur la
+          // semaine de début pour ne rien perdre.
+          const semaineRepli = lundiDeLaSemaine(debutEffectif);
+          const cle = cleSemaine(semaineRepli);
+          heuresParSemaineChantier.set(cle, resteAFaire);
+          if (!semainesVues.has(cle)) semainesVues.set(cle, semaineRepli);
+        } else {
+          for (const j of joursValides) {
+            const semaine = lundiDeLaSemaine(j.date);
+            const cle = cleSemaine(semaine);
+            const part = resteAFaire * (j.heures / totalCapaciteJours);
+            heuresParSemaineChantier.set(cle, (heuresParSemaineChantier.get(cle) || 0) + part);
+            if (!semainesVues.has(cle)) semainesVues.set(cle, semaine);
+          }
+        }
       }
 
       const equipe = c.equipeElectriciens?.length > 0 ? c.equipeElectriciens : ["À affecter"];
-      const heuresParPersonneEtParSemaine = resteAFaire / equipe.length / semaines.length;
 
-      for (const semaine of semaines) {
-        const cle = cleSemaine(semaine);
-        if (!semainesVues.has(cle)) semainesVues.set(cle, semaine);
+      for (const [cle, heuresSemaine] of heuresParSemaineChantier.entries()) {
+        const heuresParPersonne = heuresSemaine / equipe.length;
         for (const nom of equipe) {
           if (!parPersonne.has(nom)) parPersonne.set(nom, new Map());
           const m = parPersonne.get(nom);
-          m.set(cle, (m.get(cle) || 0) + heuresParPersonneEtParSemaine);
+          m.set(cle, (m.get(cle) || 0) + heuresParPersonne);
         }
       }
 
@@ -127,8 +169,8 @@ export default function ElectricitePlanDeCharge() {
         chantier: c,
         resteAFaire: arrondi1(resteAFaire),
         equipe,
-        nbSemaines: semaines.length,
-        dateFinDepassee: dateFin < aujourdHui,
+        dateFinDepassee,
+        sansDevis: toutesLignes.filter((l) => l.chantierId === c.id && !l.estPoste).length === 0,
       });
     }
 
@@ -136,26 +178,34 @@ export default function ElectricitePlanDeCharge() {
     return { parPersonneSemaine: parPersonne, colonnesSemaine: colonnes, detailChantiers: detail };
   }, [chantiersPlan, toutesLignes]);
 
-  const { parPersonneAffichee, colonnesAffichees } = useMemo(() => {
+  const { parPersonneAffichee, colonnesAffichees, capacitesColonnes } = useMemo(() => {
     if (vue === "semaine") {
-      return { parPersonneAffichee: parPersonneSemaine, colonnesAffichees: colonnesSemaine };
+      const capacites = colonnesSemaine.map((s) => capaciteSemaine(s));
+      return { parPersonneAffichee: parPersonneSemaine, colonnesAffichees: colonnesSemaine, capacitesColonnes: capacites };
     }
-    // Vue Mois : chaque semaine est rattachée au mois de son lundi.
+    // Vue Mois : chaque semaine est rattachée au mois de son lundi, les
+    // heures ET la capacité des semaines qui le composent sont cumulées.
     const parPersonneMois = new Map();
     const moisVus = new Map();
+    const capaciteParMois = new Map();
+    for (const semaine of colonnesSemaine) {
+      const cleM = cleMois(semaine);
+      if (!moisVus.has(cleM)) moisVus.set(cleM, new Date(semaine.getFullYear(), semaine.getMonth(), 1));
+      capaciteParMois.set(cleM, (capaciteParMois.get(cleM) || 0) + capaciteSemaine(semaine));
+    }
     for (const [nom, parSemaine] of parPersonneSemaine.entries()) {
       const m = new Map();
       for (const [cleS, heures] of parSemaine.entries()) {
         const dateSemaine = colonnesSemaine.find((d) => cleSemaine(d) === cleS);
         if (!dateSemaine) continue;
         const cleM = cleMois(dateSemaine);
-        if (!moisVus.has(cleM)) moisVus.set(cleM, new Date(dateSemaine.getFullYear(), dateSemaine.getMonth(), 1));
         m.set(cleM, (m.get(cleM) || 0) + heures);
       }
       parPersonneMois.set(nom, m);
     }
     const colonnes = [...moisVus.values()].sort((a, b) => a - b);
-    return { parPersonneAffichee: parPersonneMois, colonnesAffichees: colonnes };
+    const capacites = colonnes.map((d) => capaciteParMois.get(cleMois(d)) || 0);
+    return { parPersonneAffichee: parPersonneMois, colonnesAffichees: colonnes, capacitesColonnes: capacites };
   }, [vue, parPersonneSemaine, colonnesSemaine]);
 
   const cleColonne = vue === "semaine" ? cleSemaine : cleMois;
@@ -171,6 +221,11 @@ export default function ElectricitePlanDeCharge() {
   const totauxParColonne = colonnesAffichees.map((col) => {
     const cle = cleColonne(col);
     return lignesPersonnes.reduce((acc, p) => acc + (p.parColonne.get(cle) || 0), 0);
+  });
+
+  const effectifParColonne = totauxParColonne.map((total, i) => {
+    const capacite = capacitesColonnes[i];
+    return capacite > 0 ? total / capacite : null;
   });
 
   return (
@@ -215,7 +270,7 @@ export default function ElectricitePlanDeCharge() {
           <p className="empty-state-title">Rien à planifier pour l'instant</p>
           <p className="empty-state-description">
             Les chantiers avec une date de fin prévue n'ont plus de reste à faire en main
-            d'œuvre (100 % d'avancement).
+            d'œuvre (100 % d'avancement, ou aucune heure MO prévue renseignée).
           </p>
         </div>
       ) : (
@@ -262,6 +317,20 @@ export default function ElectricitePlanDeCharge() {
                     {arrondi1(totauxParColonne.reduce((a, b) => a + b, 0))} h
                   </td>
                 </tr>
+                <tr>
+                  <td
+                    style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
+                    title="Heures totales de la période ÷ capacité d'un électricien sur cette période (36h/semaine, jours fériés déduits)."
+                  >
+                    Effectif nécessaire (ETP)
+                  </td>
+                  {effectifParColonne.map((e, i) => (
+                    <td key={i} style={{ color: "var(--text-muted)" }}>
+                      {e !== null ? arrondi1(e) : "—"}
+                    </td>
+                  ))}
+                  <td></td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -270,7 +339,7 @@ export default function ElectricitePlanDeCharge() {
             Chantiers pris en compte
           </div>
           <div className="lot-list">
-            {detailChantiers.map(({ chantier, resteAFaire, equipe, dateFinDepassee }) => (
+            {detailChantiers.map(({ chantier, resteAFaire, equipe, dateFinDepassee, sansDevis }) => (
               <div key={chantier.id} className="lot-card">
                 <div className="lot-card-header" style={{ cursor: "default" }}>
                   <div>
@@ -281,6 +350,7 @@ export default function ElectricitePlanDeCharge() {
                       {equipe.join(", ")} · fin prévue le{" "}
                       {new Date(chantier.dateFin).toLocaleDateString("fr-FR")}
                       {dateFinDepassee ? " (dépassée — reporté sur la semaine en cours)" : ""}
+                      {sansDevis ? " · sans devis importé (heures saisies à la main)" : ""}
                     </span>
                   </div>
                   <span className="kanban-count">{resteAFaire} h</span>
