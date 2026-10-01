@@ -199,6 +199,24 @@ export default function Layout() {
             <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            {peutBasculerEspaces && (
+              <button
+                className="btn-ghost"
+                onClick={() => navigate(enEspaceElectricite ? "/" : "/electricite")}
+                aria-label={
+                  enEspaceElectricite
+                    ? "Basculer vers l'espace Automatisme & GTB"
+                    : "Basculer vers l'espace Électricité"
+                }
+                title={
+                  enEspaceElectricite
+                    ? "Basculer vers l'espace Automatisme & GTB"
+                    : "Basculer vers l'espace Électricité"
+                }
+              >
+                {enEspaceElectricite ? "💻 Autom." : "⚡ Élec."}
+              </button>
+            )}
             <button
               className="btn-ghost btn-refresh"
               onClick={actualiserSansCache}

@@ -2439,6 +2439,15 @@ textarea:focus {
     justify-content: space-between;
     border-bottom: 1px solid var(--border);
   }
+  /* 3 boutons (bascule d'espace, actualiser, déconnexion) doivent tenir à
+     côté du logo sur un petit écran (iPhone SE ~375px) : on resserre le
+     padding/la taille de texte pour cette barre précisément, sans toucher
+     au style .btn-ghost utilisé ailleurs. */
+  .mobile-topbar .btn-ghost {
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
 
   .main-content {
     padding: calc(70px + env(safe-area-inset-top)) 16px 24px;
