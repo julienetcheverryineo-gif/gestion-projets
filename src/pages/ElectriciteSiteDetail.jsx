@@ -99,6 +99,22 @@ function formatPct(p) {
   return formatNombre(p * 100) + " %";
 }
 
+// Ordre d'affichage d'un type de FO/MO dans les tableaux par type (Récap,
+// Bilan Achats) : priorité à l'ordre personnalisé saisi par l'utilisateur
+// (ordreTypes, stocké par chantier — voir ordreTypesFo/ordreTypesMo sur le
+// document chantier), sinon on retombe sur le numéro propre au type (tel
+// qu'importé depuis le devis), les types sans numéro passant en dernier.
+function comparerOrdreType(ordreTypes, a, b) {
+  const oa = ordreTypes[a.cle];
+  const ob = ordreTypes[b.cle];
+  if (oa != null && ob != null) return oa - ob;
+  if (oa != null) return -1;
+  if (ob != null) return 1;
+  if (a.numero == null) return 1;
+  if (b.numero == null) return -1;
+  return a.numero - b.numero;
+}
+
 // Regroupe des lignes par Type de FO (même principe que les onglets
 // « Récap Avancement FO/MO » du fichier de suivi Excel : pour chaque
 // type de FO présent dans les devis, Budget/Prévu = somme du champ
@@ -106,7 +122,7 @@ function formatPct(p) {
 // d'avancement saisi ligne par ligne, Restant = Budget − Réalisé.
 // (Le suivi Excel regroupe aussi les heures de main d'œuvre par Type de
 // FO, pas par Type de MO — repris ici à l'identique.)
-function calculerRecap(lignes, champValeur, champAvancementPct) {
+function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
   const groupes = new Map();
   lignes.forEach((l) => {
     const valeur = l[champValeur] || 0;
@@ -127,11 +143,7 @@ function calculerRecap(lignes, champValeur, champAvancementPct) {
       restant: g.budget - g.realise,
       pctAvancement: g.budget > 0 ? g.realise / g.budget : 0,
     }))
-    .sort((a, b) => {
-      if (a.numero == null) return 1;
-      if (b.numero == null) return -1;
-      return a.numero - b.numero;
-    });
+    .sort((a, b) => comparerOrdreType(ordreTypes, a, b));
   const total = parType.reduce(
     (acc, l) => {
       acc.budget += l.budget;
@@ -145,6 +157,44 @@ function calculerRecap(lignes, champValeur, champAvancementPct) {
   return { parType, total };
 }
 
+// Regroupe les lignes par Type de FO pour le Bilan Achats : à l'intérieur
+// de chaque type, une ligne par désignation UNIQUE, quantité additionnée
+// quand la même désignation revient (même devis ou devis différents) —
+// une vraie liste d'achats groupée, pas un bilan financier.
+function calculerAchats(lignes, ordreTypes) {
+  const parType = new Map();
+  lignes.forEach((l) => {
+    const cle = (l.typeFo || "").trim();
+    if (!cle) return;
+    if (!parType.has(cle)) {
+      parType.set(cle, {
+        cle,
+        libelle: formatTypeFo(cle),
+        numero: Number(cle.match(/^\s*(\d+)/)?.[1]),
+        articles: new Map(),
+      });
+    }
+    const grp = parType.get(cle);
+    const clefArticle = (l.designation || "").trim() || "(sans désignation)";
+    if (!grp.articles.has(clefArticle)) {
+      grp.articles.set(clefArticle, {
+        designation: l.designation || "(sans désignation)",
+        unite: l.unite || "",
+        quantite: 0,
+      });
+    }
+    grp.articles.get(clefArticle).quantite += l.quantite || 0;
+  });
+  return Array.from(parType.values())
+    .map((g) => ({
+      ...g,
+      articles: Array.from(g.articles.values()).sort((a, b) =>
+        a.designation.localeCompare(b.designation, "fr")
+      ),
+    }))
+    .sort((a, b) => comparerOrdreType(ordreTypes, a, b));
+}
+
 function TableauRecap({
   titre,
   sousTitre,
@@ -156,6 +206,8 @@ function TableauRecap({
   largeurColType,
   portee,
   devisId,
+  ordreTypes,
+  onModifierOrdre,
 }) {
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
@@ -194,7 +246,21 @@ function TableauRecap({
               {recap.parType.map((l, index) => (
                 <tr key={l.libelle}>
                   <td className="col-ordre" data-label="N°">
-                    {index + 1}
+                    {onModifierOrdre ? (
+                      <input
+                        type="number"
+                        className="elec-ordre-input"
+                        key={ordreTypes?.[l.cle] ?? index + 1}
+                        defaultValue={ordreTypes?.[l.cle] ?? index + 1}
+                        title="Ordre d'affichage de ce type (utilisé aussi pour le futur planning)"
+                        onBlur={(e) => onModifierOrdre(l.cle, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                        }}
+                      />
+                    ) : (
+                      ordreTypes?.[l.cle] ?? index + 1
+                    )}
                   </td>
                   <td
                     className="col-type"
@@ -245,6 +311,56 @@ function TableauRecap({
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Bilan Achats : pour chaque Type de FO, la liste des désignations à
+// acheter avec leur quantité totale (additionnée tous devis confondus
+// dans ce périmètre) — une vraie liste de courses, pas un bilan financier
+// (voir calculerAchats).
+function TableauAchats({ titre, sousTitre, achats }) {
+  return (
+    <div className="panel" style={{ marginBottom: 16 }}>
+      <div className="panel-header">
+        <h2>
+          {titre}
+          {sousTitre ? " — " + sousTitre : ""}
+        </h2>
+      </div>
+      {achats.length === 0 ? (
+        <p className="simple-list-meta">Aucune ligne avec un type de FO renseigné pour ce périmètre.</p>
+      ) : (
+        achats.map((groupe) => (
+          <div key={groupe.cle} className="elec-achats-groupe">
+            <h3 className="elec-achats-titre-type">{groupe.libelle}</h3>
+            <div className="data-table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Désignation</th>
+                    <th className="col-etroite-achats">Unité</th>
+                    <th className="col-etroite-achats">Qté totale</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupe.articles.map((a) => (
+                    <tr key={a.designation}>
+                      <td data-label="Désignation">{a.designation}</td>
+                      <td className="col-etroite-achats" data-label="Unité">
+                        {a.unite || "—"}
+                      </td>
+                      <td className="col-etroite-achats" data-label="Qté totale">
+                        {formatNombre(a.quantite)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
@@ -311,6 +427,12 @@ function LigneDevisRow({
   const titreDesignation = [l.reference, l.detail || l.designation]
     .filter(Boolean)
     .join(" — ");
+  // Sur la ligne qui sert de tête à un groupe (entete non nul), Coût
+  // total FO et Temps total affichent la somme de tout le groupe (elle
+  // y compris) plutôt que sa seule valeur propre, et modifier le % y
+  // recopie la même valeur sur toutes les lignes du groupe.
+  const coutTotalFoAffiche = entete ? entete.sommeCoutTotalFo : l.coutTotalFo;
+  const tempsTotalAffiche = entete ? entete.sommeTempsTotalHeures : l.tempsTotalHeures;
   return (
     <tr
       className={
@@ -370,7 +492,11 @@ function LigneDevisRow({
               max="100"
               defaultValue={pctFo}
               disabled={!peutGerer}
-              onBlur={(e) => onChangerAvancement("avancementFo", e.target.value)}
+              onBlur={(e) =>
+                entete
+                  ? entete.onChangerAvancementGroupe("avancementFo", e.target.value)
+                  : onChangerAvancement("avancementFo", e.target.value)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
@@ -400,9 +526,9 @@ function LigneDevisRow({
           ))}
         </select>
       </td>
-      <td className="elec-col-materiel">{formatNombre(l.coutTotalFo)} €</td>
+      <td className="elec-col-materiel">{formatNombre(coutTotalFoAffiche)} €</td>
       <td className="elec-col-materiel">
-        {l.coutTotalFo ? formatNombre((l.coutTotalFo * pctFo) / 100) + " €" : "—"}
+        {coutTotalFoAffiche ? formatNombre((coutTotalFoAffiche * pctFo) / 100) + " €" : "—"}
       </td>
       <td className="elec-col-mo elec-col-saisie">
         {l.informative ? (
@@ -416,7 +542,11 @@ function LigneDevisRow({
               max="100"
               defaultValue={pctMo}
               disabled={!peutGerer}
-              onBlur={(e) => onChangerAvancement("avancementMo", e.target.value)}
+              onBlur={(e) =>
+                entete
+                  ? entete.onChangerAvancementGroupe("avancementMo", e.target.value)
+                  : onChangerAvancement("avancementMo", e.target.value)
+              }
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
@@ -446,9 +576,9 @@ function LigneDevisRow({
           ))}
         </select>
       </td>
-      <td className="elec-col-mo">{formatNombre(l.tempsTotalHeures)} h</td>
+      <td className="elec-col-mo">{formatNombre(tempsTotalAffiche)} h</td>
       <td className="elec-col-mo">
-        {l.tempsTotalHeures ? formatNombre((l.tempsTotalHeures * pctMo) / 100) + " h" : "—"}
+        {tempsTotalAffiche ? formatNombre((tempsTotalAffiche * pctMo) / 100) + " h" : "—"}
       </td>
     </tr>
   );
@@ -456,11 +586,26 @@ function LigneDevisRow({
 
 // Ligne « tête de groupe » synthétique, utilisée quand le groupe a été
 // créé avec un nouveau nom (pas repris sur une ligne existante) : elle ne
-// correspond à aucune ligne de devis réelle, affiche juste le nom du
-// groupe, le nombre de lignes membres et une moyenne pondérée en lecture
-// seule (l'avancement se saisit ligne par ligne, une fois le groupe
-// déplié).
-function GroupeEnteteRow({ groupe, ouvert, nbMembres, moyenneFo, moyenneMo, onToggle, onDissoudre, peutGerer }) {
+// correspond à aucune ligne de devis réelle, mais affiche le nom du
+// groupe, le nombre de lignes membres, la somme de leur Coût total FO et
+// Temps total, et un % FO/MO modifiable qui, une fois validé, se recopie
+// sur toutes les lignes membres (moyenne pondérée actuelle proposée par
+// défaut, pour ne rien écraser tant qu'on ne valide pas une autre valeur).
+function GroupeEnteteRow({
+  groupe,
+  ouvert,
+  nbMembres,
+  moyenneFo,
+  moyenneMo,
+  sommeCoutTotalFo,
+  sommeTempsTotalHeures,
+  onToggle,
+  onDissoudre,
+  onChangerAvancementGroupe,
+  peutGerer,
+}) {
+  const pctFo = Math.max(0, Math.min(100, Math.round(moyenneFo * 10) / 10));
+  const pctMo = Math.max(0, Math.min(100, Math.round(moyenneMo * 10) / 10));
   return (
     <tr className="elec-ligne-groupe-entete">
       <td className="elec-td-figee elec-col-etroite" style={{ left: 0, width: LARGEUR_NUMERO }} />
@@ -496,19 +641,51 @@ function GroupeEnteteRow({ groupe, ouvert, nbMembres, moyenneFo, moyenneMo, onTo
       <td className="elec-col-etroite">—</td>
       <td className="elec-col-etroite">—</td>
       <td className="elec-col-materiel elec-col-saisie">
-        <span className="simple-list-meta">{formatPct(moyenneFo / 100)}</span>
+        <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
+          <input
+            key={pctFo}
+            type="number"
+            min="0"
+            max="100"
+            defaultValue={pctFo}
+            disabled={!peutGerer}
+            onBlur={(e) => onChangerAvancementGroupe("avancementFo", e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
+          <span>%</span>
+        </div>
       </td>
       <td className="elec-col-materiel">—</td>
       <td className="elec-col-materiel elec-type-code">—</td>
-      <td className="elec-col-materiel">—</td>
-      <td className="elec-col-materiel">—</td>
+      <td className="elec-col-materiel">{formatNombre(sommeCoutTotalFo)} €</td>
+      <td className="elec-col-materiel">
+        {sommeCoutTotalFo ? formatNombre((sommeCoutTotalFo * pctFo) / 100) + " €" : "—"}
+      </td>
       <td className="elec-col-mo elec-col-saisie">
-        <span className="simple-list-meta">{formatPct(moyenneMo / 100)}</span>
+        <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
+          <input
+            key={pctMo}
+            type="number"
+            min="0"
+            max="100"
+            defaultValue={pctMo}
+            disabled={!peutGerer}
+            onBlur={(e) => onChangerAvancementGroupe("avancementMo", e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
+          <span>%</span>
+        </div>
       </td>
       <td className="elec-col-mo">—</td>
       <td className="elec-col-mo elec-type-code">—</td>
-      <td className="elec-col-mo">—</td>
-      <td className="elec-col-mo">—</td>
+      <td className="elec-col-mo">{formatNombre(sommeTempsTotalHeures)} h</td>
+      <td className="elec-col-mo">
+        {sommeTempsTotalHeures ? formatNombre((sommeTempsTotalHeures * pctMo) / 100) + " h" : "—"}
+      </td>
     </tr>
   );
 }
@@ -754,7 +931,7 @@ export default function ElectriciteSiteDetail() {
         const ouvert = groupesOuverts.has(g.id);
         if (g.ligneRepresentativeId) {
           const representative = membres.find((m) => m.id === g.ligneRepresentativeId) || l;
-          resultat.push({ kind: "representative", ligne: representative, groupe: g, ouvert });
+          resultat.push({ kind: "representative", ligne: representative, groupe: g, ouvert, membres });
           if (ouvert) {
             membres
               .filter((m) => m.id !== representative.id)
@@ -829,29 +1006,56 @@ export default function ElectriciteSiteDetail() {
   const champAvancementRecap = recapActif === "mo" ? "avancementMo" : "avancementFo";
   const uniteRecap = recapActif === "mo" ? "h" : "€";
   const libelleValeurRecap = recapActif === "mo" ? "Heures prévues" : "Budget matériel";
-  // Le Bilan Achats reprend exactement le calcul du Bilan Fournitures
-  // (Budget matériel / Réalisé / Restant par type de FO) — seul le titre
-  // change, pour mettre en avant le montant qui reste à acheter (colonne
-  // Restant) plutôt que l'avancement d'installation.
-  const titreRecap =
-    recapActif === "mo"
-      ? "Récap Avancement MO"
-      : recapActif === "achats"
-      ? "💰 Bilan Achats"
-      : "Récap Avancement FO";
-  const recapSynthese = recapActif
-    ? calculerRecap(lignesChantier, champRecap, champAvancementRecap)
-    : null;
-  const recapParDevis = recapActif
-    ? devis.map((d) => ({
-        devis: d,
-        recap: calculerRecap(
-          lignesChantier.filter((l) => l.devisId === d.id),
-          champRecap,
-          champAvancementRecap
-        ),
-      }))
-    : [];
+  const titreRecap = recapActif === "mo" ? "Récap Avancement MO" : "Récap Avancement FO";
+  // Ordre d'affichage des types, personnalisable par chantier (champ
+  // onModifierOrdre du N° dans TableauRecap) : sert aujourd'hui à trier
+  // Récap et Bilan Achats, et servira plus tard à construire un planning
+  // Gantt du chantier dans cet ordre. FO et MO ont chacun le leur.
+  const champOrdreChantier = recapActif === "mo" ? "ordreTypesMo" : "ordreTypesFo";
+  const ordreTypesChantier = chantier?.[champOrdreChantier] || {};
+  const recapSynthese =
+    recapActif === "fo" || recapActif === "mo"
+      ? calculerRecap(lignesChantier, champRecap, champAvancementRecap, ordreTypesChantier)
+      : null;
+  const recapParDevis =
+    recapActif === "fo" || recapActif === "mo"
+      ? devis.map((d) => ({
+          devis: d,
+          recap: calculerRecap(
+            lignesChantier.filter((l) => l.devisId === d.id),
+            champRecap,
+            champAvancementRecap,
+            ordreTypesChantier
+          ),
+        }))
+      : [];
+  // Bilan Achats : toujours basé sur le Type de FO (pas de distinction
+  // FO/MO ici), avec le même ordre personnalisé que le Récap FO.
+  const ordreTypesFoChantier = chantier?.ordreTypesFo || {};
+  const achatsSynthese =
+    recapActif === "achats" ? calculerAchats(lignesChantier, ordreTypesFoChantier) : [];
+  const achatsParDevis =
+    recapActif === "achats"
+      ? devis.map((d) => ({
+          devis: d,
+          achats: calculerAchats(
+            lignesChantier.filter((l) => l.devisId === d.id),
+            ordreTypesFoChantier
+          ),
+        }))
+      : [];
+
+  // Modifie l'ordre d'affichage personnalisé d'un type (FO ou MO, selon
+  // le bilan actif) pour ce chantier — une valeur vide retire la
+  // personnalisation et le type retombe sur son numéro de code.
+  const modifierOrdreType = async (cle, valeur) => {
+    const actuel = chantier?.[champOrdreChantier] || {};
+    const maj = { ...actuel };
+    const v = valeur === "" ? NaN : Number(valeur);
+    if (Number.isNaN(v)) delete maj[cle];
+    else maj[cle] = v;
+    await updateDoc(doc(db, "sites", chantierId), { [champOrdreChantier]: maj });
+  };
 
   // Saisie groupée : applique le même % à toutes les lignes de ce type de
   // FO — soit dans tous les devis du chantier (depuis la synthèse), soit
@@ -927,6 +1131,18 @@ export default function ElectriciteSiteDetail() {
     setLignesSelectionnees(new Set());
     setModeSelection(false);
     setAfficherGroupeModal(false);
+  };
+
+  // Applique le % saisi sur la ligne de tête d'un groupe (représentante
+  // ou synthétique) à TOUTES ses lignes membres, elle y compris — c'est
+  // la seule façon de faire varier l'avancement d'un groupe en une seule
+  // saisie ; chaque ligne reste ensuite modifiable individuellement.
+  const appliquerAvancementGroupeTete = async (groupe, champPct, valeur) => {
+    const v = Math.max(0, Math.min(100, Number(valeur) || 0));
+    const membres = toutesLignes.filter((l) => l.groupeId === groupe.id);
+    const batch = writeBatch(db);
+    membres.forEach((l) => batch.update(doc(db, "elecLignes", l.id), { [champPct]: v }));
+    await batch.commit();
   };
 
   const dissoudreGroupe = async (groupe) => {
@@ -1034,7 +1250,25 @@ export default function ElectriciteSiteDetail() {
           </div>
         </div>
 
-          {recapActif && (
+          {recapActif === "achats" && (
+            <>
+              <TableauAchats
+                titre="💰 Bilan Achats"
+                sousTitre="synthèse tous devis"
+                achats={achatsSynthese}
+              />
+              {achatsParDevis.map(({ devis: d, achats }) => (
+                <TableauAchats
+                  key={d.id}
+                  titre="💰 Bilan Achats"
+                  sousTitre={"devis " + d.nom}
+                  achats={achats}
+                />
+              ))}
+            </>
+          )}
+
+          {(recapActif === "fo" || recapActif === "mo") && (
             <>
               <TableauRecap
                 titre={titreRecap}
@@ -1046,6 +1280,8 @@ export default function ElectriciteSiteDetail() {
                 onModifierGroupe={appliquerAvancementGroupe}
                 largeurColType={largeurColType}
                 portee="chantier"
+                ordreTypes={ordreTypesChantier}
+                onModifierOrdre={peutGerer ? modifierOrdreType : null}
               />
               {recapParDevis.map(({ devis: d, recap }) => (
                 <TableauRecap
@@ -1060,6 +1296,8 @@ export default function ElectriciteSiteDetail() {
                   onModifierGroupe={appliquerAvancementGroupe}
                   portee="devis"
                   devisId={d.id}
+                  ordreTypes={ordreTypesChantier}
+                  onModifierOrdre={peutGerer ? modifierOrdreType : null}
                 />
               ))}
             </>
@@ -1266,6 +1504,8 @@ export default function ElectriciteSiteDetail() {
                           );
                           return budget > 0 ? (realise / budget) * 100 : 0;
                         };
+                        const somme = (champValeur) =>
+                          membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
                         return (
                           <GroupeEnteteRow
                             key={"groupe-" + groupe.id}
@@ -1274,9 +1514,14 @@ export default function ElectriciteSiteDetail() {
                             nbMembres={membres.length}
                             moyenneFo={moyenne("coutTotalFo", "avancementFo")}
                             moyenneMo={moyenne("tempsTotalHeures", "avancementMo")}
+                            sommeCoutTotalFo={somme("coutTotalFo")}
+                            sommeTempsTotalHeures={somme("tempsTotalHeures")}
                             peutGerer={peutGerer}
                             onToggle={() => basculerGroupeOuvert(groupe.id)}
                             onDissoudre={() => dissoudreGroupe(groupe)}
+                            onChangerAvancementGroupe={(champ, valeur) =>
+                              appliquerAvancementGroupeTete(groupe, champ, valeur)
+                            }
                           />
                         );
                       }
@@ -1301,6 +1546,16 @@ export default function ElectriciteSiteDetail() {
                                   ouvert: item.ouvert,
                                   onToggle: () => basculerGroupeOuvert(item.groupe.id),
                                   onDissoudre: () => dissoudreGroupe(item.groupe),
+                                  onChangerAvancementGroupe: (champ, valeur) =>
+                                    appliquerAvancementGroupeTete(item.groupe, champ, valeur),
+                                  sommeCoutTotalFo: item.membres.reduce(
+                                    (s, m) => s + (m.coutTotalFo || 0),
+                                    0
+                                  ),
+                                  sommeTempsTotalHeures: item.membres.reduce(
+                                    (s, m) => s + (m.tempsTotalHeures || 0),
+                                    0
+                                  ),
                                 }
                               : null
                           }

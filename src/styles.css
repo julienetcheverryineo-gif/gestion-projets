@@ -609,6 +609,41 @@ table.table-recap {
 .table-recap .col-avancement {
   width: 240px;
 }
+.table-recap .col-ordre {
+  text-align: center;
+}
+/* N° éditable : ordre personnalisé des types (indépendant du numéro de
+   code du type), utilisé plus tard pour un planning Gantt — remplace le
+   N° automatique affiché par défaut. */
+.elec-ordre-input {
+  width: 100%;
+  max-width: 44px;
+  padding: 3px 2px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bilan Achats : une liste de courses groupée par Type de FO (voir
+   calculerAchats), pas un bilan financier — chaque groupe a son propre
+   petit tableau Désignation / Unité / Qté totale. */
+.elec-achats-groupe {
+  margin-bottom: 22px;
+}
+.elec-achats-groupe:last-child {
+  margin-bottom: 0;
+}
+.elec-achats-titre-type {
+  margin: 0 0 8px;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.col-etroite-achats {
+  width: 120px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .table-recap th,
 .table-recap td {
   border-right: 1px solid var(--border);
