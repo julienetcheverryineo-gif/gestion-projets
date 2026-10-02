@@ -617,9 +617,10 @@ table.table-recap {
    N° automatique affiché par défaut. */
 .elec-ordre-input {
   width: 100%;
-  max-width: 44px;
-  padding: 3px 2px;
+  max-width: 56px;
+  padding: 4px 4px;
   text-align: center;
+  font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -632,8 +633,15 @@ table.table-recap {
 .elec-achats-groupe:last-child {
   margin-bottom: 0;
 }
+.elec-achats-entete-type {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
 .elec-achats-titre-type {
-  margin: 0 0 8px;
+  margin: 0;
   font-family: var(--font-ui);
   font-size: 0.95rem;
   font-weight: 700;

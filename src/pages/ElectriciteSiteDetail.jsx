@@ -63,7 +63,7 @@ const SOMME_LARGEURS_FIXES_LIGNES =
 
 // Largeur des colonnes fixes du tableau Récap (tout sauf Type de FO, qui
 // reçoit le même traitement que Désignation ci-dessus).
-const LARGEUR_COL_ORDRE = 46;
+const LARGEUR_COL_ORDRE = 68;
 const LARGEUR_COL_NUM = 170;
 const LARGEUR_COL_AVANCEMENT = 240;
 const LARGEUR_MIN_COL_TYPE = 200;
@@ -93,6 +93,21 @@ function classeAvancement(pct) {
   if (!pct) return "elec-avancement-nul";
   if (pct >= 100) return "elec-avancement-fait";
   return "elec-avancement-partiel";
+}
+
+// Moyenne pondérée d'un % d'avancement sur un ensemble de lignes (les
+// membres d'un groupe) : Σ(valeur × %) / Σ(valeur). Utilisée aussi bien
+// pour l'affichage en lecture seule que comme valeur par défaut d'une
+// saisie « tête de groupe » — elle se recalcule à chaque rendu à partir
+// des lignes réelles, donc toute modification d'une ligne membre se
+// répercute immédiatement sur la ligne de tête du groupe.
+function moyennePondereeMembres(membres, champValeur, champPct) {
+  const budget = membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
+  const realise = membres.reduce(
+    (s, l) => s + ((l[champValeur] || 0) * (l[champPct] || 0)) / 100,
+    0
+  );
+  return budget > 0 ? (realise / budget) * 100 : 0;
 }
 
 function formatPct(p) {
@@ -316,6 +331,24 @@ function TableauRecap({
   );
 }
 
+// Lien mailto pré-rempli avec le corps du mail de demande de consultation
+// pour un type de FO (liste des désignations/quantités) — le destinataire
+// et l'objet restent volontairement vides, à saisir à la main dans le
+// client de messagerie (Outlook) qui s'ouvre.
+function construireMailtoAchat(groupe) {
+  const lignesArticles = groupe.articles
+    .map((a) => "- " + a.designation + (a.unite ? " — " + formatNombre(a.quantite) + " " + a.unite : " — " + formatNombre(a.quantite)))
+    .join("\n");
+  const corps =
+    "Bonjour,\n\n" +
+    "Veuillez trouver ci-dessous une demande de consultation pour les articles suivants (" +
+    groupe.libelle +
+    ") :\n\n" +
+    lignesArticles +
+    "\n\nCordialement,";
+  return "mailto:?body=" + encodeURIComponent(corps);
+}
+
 // Bilan Achats : pour chaque Type de FO, la liste des désignations à
 // acheter avec leur quantité totale (additionnée tous devis confondus
 // dans ce périmètre) — une vraie liste de courses, pas un bilan financier
@@ -334,7 +367,12 @@ function TableauAchats({ titre, sousTitre, achats }) {
       ) : (
         achats.map((groupe) => (
           <div key={groupe.cle} className="elec-achats-groupe">
-            <h3 className="elec-achats-titre-type">{groupe.libelle}</h3>
+            <div className="elec-achats-entete-type">
+              <h3 className="elec-achats-titre-type">{groupe.libelle}</h3>
+              <a className="btn-ghost" href={construireMailtoAchat(groupe)}>
+                ✉️ Demande d'achat
+              </a>
+            </div>
             <div className="data-table-wrapper">
               <table className="data-table">
                 <thead>
@@ -422,8 +460,18 @@ function LigneDevisRow({
   imbriquee,
   entete,
 }) {
-  const pctFo = l.avancementFo ?? l.avancement ?? 0;
-  const pctMo = l.avancementMo ?? l.avancement ?? 0;
+  // Sur la ligne de tête d'un groupe (entete non nul), le % affiché est
+  // toujours la moyenne pondérée actuelle des lignes membres — jamais la
+  // valeur propre de la ligne — pour que toute modification d'une ligne
+  // membre se répercute immédiatement ici, sans besoin de rouvrir/replier
+  // le groupe. La saisie reste possible et recopie alors sur tout le
+  // groupe (voir entete.onChangerAvancementGroupe).
+  const pctFo = entete
+    ? Math.max(0, Math.min(100, Math.round(entete.moyenneFo * 10) / 10))
+    : l.avancementFo ?? l.avancement ?? 0;
+  const pctMo = entete
+    ? Math.max(0, Math.min(100, Math.round(entete.moyenneMo * 10) / 10))
+    : l.avancementMo ?? l.avancement ?? 0;
   const titreDesignation = [l.reference, l.detail || l.designation]
     .filter(Boolean)
     .join(" — ");
@@ -1496,14 +1544,6 @@ export default function ElectriciteSiteDetail() {
                       }
                       if (item.kind === "entete") {
                         const { groupe, ouvert, membres } = item;
-                        const moyenne = (champValeur, champPct) => {
-                          const budget = membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
-                          const realise = membres.reduce(
-                            (s, l) => s + ((l[champValeur] || 0) * (l[champPct] || 0)) / 100,
-                            0
-                          );
-                          return budget > 0 ? (realise / budget) * 100 : 0;
-                        };
                         const somme = (champValeur) =>
                           membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
                         return (
@@ -1512,8 +1552,8 @@ export default function ElectriciteSiteDetail() {
                             groupe={groupe}
                             ouvert={ouvert}
                             nbMembres={membres.length}
-                            moyenneFo={moyenne("coutTotalFo", "avancementFo")}
-                            moyenneMo={moyenne("tempsTotalHeures", "avancementMo")}
+                            moyenneFo={moyennePondereeMembres(membres, "coutTotalFo", "avancementFo")}
+                            moyenneMo={moyennePondereeMembres(membres, "tempsTotalHeures", "avancementMo")}
                             sommeCoutTotalFo={somme("coutTotalFo")}
                             sommeTempsTotalHeures={somme("tempsTotalHeures")}
                             peutGerer={peutGerer}
@@ -1548,6 +1588,16 @@ export default function ElectriciteSiteDetail() {
                                   onDissoudre: () => dissoudreGroupe(item.groupe),
                                   onChangerAvancementGroupe: (champ, valeur) =>
                                     appliquerAvancementGroupeTete(item.groupe, champ, valeur),
+                                  moyenneFo: moyennePondereeMembres(
+                                    item.membres,
+                                    "coutTotalFo",
+                                    "avancementFo"
+                                  ),
+                                  moyenneMo: moyennePondereeMembres(
+                                    item.membres,
+                                    "tempsTotalHeures",
+                                    "avancementMo"
+                                  ),
                                   sommeCoutTotalFo: item.membres.reduce(
                                     (s, m) => s + (m.coutTotalFo || 0),
                                     0
