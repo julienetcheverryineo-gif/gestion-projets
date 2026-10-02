@@ -829,6 +829,16 @@ export default function ElectriciteSiteDetail() {
   const champAvancementRecap = recapActif === "mo" ? "avancementMo" : "avancementFo";
   const uniteRecap = recapActif === "mo" ? "h" : "€";
   const libelleValeurRecap = recapActif === "mo" ? "Heures prévues" : "Budget matériel";
+  // Le Bilan Achats reprend exactement le calcul du Bilan Fournitures
+  // (Budget matériel / Réalisé / Restant par type de FO) — seul le titre
+  // change, pour mettre en avant le montant qui reste à acheter (colonne
+  // Restant) plutôt que l'avancement d'installation.
+  const titreRecap =
+    recapActif === "mo"
+      ? "Récap Avancement MO"
+      : recapActif === "achats"
+      ? "💰 Bilan Achats"
+      : "Récap Avancement FO";
   const recapSynthese = recapActif
     ? calculerRecap(lignesChantier, champRecap, champAvancementRecap)
     : null;
@@ -996,6 +1006,12 @@ export default function ElectriciteSiteDetail() {
             >
               👷 Bilan Main d'œuvre
             </button>
+            <button
+              className={recapActif === "achats" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif(recapActif === "achats" ? null : "achats")}
+            >
+              💰 Bilan Achats
+            </button>
           </div>
 
           <div className="chantier-actions-bar">
@@ -1021,7 +1037,7 @@ export default function ElectriciteSiteDetail() {
           {recapActif && (
             <>
               <TableauRecap
-                titre={recapActif === "mo" ? "Récap Avancement MO" : "Récap Avancement FO"}
+                titre={titreRecap}
                 sousTitre="synthèse tous devis"
                 recap={recapSynthese}
                 uniteValeur={uniteRecap}
@@ -1034,7 +1050,7 @@ export default function ElectriciteSiteDetail() {
               {recapParDevis.map(({ devis: d, recap }) => (
                 <TableauRecap
                   key={d.id}
-                  titre={recapActif === "mo" ? "Récap Avancement MO" : "Récap Avancement FO"}
+                  titre={titreRecap}
                   sousTitre={"devis " + d.nom}
                   recap={recap}
                   uniteValeur={uniteRecap}
