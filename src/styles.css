@@ -665,18 +665,52 @@ table.table-recap {
   color: var(--text-muted);
   font-style: italic;
 }
-.elec-groupe-badge {
-  display: inline-block;
-  margin-right: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--accent-light, #e3ecff);
-  color: var(--accent, #3b5bdb);
+/* Groupement de lignes de devis : le groupe s'affiche sur sa ligne de
+   tête (existante ou synthétique), avec un petit bouton +/- à droite du
+   libellé pour déplier/replier ses lignes membres, imbriquées juste en
+   dessous avec un léger retrait et un fond distinct. */
+.elec-designation-cellule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.elec-groupe-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.elec-groupe-toggle {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text-muted);
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.elec-groupe-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.elec-groupe-dissoudre {
+  padding: 1px 6px !important;
+  font-size: 0.68rem !important;
+}
+.elec-ligne-groupe-entete td {
+  background: var(--bg);
   font-weight: 600;
-  white-space: nowrap;
-  vertical-align: middle;
+}
+.elec-ligne-membre-groupe td {
+  background: var(--bg);
 }
 
 /* Colonnes figées (N°, Référence, Désignation) : gel de volets comme dans

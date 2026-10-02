@@ -290,61 +290,226 @@ function LigneAvancementModifiable({ pct, onValider }) {
   );
 }
 
-// Contrôle d'avancement d'un groupe de lignes (FO ou MO) : deux boutons
-// pour choisir le mode ("Par groupe" = un seul % saisi ici et appliqué à
-// toutes les lignes du groupe, "Par ligne" = chaque ligne garde son
-// propre %, affiché ici en lecture seule sous forme de moyenne pondérée).
-function GroupeAvancementControle({ label, mode, valeurGroupe, moyenneLignes, peutGerer, onChangerMode, onValiderValeur }) {
-  const estEditable = mode === "groupe" && peutGerer;
-  const valeurAffichee = mode === "groupe" ? valeurGroupe : moyenneLignes;
-  const pourcent = Math.max(0, Math.min(100, Math.round(valeurAffichee * 10) / 10));
+// Une ligne normale du tableau des lignes de devis : éditable (% avanc.
+// FO/MO, type FO/MO) comme avant. Utilisée aussi bien pour une ligne hors
+// groupe que pour la ligne « tête » d'un groupe (auquel cas `entete` lui
+// ajoute le bouton +/− qui déplie ses lignes membres, affichées juste en
+// dessous avec `imbriquee`) ou pour une ligne membre imbriquée.
+function LigneDevisRow({
+  ligne: l,
+  peutGerer,
+  modeSelection,
+  selectionnee,
+  onBasculerSelection,
+  onChangerAvancement,
+  onChangerType,
+  imbriquee,
+  entete,
+}) {
+  const pctFo = l.avancementFo ?? l.avancement ?? 0;
+  const pctMo = l.avancementMo ?? l.avancement ?? 0;
+  const titreDesignation = [l.reference, l.detail || l.designation]
+    .filter(Boolean)
+    .join(" — ");
   return (
-    <div>
-      <div className="simple-list-meta" style={{ marginBottom: 4 }}>
-        {label}
-      </div>
-      {peutGerer && (
-        <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
-          <button
-            type="button"
-            className={"btn-ghost" + (mode === "groupe" ? " btn-espace-actif" : "")}
-            style={{ padding: "2px 8px", fontSize: "0.76rem" }}
-            onClick={() => onChangerMode("groupe")}
-          >
-            Par groupe
-          </button>
-          <button
-            type="button"
-            className={"btn-ghost" + (mode === "ligne" ? " btn-espace-actif" : "")}
-            style={{ padding: "2px 8px", fontSize: "0.76rem" }}
-            onClick={() => onChangerMode("ligne")}
-          >
-            Par ligne
-          </button>
+    <tr
+      className={
+        (l.informative ? "elec-ligne-informative " : "") +
+        (imbriquee ? "elec-ligne-membre-groupe" : "")
+      }
+    >
+      <td className="elec-td-figee elec-col-etroite" style={{ left: 0, width: LARGEUR_NUMERO }}>
+        {modeSelection && peutGerer ? (
+          <input type="checkbox" checked={selectionnee} onChange={onBasculerSelection} />
+        ) : (
+          l.code || ""
+        )}
+      </td>
+      <td
+        className="elec-td-figee elec-th-figee-bord"
+        style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
+        title={titreDesignation}
+      >
+        <div className="elec-designation-cellule">
+          <span style={imbriquee ? { paddingLeft: 20 } : undefined}>{l.designation}</span>
+          {entete && (
+            <span className="elec-groupe-actions">
+              {entete.ouvert && peutGerer && (
+                <button
+                  type="button"
+                  className="btn-ghost btn-danger elec-groupe-dissoudre"
+                  onClick={entete.onDissoudre}
+                >
+                  Dissoudre
+                </button>
+              )}
+              <button
+                type="button"
+                className="elec-groupe-toggle"
+                onClick={entete.onToggle}
+                title={entete.ouvert ? "Replier le groupe" : "Déplier le groupe"}
+                aria-label={entete.ouvert ? "Replier le groupe" : "Déplier le groupe"}
+              >
+                {entete.ouvert ? "−" : "+"}
+              </button>
+            </span>
+          )}
         </div>
-      )}
-      {estEditable ? (
-        <div className={"elec-avancement-input " + classeAvancement(pourcent)}>
-          <input
-            key={pourcent}
-            type="number"
-            min="0"
-            max="100"
-            defaultValue={pourcent}
-            onBlur={(e) => onValiderValeur(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-          />
-          <span>%</span>
+      </td>
+      <td className="elec-col-etroite">{l.unite || "—"}</td>
+      <td className="elec-col-etroite">{formatNombre(l.quantite)}</td>
+      <td className="elec-col-materiel elec-col-saisie">
+        {l.informative ? (
+          "—"
+        ) : (
+          <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
+            <input
+              key={pctFo}
+              type="number"
+              min="0"
+              max="100"
+              defaultValue={pctFo}
+              disabled={!peutGerer}
+              onBlur={(e) => onChangerAvancement("avancementFo", e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+            />
+            <span>%</span>
+          </div>
+        )}
+      </td>
+      <td className="elec-col-materiel">{formatNombre(l.coutUnitaireFo)} €</td>
+      <td className="elec-col-materiel elec-type-code">
+        <select
+          className="elec-type-select"
+          title={formatTypeFo(l.typeFo)}
+          value={l.typeFo || ""}
+          disabled={!peutGerer}
+          onChange={(e) => onChangerType("typeFo", e.target.value)}
+        >
+          <option value="">—</option>
+          {l.typeFo &&
+            !LISTE_TYPES_FO.some((o) => valeurType(o.code, o.label) === l.typeFo) && (
+              <option value={l.typeFo}>{formatTypeFo(l.typeFo)}</option>
+            )}
+          {LISTE_TYPES_FO.map((o) => (
+            <option key={o.code} value={valeurType(o.code, o.label)}>
+              {o.code} · {o.label}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="elec-col-materiel">{formatNombre(l.coutTotalFo)} €</td>
+      <td className="elec-col-materiel">
+        {l.coutTotalFo ? formatNombre((l.coutTotalFo * pctFo) / 100) + " €" : "—"}
+      </td>
+      <td className="elec-col-mo elec-col-saisie">
+        {l.informative ? (
+          "—"
+        ) : (
+          <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
+            <input
+              key={pctMo}
+              type="number"
+              min="0"
+              max="100"
+              defaultValue={pctMo}
+              disabled={!peutGerer}
+              onBlur={(e) => onChangerAvancement("avancementMo", e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+            />
+            <span>%</span>
+          </div>
+        )}
+      </td>
+      <td className="elec-col-mo">{formatNombre(l.tempsUnitaire)} h</td>
+      <td className="elec-col-mo elec-type-code">
+        <select
+          className="elec-type-select"
+          title={formatTypeFo(l.typeMo)}
+          value={l.typeMo || ""}
+          disabled={!peutGerer}
+          onChange={(e) => onChangerType("typeMo", e.target.value)}
+        >
+          <option value="">—</option>
+          {l.typeMo &&
+            !LISTE_TYPES_MO.some((o) => valeurType(o.code, o.label) === l.typeMo) && (
+              <option value={l.typeMo}>{formatTypeFo(l.typeMo)}</option>
+            )}
+          {LISTE_TYPES_MO.map((o) => (
+            <option key={o.code} value={valeurType(o.code, o.label)}>
+              {o.code} · {o.label}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="elec-col-mo">{formatNombre(l.tempsTotalHeures)} h</td>
+      <td className="elec-col-mo">
+        {l.tempsTotalHeures ? formatNombre((l.tempsTotalHeures * pctMo) / 100) + " h" : "—"}
+      </td>
+    </tr>
+  );
+}
+
+// Ligne « tête de groupe » synthétique, utilisée quand le groupe a été
+// créé avec un nouveau nom (pas repris sur une ligne existante) : elle ne
+// correspond à aucune ligne de devis réelle, affiche juste le nom du
+// groupe, le nombre de lignes membres et une moyenne pondérée en lecture
+// seule (l'avancement se saisit ligne par ligne, une fois le groupe
+// déplié).
+function GroupeEnteteRow({ groupe, ouvert, nbMembres, moyenneFo, moyenneMo, onToggle, onDissoudre, peutGerer }) {
+  return (
+    <tr className="elec-ligne-groupe-entete">
+      <td className="elec-td-figee elec-col-etroite" style={{ left: 0, width: LARGEUR_NUMERO }} />
+      <td
+        className="elec-td-figee elec-th-figee-bord"
+        style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
+      >
+        <div className="elec-designation-cellule">
+          <span>
+            📁 {groupe.nom}
+            <span className="simple-list-meta" style={{ marginLeft: 8 }}>
+              {nbMembres} ligne(s)
+            </span>
+          </span>
+          <span className="elec-groupe-actions">
+            {ouvert && peutGerer && (
+              <button type="button" className="btn-ghost btn-danger elec-groupe-dissoudre" onClick={onDissoudre}>
+                Dissoudre
+              </button>
+            )}
+            <button
+              type="button"
+              className="elec-groupe-toggle"
+              onClick={onToggle}
+              title={ouvert ? "Replier le groupe" : "Déplier le groupe"}
+              aria-label={ouvert ? "Replier le groupe" : "Déplier le groupe"}
+            >
+              {ouvert ? "−" : "+"}
+            </button>
+          </span>
         </div>
-      ) : (
-        <span className="simple-list-meta">
-          {mode === "groupe" ? "Groupe (lecture seule) : " : "Moyenne pondérée : "}
-          {formatPct(pourcent / 100)}
-        </span>
-      )}
-    </div>
+      </td>
+      <td className="elec-col-etroite">—</td>
+      <td className="elec-col-etroite">—</td>
+      <td className="elec-col-materiel elec-col-saisie">
+        <span className="simple-list-meta">{formatPct(moyenneFo / 100)}</span>
+      </td>
+      <td className="elec-col-materiel">—</td>
+      <td className="elec-col-materiel elec-type-code">—</td>
+      <td className="elec-col-materiel">—</td>
+      <td className="elec-col-materiel">—</td>
+      <td className="elec-col-mo elec-col-saisie">
+        <span className="simple-list-meta">{formatPct(moyenneMo / 100)}</span>
+      </td>
+      <td className="elec-col-mo">—</td>
+      <td className="elec-col-mo elec-type-code">—</td>
+      <td className="elec-col-mo">—</td>
+      <td className="elec-col-mo">—</td>
+    </tr>
   );
 }
 
@@ -370,7 +535,7 @@ function GroupeLignesModal({ lignesSelection, onConfirmer, onClose }) {
     }
     setErreur("");
     setEnCours(true);
-    await onConfirmer(nom);
+    await onConfirmer(nom, source === "existante" ? ligneSourceId : null);
     setEnCours(false);
   };
 
@@ -521,17 +686,27 @@ export default function ElectriciteSiteDetail() {
 
   // Regroupement de lignes (par devis) : sélection de lignes dans le
   // tableau, puis "Grouper" crée un document elecGroupes et tague les
-  // lignes sélectionnées avec son id. L'avancement de chaque groupe peut
-  // ensuite être géré soit globalement ("groupe" — un seul % appliqué à
-  // toutes ses lignes), soit ligne par ligne ("ligne" — le groupe
-  // n'affiche alors qu'une moyenne pondérée, en lecture seule) ; FO et MO
-  // ont chacun leur propre mode, indépendamment.
+  // lignes sélectionnées avec son id. Le groupe s'affiche directement
+  // dans le tableau des lignes, sur la ligne choisie comme représentante
+  // (ligneRepresentativeId) ou, si un nouveau nom a été saisi, sur une
+  // ligne de tête synthétique — un bouton +/− la déplie pour afficher ses
+  // lignes membres juste en dessous, où l'avancement se gère ligne par
+  // ligne comme d'habitude (plus de mode "par groupe").
   const [modeSelection, setModeSelection] = useState(false);
   const [lignesSelectionnees, setLignesSelectionnees] = useState(new Set());
   const [afficherGroupeModal, setAfficherGroupeModal] = useState(false);
+  const [groupesOuverts, setGroupesOuverts] = useState(new Set());
   const groupesDuDevis = devisOuvert
     ? tousGroupes.filter((g) => g.devisId === devisOuvert.id)
     : [];
+  const basculerGroupeOuvert = (id) => {
+    setGroupesOuverts((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
+  };
 
   // "fo" / "mo" : un récapitulatif chantier (tous devis + détail par
   // devis) est affiché à la place du devis ouvert. null = vue normale.
@@ -546,6 +721,57 @@ export default function ElectriciteSiteDetail() {
   const lignes = toutesLignes
     .filter((l) => devisOuvert && l.devisId === devisOuvert.id)
     .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
+
+  // Construit la liste finale des lignes à afficher dans le tableau : une
+  // ligne de poste ou hors-groupe s'affiche à sa place habituelle ; une
+  // ligne qui appartient à un groupe n'apparaît qu'une fois, à l'endroit
+  // de sa première occurrence dans l'ordre du devis — soit sous la forme
+  // de sa propre ligne (groupe créé à partir d'une ligne existante), soit
+  // sous la forme d'une ligne de tête synthétique (nouveau nom de
+  // groupe) — suivie, uniquement si le groupe est déplié, de toutes ses
+  // autres lignes membres (imbriquées, dans leur ordre d'origine).
+  const groupesParId = new Map(groupesDuDevis.map((g) => [g.id, g]));
+  const lignesAffichees = (() => {
+    const membresParGroupe = new Map();
+    lignes.forEach((l) => {
+      if (!l.estPoste && l.groupeId && groupesParId.has(l.groupeId)) {
+        if (!membresParGroupe.has(l.groupeId)) membresParGroupe.set(l.groupeId, []);
+        membresParGroupe.get(l.groupeId).push(l);
+      }
+    });
+    const groupesRendus = new Set();
+    const resultat = [];
+    lignes.forEach((l) => {
+      if (l.estPoste) {
+        resultat.push({ kind: "poste", ligne: l });
+        return;
+      }
+      if (l.groupeId && groupesParId.has(l.groupeId)) {
+        const g = groupesParId.get(l.groupeId);
+        if (groupesRendus.has(g.id)) return;
+        groupesRendus.add(g.id);
+        const membres = membresParGroupe.get(g.id) || [];
+        const ouvert = groupesOuverts.has(g.id);
+        if (g.ligneRepresentativeId) {
+          const representative = membres.find((m) => m.id === g.ligneRepresentativeId) || l;
+          resultat.push({ kind: "representative", ligne: representative, groupe: g, ouvert });
+          if (ouvert) {
+            membres
+              .filter((m) => m.id !== representative.id)
+              .forEach((m) => resultat.push({ kind: "membre", ligne: m, groupe: g }));
+          }
+        } else {
+          resultat.push({ kind: "entete", groupe: g, ouvert, membres });
+          if (ouvert) {
+            membres.forEach((m) => resultat.push({ kind: "membre", ligne: m, groupe: g }));
+          }
+        }
+        return;
+      }
+      resultat.push({ kind: "normal", ligne: l });
+    });
+    return resultat;
+  })();
 
   const changerAvancement = async (ligne, champ, valeur) => {
     const v = Math.max(0, Math.min(100, Number(valeur) || 0));
@@ -668,21 +894,18 @@ export default function ElectriciteSiteDetail() {
   };
 
   // Crée un groupe à partir de la sélection courante, soit avec un nouveau
-  // nom, soit en reprenant la désignation d'une des lignes sélectionnées.
-  // Les deux avancements (FO, MO) démarrent en mode "ligne" (chaque ligne
-  // garde sa valeur actuelle) : grouper des lignes ne modifie jamais leur
-  // avancement existant tant qu'on n'a pas explicitement basculé le
-  // groupe en mode "groupe".
-  const creerGroupe = async (nom) => {
+  // nom (ligneRepresentativeId = null, une ligne de tête synthétique
+  // l'affichera), soit en reprenant une des lignes sélectionnées comme
+  // représentante (son id est alors stocké et c'est elle qui porte le
+  // bouton +/− dans le tableau). L'avancement de chaque ligne membre est
+  // conservé tel quel : grouper ne le modifie jamais.
+  const creerGroupe = async (nom, ligneRepresentativeId) => {
     if (!nom || !devisOuvert || lignesSelectionnees.size === 0) return;
     const refGroupe = await addDoc(collection(db, "elecGroupes"), {
       chantierId,
       devisId: devisOuvert.id,
       nom,
-      modeFo: "ligne",
-      modeMo: "ligne",
-      avancementFo: 0,
-      avancementMo: 0,
+      ligneRepresentativeId: ligneRepresentativeId || null,
       creeLe: serverTimestamp(),
     });
     const batch = writeBatch(db);
@@ -690,41 +913,10 @@ export default function ElectriciteSiteDetail() {
       batch.update(doc(db, "elecLignes", id), { groupeId: refGroupe.id })
     );
     await batch.commit();
+    setGroupesOuverts((prev) => new Set(prev).add(refGroupe.id));
     setLignesSelectionnees(new Set());
     setModeSelection(false);
     setAfficherGroupeModal(false);
-  };
-
-  // Bascule le mode d'un groupe (FO ou MO indépendamment). En passant en
-  // mode "groupe", on préremplit le % avec la moyenne pondérée actuelle
-  // des lignes membres plutôt que 0, pour ne pas effacer un avancement
-  // déjà saisi ligne par ligne.
-  const changerModeGroupe = async (groupe, champMode, nouveauMode) => {
-    const champPct = champMode === "modeFo" ? "avancementFo" : "avancementMo";
-    const champValeur = champMode === "modeFo" ? "coutTotalFo" : "tempsTotalHeures";
-    const maj = { [champMode]: nouveauMode };
-    if (nouveauMode === "groupe") {
-      const membres = toutesLignes.filter((l) => l.groupeId === groupe.id);
-      const budget = membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
-      const realise = membres.reduce(
-        (s, l) => s + ((l[champValeur] || 0) * (l[champPct] || 0)) / 100,
-        0
-      );
-      maj[champPct] = budget > 0 ? Math.round((realise / budget) * 1000) / 10 : 0;
-    }
-    await updateDoc(doc(db, "elecGroupes", groupe.id), maj);
-  };
-
-  // Applique le % saisi au niveau du groupe à toutes ses lignes membres —
-  // utilisé uniquement quand le groupe est en mode "groupe" (sinon chaque
-  // ligne garde sa propre saisie, voir le tableau des lignes).
-  const appliquerAvancementGroupeLignes = async (groupe, champPct, valeur) => {
-    const v = Math.max(0, Math.min(100, Number(valeur) || 0));
-    const membres = toutesLignes.filter((l) => l.groupeId === groupe.id);
-    const batch = writeBatch(db);
-    batch.update(doc(db, "elecGroupes", groupe.id), { [champPct]: v });
-    membres.forEach((l) => batch.update(doc(db, "elecLignes", l.id), { [champPct]: v }));
-    await batch.commit();
   };
 
   const dissoudreGroupe = async (groupe) => {
@@ -741,6 +933,11 @@ export default function ElectriciteSiteDetail() {
     membres.forEach((l) => batch.update(doc(db, "elecLignes", l.id), { groupeId: null }));
     batch.delete(doc(db, "elecGroupes", groupe.id));
     await batch.commit();
+    setGroupesOuverts((prev) => {
+      const suivant = new Set(prev);
+      suivant.delete(groupe.id);
+      return suivant;
+    });
   };
 
   if (!chantier) {
@@ -905,71 +1102,6 @@ export default function ElectriciteSiteDetail() {
                 </div>
               </div>
 
-              {groupesDuDevis.length > 0 && (
-                <div className="panel" style={{ marginBottom: 16 }}>
-                  <div className="panel-header">
-                    <h2>Groupes de lignes</h2>
-                  </div>
-                  <div className="lot-list">
-                    {groupesDuDevis.map((g) => {
-                      const membres = lignes.filter((l) => l.groupeId === g.id);
-                      const moyennePonderee = (champValeur, champPct) => {
-                        const budget = membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
-                        const realise = membres.reduce(
-                          (s, l) => s + ((l[champValeur] || 0) * (l[champPct] || 0)) / 100,
-                          0
-                        );
-                        return budget > 0 ? (realise / budget) * 100 : 0;
-                      };
-                      return (
-                        <div key={g.id} className="lot-card">
-                          <div className="lot-card-header" style={{ cursor: "default" }}>
-                            <div>
-                              <strong>{g.nom}</strong>
-                              <span className="simple-list-meta" style={{ marginLeft: 10 }}>
-                                {membres.length} ligne(s)
-                              </span>
-                            </div>
-                            {peutGerer && (
-                              <button
-                                type="button"
-                                className="btn-ghost btn-danger"
-                                onClick={() => dissoudreGroupe(g)}
-                              >
-                                Dissoudre
-                              </button>
-                            )}
-                          </div>
-                          <div
-                            className="lot-card-body"
-                            style={{ display: "flex", flexWrap: "wrap", gap: 24, padding: "10px 14px" }}
-                          >
-                            <GroupeAvancementControle
-                              label="Avancement Fournitures"
-                              mode={g.modeFo}
-                              valeurGroupe={g.avancementFo}
-                              moyenneLignes={moyennePonderee("coutTotalFo", "avancementFo")}
-                              peutGerer={peutGerer}
-                              onChangerMode={(m) => changerModeGroupe(g, "modeFo", m)}
-                              onValiderValeur={(v) => appliquerAvancementGroupeLignes(g, "avancementFo", v)}
-                            />
-                            <GroupeAvancementControle
-                              label="Avancement Main d'œuvre"
-                              mode={g.modeMo}
-                              valeurGroupe={g.avancementMo}
-                              moyenneLignes={moyennePonderee("tempsTotalHeures", "avancementMo")}
-                              peutGerer={peutGerer}
-                              onChangerMode={(m) => changerModeGroupe(g, "modeMo", m)}
-                              onValiderValeur={(v) => appliquerAvancementGroupeLignes(g, "avancementMo", v)}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {peutGerer && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
                   <button
@@ -997,6 +1129,12 @@ export default function ElectriciteSiteDetail() {
                         Grouper la sélection
                       </button>
                     </>
+                  )}
+                  {groupesDuDevis.length > 0 && !modeSelection && (
+                    <span className="simple-list-meta">
+                      {groupesDuDevis.length} groupe(s) de lignes dans ce devis — repliable(s)
+                      avec le bouton + sur la ligne de tête.
+                    </span>
                   )}
                 </div>
               )}
@@ -1090,10 +1228,9 @@ export default function ElectriciteSiteDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {lignes.map((l) => {
-                      const pctFo = l.avancementFo ?? l.avancement ?? 0;
-                      const pctMo = l.avancementMo ?? l.avancement ?? 0;
-                      if (l.estPoste) {
+                    {lignesAffichees.map((item) => {
+                      if (item.kind === "poste") {
+                        const l = item.ligne;
                         return (
                           <tr key={l.id} className="elec-ligne-poste">
                             <td colSpan={14} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
@@ -1103,140 +1240,55 @@ export default function ElectriciteSiteDetail() {
                           </tr>
                         );
                       }
-                      // La référence (importée mais pas affichée en colonne,
-                      // inutile sur ce projet) reste consultable en infobulle
-                      // sur la désignation.
-                      const titreDesignation = [l.reference, l.detail || l.designation]
-                        .filter(Boolean)
-                        .join(" — ");
-                      const groupe = l.groupeId
-                        ? tousGroupes.find((g) => g.id === l.groupeId)
-                        : null;
+                      if (item.kind === "entete") {
+                        const { groupe, ouvert, membres } = item;
+                        const moyenne = (champValeur, champPct) => {
+                          const budget = membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
+                          const realise = membres.reduce(
+                            (s, l) => s + ((l[champValeur] || 0) * (l[champPct] || 0)) / 100,
+                            0
+                          );
+                          return budget > 0 ? (realise / budget) * 100 : 0;
+                        };
+                        return (
+                          <GroupeEnteteRow
+                            key={"groupe-" + groupe.id}
+                            groupe={groupe}
+                            ouvert={ouvert}
+                            nbMembres={membres.length}
+                            moyenneFo={moyenne("coutTotalFo", "avancementFo")}
+                            moyenneMo={moyenne("tempsTotalHeures", "avancementMo")}
+                            peutGerer={peutGerer}
+                            onToggle={() => basculerGroupeOuvert(groupe.id)}
+                            onDissoudre={() => dissoudreGroupe(groupe)}
+                          />
+                        );
+                      }
+                      // "representative", "membre" ou "normal" : une ligne
+                      // réelle du devis, éventuellement tête de groupe
+                      // (entete) ou imbriquée (membre).
+                      const l = item.ligne;
                       return (
-                        <tr key={l.id} className={l.informative ? "elec-ligne-informative" : ""}>
-                          <td
-                            className="elec-td-figee elec-col-etroite"
-                            style={{ left: 0, width: LARGEUR_NUMERO }}
-                          >
-                            {modeSelection && peutGerer ? (
-                              <input
-                                type="checkbox"
-                                checked={lignesSelectionnees.has(l.id)}
-                                onChange={() => basculerSelectionLigne(l.id)}
-                              />
-                            ) : (
-                              l.code || ""
-                            )}
-                          </td>
-                          <td
-                            className="elec-td-figee elec-th-figee-bord"
-                            style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
-                            title={titreDesignation}
-                          >
-                            {groupe && (
-                              <span className="elec-groupe-badge" title={"Groupe : " + groupe.nom}>
-                                {groupe.nom}
-                              </span>
-                            )}
-                            {l.designation}
-                          </td>
-                          <td className="elec-col-etroite">{l.unite || "—"}</td>
-                          <td className="elec-col-etroite">{formatNombre(l.quantite)}</td>
-                          <td className="elec-col-materiel elec-col-saisie">
-                            {l.informative ? (
-                              "—"
-                            ) : (
-                              <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
-                                <input
-                                  key={pctFo}
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  defaultValue={pctFo}
-                                  disabled={!peutGerer || (groupe && groupe.modeFo === "groupe")}
-                                  onBlur={(e) => changerAvancement(l, "avancementFo", e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") e.currentTarget.blur();
-                                  }}
-                                />
-                                <span>%</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="elec-col-materiel">{formatNombre(l.coutUnitaireFo)} €</td>
-                          <td className="elec-col-materiel elec-type-code">
-                            <select
-                              className="elec-type-select"
-                              title={formatTypeFo(l.typeFo)}
-                              value={l.typeFo || ""}
-                              disabled={!peutGerer}
-                              onChange={(e) => changerType(l, "typeFo", e.target.value)}
-                            >
-                              <option value="">—</option>
-                              {l.typeFo &&
-                                !LISTE_TYPES_FO.some(
-                                  (o) => valeurType(o.code, o.label) === l.typeFo
-                                ) && <option value={l.typeFo}>{formatTypeFo(l.typeFo)}</option>}
-                              {LISTE_TYPES_FO.map((o) => (
-                                <option key={o.code} value={valeurType(o.code, o.label)}>
-                                  {o.code} · {o.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="elec-col-materiel">{formatNombre(l.coutTotalFo)} €</td>
-                          <td className="elec-col-materiel">
-                            {l.coutTotalFo ? formatNombre((l.coutTotalFo * pctFo) / 100) + " €" : "—"}
-                          </td>
-                          <td className="elec-col-mo elec-col-saisie">
-                            {l.informative ? (
-                              "—"
-                            ) : (
-                              <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
-                                <input
-                                  key={pctMo}
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  defaultValue={pctMo}
-                                  disabled={!peutGerer || (groupe && groupe.modeMo === "groupe")}
-                                  onBlur={(e) => changerAvancement(l, "avancementMo", e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") e.currentTarget.blur();
-                                  }}
-                                />
-                                <span>%</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="elec-col-mo">{formatNombre(l.tempsUnitaire)} h</td>
-                          <td className="elec-col-mo elec-type-code">
-                            <select
-                              className="elec-type-select"
-                              title={formatTypeFo(l.typeMo)}
-                              value={l.typeMo || ""}
-                              disabled={!peutGerer}
-                              onChange={(e) => changerType(l, "typeMo", e.target.value)}
-                            >
-                              <option value="">—</option>
-                              {l.typeMo &&
-                                !LISTE_TYPES_MO.some(
-                                  (o) => valeurType(o.code, o.label) === l.typeMo
-                                ) && <option value={l.typeMo}>{formatTypeFo(l.typeMo)}</option>}
-                              {LISTE_TYPES_MO.map((o) => (
-                                <option key={o.code} value={valeurType(o.code, o.label)}>
-                                  {o.code} · {o.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="elec-col-mo">{formatNombre(l.tempsTotalHeures)} h</td>
-                          <td className="elec-col-mo">
-                            {l.tempsTotalHeures
-                              ? formatNombre((l.tempsTotalHeures * pctMo) / 100) + " h"
-                              : "—"}
-                          </td>
-                        </tr>
+                        <LigneDevisRow
+                          key={l.id}
+                          ligne={l}
+                          peutGerer={peutGerer}
+                          modeSelection={modeSelection}
+                          selectionnee={lignesSelectionnees.has(l.id)}
+                          onBasculerSelection={() => basculerSelectionLigne(l.id)}
+                          onChangerAvancement={(champ, valeur) => changerAvancement(l, champ, valeur)}
+                          onChangerType={(champ, valeur) => changerType(l, champ, valeur)}
+                          imbriquee={item.kind === "membre"}
+                          entete={
+                            item.kind === "representative"
+                              ? {
+                                  ouvert: item.ouvert,
+                                  onToggle: () => basculerGroupeOuvert(item.groupe.id),
+                                  onDissoudre: () => dissoudreGroupe(item.groupe),
+                                }
+                              : null
+                          }
+                        />
                       );
                     })}
                   </tbody>
