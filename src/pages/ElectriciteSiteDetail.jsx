@@ -1,6 +1,16 @@
 import { useCallback, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { doc, updateDoc, query, collection, where, getDocs, writeBatch } from "firebase/firestore";
+import {
+  addDoc,
+  doc,
+  updateDoc,
+  query,
+  collection,
+  where,
+  getDocs,
+  writeBatch,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
@@ -53,10 +63,12 @@ const SOMME_LARGEURS_FIXES_LIGNES =
 
 // Largeur des colonnes fixes du tableau Récap (tout sauf Type de FO, qui
 // reçoit le même traitement que Désignation ci-dessus).
+const LARGEUR_COL_ORDRE = 46;
 const LARGEUR_COL_NUM = 170;
 const LARGEUR_COL_AVANCEMENT = 240;
 const LARGEUR_MIN_COL_TYPE = 200;
-const SOMME_LARGEURS_RECAP_FIXES = LARGEUR_COL_NUM * 3 + LARGEUR_COL_AVANCEMENT;
+const SOMME_LARGEURS_RECAP_FIXES =
+  LARGEUR_COL_ORDRE + LARGEUR_COL_NUM * 3 + LARGEUR_COL_AVANCEMENT;
 
 // "4  [Automatisme & Contrôle]" → "4 · Automatisme & Contrôle" : le numéro
 // ET le type, comme dans le devis, affichés en tout petit (voir
@@ -166,6 +178,9 @@ function TableauRecap({
           <table className="data-table table-recap">
             <thead>
               <tr>
+                <th className="col-ordre" style={{ width: LARGEUR_COL_ORDRE }}>
+                  N°
+                </th>
                 <th className="col-type" style={{ width: largeurColType }}>
                   Type de FO
                 </th>
@@ -176,8 +191,11 @@ function TableauRecap({
               </tr>
             </thead>
             <tbody>
-              {recap.parType.map((l) => (
+              {recap.parType.map((l, index) => (
                 <tr key={l.libelle}>
+                  <td className="col-ordre" data-label="N°">
+                    {index + 1}
+                  </td>
                   <td
                     className="col-type"
                     data-label="Type de FO"
@@ -207,6 +225,7 @@ function TableauRecap({
                 </tr>
               ))}
               <tr className="table-recap-total">
+                <td className="col-ordre" data-label="N°"></td>
                 <td className="col-type" data-label="Type de FO">
                   TOTAL
                 </td>
@@ -266,6 +285,145 @@ function LigneAvancementModifiable({ pct, onValider }) {
       </div>
       <div className="progress-bar">
         <div className={"progress-bar-fill " + classeAvancement(pourcent)} style={{ width: pourcent + "%" }} />
+      </div>
+    </div>
+  );
+}
+
+// Contrôle d'avancement d'un groupe de lignes (FO ou MO) : deux boutons
+// pour choisir le mode ("Par groupe" = un seul % saisi ici et appliqué à
+// toutes les lignes du groupe, "Par ligne" = chaque ligne garde son
+// propre %, affiché ici en lecture seule sous forme de moyenne pondérée).
+function GroupeAvancementControle({ label, mode, valeurGroupe, moyenneLignes, peutGerer, onChangerMode, onValiderValeur }) {
+  const estEditable = mode === "groupe" && peutGerer;
+  const valeurAffichee = mode === "groupe" ? valeurGroupe : moyenneLignes;
+  const pourcent = Math.max(0, Math.min(100, Math.round(valeurAffichee * 10) / 10));
+  return (
+    <div>
+      <div className="simple-list-meta" style={{ marginBottom: 4 }}>
+        {label}
+      </div>
+      {peutGerer && (
+        <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+          <button
+            type="button"
+            className={"btn-ghost" + (mode === "groupe" ? " btn-espace-actif" : "")}
+            style={{ padding: "2px 8px", fontSize: "0.76rem" }}
+            onClick={() => onChangerMode("groupe")}
+          >
+            Par groupe
+          </button>
+          <button
+            type="button"
+            className={"btn-ghost" + (mode === "ligne" ? " btn-espace-actif" : "")}
+            style={{ padding: "2px 8px", fontSize: "0.76rem" }}
+            onClick={() => onChangerMode("ligne")}
+          >
+            Par ligne
+          </button>
+        </div>
+      )}
+      {estEditable ? (
+        <div className={"elec-avancement-input " + classeAvancement(pourcent)}>
+          <input
+            key={pourcent}
+            type="number"
+            min="0"
+            max="100"
+            defaultValue={pourcent}
+            onBlur={(e) => onValiderValeur(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
+          <span>%</span>
+        </div>
+      ) : (
+        <span className="simple-list-meta">
+          {mode === "groupe" ? "Groupe (lecture seule) : " : "Moyenne pondérée : "}
+          {formatPct(pourcent / 100)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Modale de création d'un groupe à partir de la sélection courante : soit
+// un nouveau nom de groupe, soit le nom (désignation) d'une des lignes
+// sélectionnées.
+function GroupeLignesModal({ lignesSelection, onConfirmer, onClose }) {
+  const [source, setSource] = useState("nouveau");
+  const [nouveauNom, setNouveauNom] = useState("");
+  const [ligneSourceId, setLigneSourceId] = useState(lignesSelection[0]?.id ?? "");
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const nom =
+      source === "existante"
+        ? lignesSelection.find((l) => l.id === ligneSourceId)?.designation
+        : nouveauNom.trim();
+    if (!nom) {
+      setErreur("Indiquez un nom de groupe.");
+      return;
+    }
+    setErreur("");
+    setEnCours(true);
+    await onConfirmer(nom);
+    setEnCours(false);
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Grouper {lignesSelection.length} ligne(s)</h2>
+        <form onSubmit={handleSubmit} className="form">
+          <label className="team-checklist-item">
+            <input
+              type="radio"
+              name="source-nom-groupe"
+              checked={source === "nouveau"}
+              onChange={() => setSource("nouveau")}
+            />
+            Nouveau nom de groupe
+          </label>
+          {source === "nouveau" && (
+            <input
+              value={nouveauNom}
+              onChange={(e) => setNouveauNom(e.target.value)}
+              placeholder="ex : Tableau TGBT 1"
+              autoFocus
+            />
+          )}
+          <label className="team-checklist-item">
+            <input
+              type="radio"
+              name="source-nom-groupe"
+              checked={source === "existante"}
+              onChange={() => setSource("existante")}
+            />
+            Utiliser le nom d'une ligne sélectionnée
+          </label>
+          {source === "existante" && (
+            <select value={ligneSourceId} onChange={(e) => setLigneSourceId(e.target.value)}>
+              {lignesSelection.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.designation}
+                </option>
+              ))}
+            </select>
+          )}
+          {erreur && <div className="form-error">{erreur}</div>}
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={enCours}>
+              {enCours ? "Création…" : "Grouper"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -352,6 +510,7 @@ export default function ElectriciteSiteDetail() {
   const { documents: utilisateurs } = useCollection("users", "email");
   const { documents: tousDevis } = useCollection("elecDevis");
   const { documents: toutesLignes } = useCollection("elecLignes");
+  const { documents: tousGroupes } = useCollection("elecGroupes");
 
   const devis = tousDevis
     .filter((d) => d.chantierId === chantierId)
@@ -359,6 +518,20 @@ export default function ElectriciteSiteDetail() {
 
   const [devisOuvertId, setDevisOuvertId] = useState(null);
   const devisOuvert = devis.find((d) => d.id === devisOuvertId) ?? devis[0] ?? null;
+
+  // Regroupement de lignes (par devis) : sélection de lignes dans le
+  // tableau, puis "Grouper" crée un document elecGroupes et tague les
+  // lignes sélectionnées avec son id. L'avancement de chaque groupe peut
+  // ensuite être géré soit globalement ("groupe" — un seul % appliqué à
+  // toutes ses lignes), soit ligne par ligne ("ligne" — le groupe
+  // n'affiche alors qu'une moyenne pondérée, en lecture seule) ; FO et MO
+  // ont chacun leur propre mode, indépendamment.
+  const [modeSelection, setModeSelection] = useState(false);
+  const [lignesSelectionnees, setLignesSelectionnees] = useState(new Set());
+  const [afficherGroupeModal, setAfficherGroupeModal] = useState(false);
+  const groupesDuDevis = devisOuvert
+    ? tousGroupes.filter((g) => g.devisId === devisOuvert.id)
+    : [];
 
   // "fo" / "mo" : un récapitulatif chantier (tous devis + détail par
   // devis) est affiché à la place du devis ouvert. null = vue normale.
@@ -384,40 +557,10 @@ export default function ElectriciteSiteDetail() {
     await updateDoc(doc(db, "elecLignes", ligne.id), { [champ]: valeur });
   };
 
-  // Arrondi à 2 décimales (quantités, coûts, temps) — évite d'accumuler
-  // des décimales flottantes à chaque recalcul en chaîne.
-  const arrondi2 = (n) => Math.round((n || 0) * 100) / 100;
-
-  // Qté, PU et PT (coût ou temps) sont liés : Qté × PU = PT. Modifier l'un
-  // des trois recalcule automatiquement les deux autres pour les garder
-  // cohérents, aussi bien côté Matériel (coûts) que côté Main d'œuvre
-  // (temps) — la quantité est commune aux deux.
-  const modifierValeurLigne = async (ligne, champ, valeurBrute) => {
-    const valeur = Math.max(0, Number(String(valeurBrute).replace(",", ".")) || 0);
-    const maj = {};
-    if (champ === "quantite") {
-      maj.quantite = valeur;
-      maj.coutTotalFo = arrondi2(valeur * (ligne.coutUnitaireFo || 0));
-      maj.tempsTotalHeures = arrondi2(valeur * (ligne.tempsUnitaire || 0));
-    } else if (champ === "coutUnitaireFo") {
-      const q = ligne.quantite || 0;
-      maj.coutUnitaireFo = valeur;
-      maj.coutTotalFo = arrondi2(q * valeur);
-    } else if (champ === "coutTotalFo") {
-      const q = ligne.quantite || 0;
-      maj.coutTotalFo = valeur;
-      maj.coutUnitaireFo = q > 0 ? arrondi2(valeur / q) : ligne.coutUnitaireFo || 0;
-    } else if (champ === "tempsUnitaire") {
-      const q = ligne.quantite || 0;
-      maj.tempsUnitaire = valeur;
-      maj.tempsTotalHeures = arrondi2(q * valeur);
-    } else if (champ === "tempsTotalHeures") {
-      const q = ligne.quantite || 0;
-      maj.tempsTotalHeures = valeur;
-      maj.tempsUnitaire = q > 0 ? arrondi2(valeur / q) : ligne.tempsUnitaire || 0;
-    }
-    await updateDoc(doc(db, "elecLignes", ligne.id), maj);
-  };
+  // Qté, coût unitaire/total et temps unitaire/total viennent du devis
+  // importé et ne sont plus modifiables à la main depuis ce tableau (seuls
+  // les % d'avancement et le type FO/MO le restent) — évite les incohérences
+  // entre Qté × PU et PT que la ressaisie manuelle pouvait introduire.
 
   const supprimerDevis = async (d) => {
     if (!confirm('Supprimer le devis « ' + d.nom + ' » et toutes ses lignes ?')) return;
@@ -515,6 +658,91 @@ export default function ElectriciteSiteDetail() {
     await batch.commit();
   };
 
+  const basculerSelectionLigne = (id) => {
+    setLignesSelectionnees((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
+  };
+
+  // Crée un groupe à partir de la sélection courante, soit avec un nouveau
+  // nom, soit en reprenant la désignation d'une des lignes sélectionnées.
+  // Les deux avancements (FO, MO) démarrent en mode "ligne" (chaque ligne
+  // garde sa valeur actuelle) : grouper des lignes ne modifie jamais leur
+  // avancement existant tant qu'on n'a pas explicitement basculé le
+  // groupe en mode "groupe".
+  const creerGroupe = async (nom) => {
+    if (!nom || !devisOuvert || lignesSelectionnees.size === 0) return;
+    const refGroupe = await addDoc(collection(db, "elecGroupes"), {
+      chantierId,
+      devisId: devisOuvert.id,
+      nom,
+      modeFo: "ligne",
+      modeMo: "ligne",
+      avancementFo: 0,
+      avancementMo: 0,
+      creeLe: serverTimestamp(),
+    });
+    const batch = writeBatch(db);
+    lignesSelectionnees.forEach((id) =>
+      batch.update(doc(db, "elecLignes", id), { groupeId: refGroupe.id })
+    );
+    await batch.commit();
+    setLignesSelectionnees(new Set());
+    setModeSelection(false);
+    setAfficherGroupeModal(false);
+  };
+
+  // Bascule le mode d'un groupe (FO ou MO indépendamment). En passant en
+  // mode "groupe", on préremplit le % avec la moyenne pondérée actuelle
+  // des lignes membres plutôt que 0, pour ne pas effacer un avancement
+  // déjà saisi ligne par ligne.
+  const changerModeGroupe = async (groupe, champMode, nouveauMode) => {
+    const champPct = champMode === "modeFo" ? "avancementFo" : "avancementMo";
+    const champValeur = champMode === "modeFo" ? "coutTotalFo" : "tempsTotalHeures";
+    const maj = { [champMode]: nouveauMode };
+    if (nouveauMode === "groupe") {
+      const membres = toutesLignes.filter((l) => l.groupeId === groupe.id);
+      const budget = membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
+      const realise = membres.reduce(
+        (s, l) => s + ((l[champValeur] || 0) * (l[champPct] || 0)) / 100,
+        0
+      );
+      maj[champPct] = budget > 0 ? Math.round((realise / budget) * 1000) / 10 : 0;
+    }
+    await updateDoc(doc(db, "elecGroupes", groupe.id), maj);
+  };
+
+  // Applique le % saisi au niveau du groupe à toutes ses lignes membres —
+  // utilisé uniquement quand le groupe est en mode "groupe" (sinon chaque
+  // ligne garde sa propre saisie, voir le tableau des lignes).
+  const appliquerAvancementGroupeLignes = async (groupe, champPct, valeur) => {
+    const v = Math.max(0, Math.min(100, Number(valeur) || 0));
+    const membres = toutesLignes.filter((l) => l.groupeId === groupe.id);
+    const batch = writeBatch(db);
+    batch.update(doc(db, "elecGroupes", groupe.id), { [champPct]: v });
+    membres.forEach((l) => batch.update(doc(db, "elecLignes", l.id), { [champPct]: v }));
+    await batch.commit();
+  };
+
+  const dissoudreGroupe = async (groupe) => {
+    if (
+      !confirm(
+        "Dissoudre le groupe « " +
+          groupe.nom +
+          " » ? Ses lignes repassent en gestion individuelle (leur avancement actuel est conservé)."
+      )
+    )
+      return;
+    const membres = toutesLignes.filter((l) => l.groupeId === groupe.id);
+    const batch = writeBatch(db);
+    membres.forEach((l) => batch.update(doc(db, "elecLignes", l.id), { groupeId: null }));
+    batch.delete(doc(db, "elecGroupes", groupe.id));
+    await batch.commit();
+  };
+
   if (!chantier) {
     return <div className="page-loading">Chargement…</div>;
   }
@@ -583,6 +811,8 @@ export default function ElectriciteSiteDetail() {
                 onClick={() => {
                   setRecapActif(null);
                   setDevisOuvertId(d.id);
+                  setModeSelection(false);
+                  setLignesSelectionnees(new Set());
                 }}
               >
                 {d.nom}
@@ -674,6 +904,102 @@ export default function ElectriciteSiteDetail() {
                   </div>
                 </div>
               </div>
+
+              {groupesDuDevis.length > 0 && (
+                <div className="panel" style={{ marginBottom: 16 }}>
+                  <div className="panel-header">
+                    <h2>Groupes de lignes</h2>
+                  </div>
+                  <div className="lot-list">
+                    {groupesDuDevis.map((g) => {
+                      const membres = lignes.filter((l) => l.groupeId === g.id);
+                      const moyennePonderee = (champValeur, champPct) => {
+                        const budget = membres.reduce((s, l) => s + (l[champValeur] || 0), 0);
+                        const realise = membres.reduce(
+                          (s, l) => s + ((l[champValeur] || 0) * (l[champPct] || 0)) / 100,
+                          0
+                        );
+                        return budget > 0 ? (realise / budget) * 100 : 0;
+                      };
+                      return (
+                        <div key={g.id} className="lot-card">
+                          <div className="lot-card-header" style={{ cursor: "default" }}>
+                            <div>
+                              <strong>{g.nom}</strong>
+                              <span className="simple-list-meta" style={{ marginLeft: 10 }}>
+                                {membres.length} ligne(s)
+                              </span>
+                            </div>
+                            {peutGerer && (
+                              <button
+                                type="button"
+                                className="btn-ghost btn-danger"
+                                onClick={() => dissoudreGroupe(g)}
+                              >
+                                Dissoudre
+                              </button>
+                            )}
+                          </div>
+                          <div
+                            className="lot-card-body"
+                            style={{ display: "flex", flexWrap: "wrap", gap: 24, padding: "10px 14px" }}
+                          >
+                            <GroupeAvancementControle
+                              label="Avancement Fournitures"
+                              mode={g.modeFo}
+                              valeurGroupe={g.avancementFo}
+                              moyenneLignes={moyennePonderee("coutTotalFo", "avancementFo")}
+                              peutGerer={peutGerer}
+                              onChangerMode={(m) => changerModeGroupe(g, "modeFo", m)}
+                              onValiderValeur={(v) => appliquerAvancementGroupeLignes(g, "avancementFo", v)}
+                            />
+                            <GroupeAvancementControle
+                              label="Avancement Main d'œuvre"
+                              mode={g.modeMo}
+                              valeurGroupe={g.avancementMo}
+                              moyenneLignes={moyennePonderee("tempsTotalHeures", "avancementMo")}
+                              peutGerer={peutGerer}
+                              onChangerMode={(m) => changerModeGroupe(g, "modeMo", m)}
+                              onValiderValeur={(v) => appliquerAvancementGroupeLignes(g, "avancementMo", v)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {peutGerer && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className={"btn-ghost" + (modeSelection ? " btn-espace-actif" : "")}
+                    onClick={() => {
+                      setModeSelection((v) => !v);
+                      setLignesSelectionnees(new Set());
+                    }}
+                  >
+                    {modeSelection ? "Annuler la sélection" : "Sélectionner des lignes"}
+                  </button>
+                  {modeSelection && (
+                    <>
+                      <span className="simple-list-meta">
+                        {lignesSelectionnees.size} ligne(s) sélectionnée(s) — cochez le N° des
+                        lignes à grouper
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={lignesSelectionnees.size === 0}
+                        onClick={() => setAfficherGroupeModal(true)}
+                      >
+                        Grouper la sélection
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="data-table-wrapper elec-lignes-wrapper">
                 <table className="data-table elec-lignes-table" style={{ width: largeurTableLignes }}>
@@ -783,38 +1109,39 @@ export default function ElectriciteSiteDetail() {
                       const titreDesignation = [l.reference, l.detail || l.designation]
                         .filter(Boolean)
                         .join(" — ");
+                      const groupe = l.groupeId
+                        ? tousGroupes.find((g) => g.id === l.groupeId)
+                        : null;
                       return (
                         <tr key={l.id} className={l.informative ? "elec-ligne-informative" : ""}>
                           <td
                             className="elec-td-figee elec-col-etroite"
                             style={{ left: 0, width: LARGEUR_NUMERO }}
                           >
-                            {l.code || ""}
+                            {modeSelection && peutGerer ? (
+                              <input
+                                type="checkbox"
+                                checked={lignesSelectionnees.has(l.id)}
+                                onChange={() => basculerSelectionLigne(l.id)}
+                              />
+                            ) : (
+                              l.code || ""
+                            )}
                           </td>
                           <td
                             className="elec-td-figee elec-th-figee-bord"
                             style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
                             title={titreDesignation}
                           >
+                            {groupe && (
+                              <span className="elec-groupe-badge" title={"Groupe : " + groupe.nom}>
+                                {groupe.nom}
+                              </span>
+                            )}
                             {l.designation}
                           </td>
                           <td className="elec-col-etroite">{l.unite || "—"}</td>
-                          <td className="elec-col-etroite">
-                            <div className="elec-valeur-input">
-                              <input
-                                key={l.quantite}
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                defaultValue={l.quantite || 0}
-                                disabled={!peutGerer}
-                                onBlur={(e) => modifierValeurLigne(l, "quantite", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") e.currentTarget.blur();
-                                }}
-                              />
-                            </div>
-                          </td>
+                          <td className="elec-col-etroite">{formatNombre(l.quantite)}</td>
                           <td className="elec-col-materiel elec-col-saisie">
                             {l.informative ? (
                               "—"
@@ -826,7 +1153,7 @@ export default function ElectriciteSiteDetail() {
                                   min="0"
                                   max="100"
                                   defaultValue={pctFo}
-                                  disabled={!peutGerer}
+                                  disabled={!peutGerer || (groupe && groupe.modeFo === "groupe")}
                                   onBlur={(e) => changerAvancement(l, "avancementFo", e.target.value)}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") e.currentTarget.blur();
@@ -836,23 +1163,7 @@ export default function ElectriciteSiteDetail() {
                               </div>
                             )}
                           </td>
-                          <td className="elec-col-materiel">
-                            <div className="elec-valeur-input">
-                              <input
-                                key={l.coutUnitaireFo}
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                defaultValue={l.coutUnitaireFo || 0}
-                                disabled={!peutGerer}
-                                onBlur={(e) => modifierValeurLigne(l, "coutUnitaireFo", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") e.currentTarget.blur();
-                                }}
-                              />
-                              <span>€</span>
-                            </div>
-                          </td>
+                          <td className="elec-col-materiel">{formatNombre(l.coutUnitaireFo)} €</td>
                           <td className="elec-col-materiel elec-type-code">
                             <select
                               className="elec-type-select"
@@ -873,23 +1184,7 @@ export default function ElectriciteSiteDetail() {
                               ))}
                             </select>
                           </td>
-                          <td className="elec-col-materiel">
-                            <div className="elec-valeur-input">
-                              <input
-                                key={l.coutTotalFo}
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                defaultValue={l.coutTotalFo || 0}
-                                disabled={!peutGerer}
-                                onBlur={(e) => modifierValeurLigne(l, "coutTotalFo", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") e.currentTarget.blur();
-                                }}
-                              />
-                              <span>€</span>
-                            </div>
-                          </td>
+                          <td className="elec-col-materiel">{formatNombre(l.coutTotalFo)} €</td>
                           <td className="elec-col-materiel">
                             {l.coutTotalFo ? formatNombre((l.coutTotalFo * pctFo) / 100) + " €" : "—"}
                           </td>
@@ -904,7 +1199,7 @@ export default function ElectriciteSiteDetail() {
                                   min="0"
                                   max="100"
                                   defaultValue={pctMo}
-                                  disabled={!peutGerer}
+                                  disabled={!peutGerer || (groupe && groupe.modeMo === "groupe")}
                                   onBlur={(e) => changerAvancement(l, "avancementMo", e.target.value)}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") e.currentTarget.blur();
@@ -914,23 +1209,7 @@ export default function ElectriciteSiteDetail() {
                               </div>
                             )}
                           </td>
-                          <td className="elec-col-mo">
-                            <div className="elec-valeur-input">
-                              <input
-                                key={l.tempsUnitaire}
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                defaultValue={l.tempsUnitaire || 0}
-                                disabled={!peutGerer}
-                                onBlur={(e) => modifierValeurLigne(l, "tempsUnitaire", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") e.currentTarget.blur();
-                                }}
-                              />
-                              <span>h</span>
-                            </div>
-                          </td>
+                          <td className="elec-col-mo">{formatNombre(l.tempsUnitaire)} h</td>
                           <td className="elec-col-mo elec-type-code">
                             <select
                               className="elec-type-select"
@@ -951,23 +1230,7 @@ export default function ElectriciteSiteDetail() {
                               ))}
                             </select>
                           </td>
-                          <td className="elec-col-mo">
-                            <div className="elec-valeur-input">
-                              <input
-                                key={l.tempsTotalHeures}
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                defaultValue={l.tempsTotalHeures || 0}
-                                disabled={!peutGerer}
-                                onBlur={(e) => modifierValeurLigne(l, "tempsTotalHeures", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") e.currentTarget.blur();
-                                }}
-                              />
-                              <span>h</span>
-                            </div>
-                          </td>
+                          <td className="elec-col-mo">{formatNombre(l.tempsTotalHeures)} h</td>
                           <td className="elec-col-mo">
                             {l.tempsTotalHeures
                               ? formatNombre((l.tempsTotalHeures * pctMo) / 100) + " h"
@@ -998,6 +1261,14 @@ export default function ElectriciteSiteDetail() {
           chantierId={chantierId}
           nbDevisExistants={devis.length}
           onClose={() => setAfficherImport(false)}
+        />
+      )}
+
+      {afficherGroupeModal && (
+        <GroupeLignesModal
+          lignesSelection={lignes.filter((l) => lignesSelectionnees.has(l.id))}
+          onConfirmer={creerGroupe}
+          onClose={() => setAfficherGroupeModal(false)}
         />
       )}
     </div>

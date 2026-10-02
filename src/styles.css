@@ -665,6 +665,19 @@ table.table-recap {
   color: var(--text-muted);
   font-style: italic;
 }
+.elec-groupe-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-light, #e3ecff);
+  color: var(--accent, #3b5bdb);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
 
 /* Colonnes figées (N°, Référence, Désignation) : gel de volets comme dans
    Excel, pour garder l'identité de la ligne visible en défilant vers les
@@ -2596,12 +2609,13 @@ textarea:focus {
     /* minmax(0, 1fr) et non 1fr : sans ça, une grille ne réduit jamais
        une piste en dessous de la taille "naturelle" de son contenu, donc
        un nombre un peu long (ex. "9 277,1 €") faisait déborder sa
-       colonne hors de la carte au lieu de passer à la ligne. */
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+       colonne hors de la carte au lieu de passer à la ligne. La 1ère
+       colonne (N°) reste étroite, les 3 autres se partagent le reste. */
+    grid-template-columns: minmax(0, 0.5fr) repeat(3, minmax(0, 1fr));
     grid-template-areas:
-      "type type type"
-      "avancement avancement avancement"
-      "budget realise restant";
+      "ordre type type type"
+      "avancement avancement avancement avancement"
+      ". budget realise restant";
     gap: 8px 10px;
   }
   .table-recap td {
@@ -2616,11 +2630,22 @@ textarea:focus {
     text-align: left;
     margin-bottom: 2px;
   }
+  .table-recap td.col-ordre {
+    grid-area: ordre;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+    align-self: center;
+  }
+  .table-recap td.col-ordre::before {
+    display: none;
+  }
   .table-recap td.col-type {
     grid-area: type;
     font-family: var(--font-ui);
     font-size: 0.95rem;
     font-weight: 600;
+    align-self: center;
   }
   .table-recap td.col-type::before {
     display: none;
@@ -2644,13 +2669,13 @@ textarea:focus {
   .table-recap td.col-num::before {
     font-size: 0.68rem;
   }
-  .table-recap td:nth-of-type(2) {
+  .table-recap td:nth-of-type(3) {
     grid-area: budget;
   }
-  .table-recap td:nth-of-type(3) {
+  .table-recap td:nth-of-type(4) {
     grid-area: realise;
   }
-  .table-recap td:nth-of-type(5) {
+  .table-recap td:nth-of-type(6) {
     grid-area: restant;
   }
   .table-recap .recap-avancement-barre {
