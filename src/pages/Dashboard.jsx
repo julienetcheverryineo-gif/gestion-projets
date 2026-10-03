@@ -138,18 +138,14 @@ export default function Dashboard() {
             <StatCard label="Heures prévues" valeur={stats.heuresPrevues} />
           </div>
 
-          <section className={"panel" + (stats.reservesEnRetard > 0 ? " panel-alert" : "")}>
-            <div className="panel-header">
-              <h2>Réserves en retard</h2>
-              <Link to="/reserves" className="link">
-                Voir toutes les réserves
-              </Link>
-            </div>
-            {stats.reservesEnRetard === 0 ? (
-              <p className="empty-state-description" style={{ margin: "10px 0" }}>
-                Aucune réserve en retard.
-              </p>
-            ) : (
+          {stats.reservesEnRetard > 0 && (
+            <section className="panel panel-alert">
+              <div className="panel-header">
+                <h2>Réserves en retard</h2>
+                <Link to="/reserves" className="link">
+                  Voir toutes les réserves
+                </Link>
+              </div>
               <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                 <table className="data-table">
                   <thead>
@@ -181,21 +177,17 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </section>
+            </section>
+          )}
 
-          <section className={"panel" + (stats.tachesEnRetard > 0 ? " panel-alert" : "")}>
-            <div className="panel-header">
-              <h2>Tâches en retard</h2>
-              <Link to="/taches" className="link">
-                Voir toutes les tâches
-              </Link>
-            </div>
-            {stats.tachesEnRetard === 0 ? (
-              <p className="empty-state-description" style={{ margin: "10px 0" }}>
-                Aucune tâche en retard.
-              </p>
-            ) : (
+          {stats.tachesEnRetard > 0 && (
+            <section className="panel panel-alert">
+              <div className="panel-header">
+                <h2>Tâches en retard</h2>
+                <Link to="/taches" className="link">
+                  Voir toutes les tâches
+                </Link>
+              </div>
               <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                 <table className="data-table">
                   <thead>
@@ -225,8 +217,8 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </section>
+            </section>
+          )}
 
           <section className="panel">
             <div className="panel-header">
