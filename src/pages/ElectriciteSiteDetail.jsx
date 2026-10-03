@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   addDoc,
@@ -18,6 +18,7 @@ import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 import { exporterGoat } from "../lib/exportGoat";
+import { otpDepuisCompte } from "../lib/parseSapExports";
 
 // Largeurs des 2 colonnes d'identification figées (gel de volets, comme
 // dans Excel) : n°, Désignation restent visibles quand on défile vers
@@ -400,6 +401,128 @@ function TableauAchats({ titre, sousTitre, achats }) {
             </div>
           </div>
         ))
+      )}
+    </div>
+  );
+}
+
+const COLONNES_SAP_FO = [
+  { champ: "dateDoc", label: "Date" },
+  { champ: "grOr", label: "Code SAP" },
+  { champ: "nomFournisseur", label: "Fournisseur" },
+  { champ: "designation", label: "Désignation" },
+  { champ: "quantite", label: "Qté", numerique: true },
+  { champ: "valNette", label: "Val. nette €", numerique: true },
+];
+const COLONNES_SAP_MO = [
+  { champ: "date", label: "Date" },
+  { champ: "nomPrenom", label: "Personne" },
+  { champ: "typAct", label: "Type activité" },
+  { champ: "heures", label: "Heures", numerique: true },
+];
+
+function formatValeurSap(v, numerique) {
+  if (v === null || v === undefined || v === "") return "";
+  if (!numerique) return String(v);
+  return (Number(v) || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+}
+
+// "10.12.2025" -> timestamp, pour trier du plus récent au plus ancien
+// (les champs date de ces lignes sont des chaînes JJ.MM.AAAA, pas
+// triables telles quelles).
+function tsDateSap(texte) {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(texte || "");
+  return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0;
+}
+
+// Suivi SAP d'un chantier : dès que son champ "Compte" correspond au code
+// OTP d'un import SAP (page Import SAP, voir lib/parseSapExports.js),
+// affiche les achats et heures réels remontés pour ce chantier.
+// N'affiche rien quand il n'y a pas de correspondance (compte non
+// renseigné, ou aucune ligne importée pour ce code pour l'instant) — le
+// rapprochement se fait tout seul au fur et à mesure des imports.
+function SuiviSap({ chantier }) {
+  const otp = otpDepuisCompte(chantier.compte);
+  const { documents: lignesFo, chargement: chargementFo } = useCollection("sapLignesFo");
+  const { documents: lignesMo, chargement: chargementMo } = useCollection("sapLignesMo");
+  const [onglet, setOnglet] = useState("fo");
+
+  const achats = useMemo(
+    () =>
+      otp
+        ? lignesFo.filter((l) => l.otp === otp).sort((a, b) => tsDateSap(b.dateDoc) - tsDateSap(a.dateDoc))
+        : [],
+    [lignesFo, otp]
+  );
+  const heures = useMemo(
+    () =>
+      otp
+        ? lignesMo.filter((l) => l.otp === otp).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
+        : [],
+    [lignesMo, otp]
+  );
+
+  if (!otp || chargementFo || chargementMo) return null;
+  if (achats.length === 0 && heures.length === 0) return null;
+
+  const colonnes = onglet === "fo" ? COLONNES_SAP_FO : COLONNES_SAP_MO;
+  const lignes = onglet === "fo" ? achats : heures;
+  const champValeur = onglet === "fo" ? "valNette" : "heures";
+  const total = lignes.reduce((s, l) => s + (Number(l[champValeur]) || 0), 0);
+
+  return (
+    <div className="panel" style={{ marginBottom: 16 }}>
+      <div className="panel-header">
+        <h2>📡 Suivi SAP — {otp}</h2>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <button
+          className={onglet === "fo" ? "btn-primary" : "btn-ghost"}
+          onClick={() => setOnglet("fo")}
+        >
+          💰 Achats ({achats.length})
+        </button>
+        <button
+          className={onglet === "mo" ? "btn-primary" : "btn-ghost"}
+          onClick={() => setOnglet("mo")}
+        >
+          🕐 Heures ({heures.length})
+        </button>
+      </div>
+      {lignes.length === 0 ? (
+        <p className="simple-list-meta">Aucune ligne SAP de ce type pour ce chantier.</p>
+      ) : (
+        <>
+          <p className="page-subtitle" style={{ marginBottom: 8 }}>
+            {lignes.length} ligne(s) — {onglet === "fo" ? "Val. nette totale" : "Heures totales"} :{" "}
+            <strong>
+              {formatValeurSap(total, true)}
+              {onglet === "fo" ? " €" : " h"}
+            </strong>
+          </p>
+          <div className="data-table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  {colonnes.map((c) => (
+                    <th key={c.champ}>{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {lignes.map((l) => (
+                  <tr key={l.id}>
+                    {colonnes.map((c) => (
+                      <td key={c.champ} data-label={c.label}>
+                        {formatValeurSap(l[c.champ], c.numerique)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1254,6 +1377,8 @@ export default function ElectriciteSiteDetail() {
           )}
         </div>
       </header>
+
+      <SuiviSap chantier={chantier} />
 
       {devis.length === 0 ? (
         <div className="empty-state">

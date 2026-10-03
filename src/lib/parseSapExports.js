@@ -48,6 +48,23 @@ function nombreFr(texte) {
 
 const RE_DATE = /^\d{2}\.\d{2}\.\d{4}$/;
 
+// Préfixe fixe de tous les codes OTP de ces exports SAP : c'est le code
+// de notre agence, toujours présent devant le code propre au chantier
+// (ex. "AAQ5JE605" = préfixe "AAQ5" + compte "JE605").
+const PREFIXE_AGENCE_OTP = "AAQ5";
+
+// Champ "Compte" du chantier (ex. "JE605", voir SiteFormModal) -> code
+// OTP complet tel qu'il apparaît dans les lignes importées (ex.
+// "AAQ5JE605") — utilisé pour retrouver les lignes SAP d'un chantier
+// donné. Tolère que le compte ait déjà été saisi avec le préfixe.
+export function otpDepuisCompte(compte) {
+  const brut = (compte || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!brut) return null;
+  const suffixe = brut.startsWith(PREFIXE_AGENCE_OTP) ? brut.slice(PREFIXE_AGENCE_OTP.length) : brut;
+  if (!suffixe) return null;
+  return PREFIXE_AGENCE_OTP + suffixe;
+}
+
 const CHAMPS_FO = [
   "otp",
   "dateDoc",
