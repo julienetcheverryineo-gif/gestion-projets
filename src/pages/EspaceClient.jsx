@@ -182,6 +182,7 @@ export default function EspaceClient() {
       {afficherForm && chantierActif && (
         <ReserveClientFormModal
           chantierId={chantierActif.id}
+          chantier={chantierActif}
           nomSignalant={profile?.nom}
           onClose={() => setAfficherForm(false)}
         />

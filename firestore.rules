@@ -153,6 +153,23 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Notifications (cloche in-app + déclencheur de la Cloud Function qui
+    // envoie le push) : chacun ne lit/marque comme lues que les siennes.
+    // La création est ouverte à tout connecté (c'est ce qui permet à un
+    // client de déclencher une notif pour l'équipe, ou à un automaticien
+    // d'en déclencher une pour un collègue nouvellement assigné), mais le
+    // champ `type` doit être l'un des types connus et `lu` doit démarrer
+    // à false — on ne modifie/supprime jamais la notification de
+    // quelqu'un d'autre.
+    match /notifications/{notifId} {
+      allow read: if estConnecte() && resource.data.destinataireId == request.auth.uid;
+      allow create: if estConnecte() &&
+        request.resource.data.destinataireId is string &&
+        request.resource.data.type in ['reserve_client', 'tache_retard', 'tache_assignee'] &&
+        request.resource.data.lu == false;
+      allow update, delete: if estConnecte() && resource.data.destinataireId == request.auth.uid;
+    }
+
     // Notes (par chantier si chantierId renseigné, générales sinon) :
     // lecture pour tous les connectés, chacun ne peut créer que ses
     // propres notes (usurpation impossible), modification/suppression par

@@ -3127,3 +3127,122 @@ textarea:focus {
     padding: 16px 12px 40px;
   }
 }
+
+/* ---------- Cloche de notifications ---------- */
+.notif-bell-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notif-bell-bouton {
+  position: relative;
+  padding: 7px 9px;
+  line-height: 1;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--danger);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+.notif-bell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+}
+
+.notif-bell-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--ring);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  z-index: 30;
+}
+
+.notif-bell-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notif-bell-push {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel-raised);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+
+.notif-bell-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notif-bell-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 6px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+.notif-bell-item:last-child {
+  border-bottom: none;
+}
+.notif-bell-item:hover {
+  background: var(--panel-raised);
+}
+.notif-bell-item-non-lue {
+  background: color-mix(in srgb, var(--accent-dim) 40%, transparent);
+}
+.notif-bell-item-titre {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.notif-bell-item-message {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 2px 0 4px;
+}
+
+@media (max-width: 860px) {
+  .notif-bell-panel {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
+}

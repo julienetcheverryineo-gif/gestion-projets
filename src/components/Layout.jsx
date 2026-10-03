@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { ecouterNotificationsPremierPlan } from "../lib/push";
+import NotificationsBell from "./NotificationsBell";
 import logoIneo from "../assets/logo-ineo.png";
 
 const NAV_ITEMS_AUTOMATISME = [
@@ -54,6 +56,14 @@ export default function Layout() {
   const peutBasculerEspaces = isAdmin || estRAElectricite;
   const enEspaceElectricite = location.pathname.startsWith("/electricite");
 
+  // Démarre l'écoute des notifications push reçues au premier plan (onglet
+  // ouvert) une seule fois, pour toute la durée de la session connectée.
+  // Avant le "return" conditionnel ci-dessous : les Hooks doivent être
+  // appelés dans le même ordre à chaque rendu.
+  useEffect(() => {
+    ecouterNotificationsPremierPlan();
+  }, []);
+
   if (enEspaceElectricite && !peutBasculerEspaces) {
     return <Navigate to="/" replace />;
   }
@@ -96,13 +106,14 @@ export default function Layout() {
             <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
           </div>
           {!reduite && (
-            <div>
+            <div style={{ flex: 1 }}>
               <div className="brand-title">Pilotage</div>
               <div className="brand-subtitle">
                 {enEspaceElectricite ? "Électricité" : "Automatisme & GTB"}
               </div>
             </div>
           )}
+          <NotificationsBell />
         </div>
 
         <button
@@ -212,7 +223,8 @@ export default function Layout() {
           <div className="logo-chip logo-chip-sm">
             <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <NotificationsBell />
             {peutBasculerEspaces && (
               <button
                 className="btn-ghost"

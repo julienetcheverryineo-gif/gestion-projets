@@ -20,6 +20,8 @@ import NotesPanel from "../components/NotesPanel";
 import { estTactile } from "../lib/tactile";
 import { equipeChantier, electriciensChantier } from "../lib/equipe";
 import { exporterTachesExcel } from "../lib/tachesExcel";
+import { creerNotification, TYPE_TACHE_ASSIGNEE } from "../lib/notifications";
+import { libelleChantier } from "../lib/usePlanningData";
 
 const STATUTS_MATERIEL = [
   { value: "a_acheter", label: "À acheter" },
@@ -538,6 +540,24 @@ export default function SiteDetail() {
                 updateDoc(doc(db, "regitems", it.id), { assigneA: [nom] })
               ),
             ]);
+            // Une seule notification récapitulative (pas une par tâche) —
+            // sauf si on s'auto-affecte tout le chantier, ça n'a rien à
+            // apprendre à personne.
+            const nbTaches = tachesDuChantier.length + regTachesDuChantier.length;
+            const destinataire = utilisateurs.find((u) => u.nom === nom);
+            if (destinataire && nom !== profile?.nom && nbTaches > 0) {
+              await creerNotification({
+                destinataireId: destinataire.id,
+                type: TYPE_TACHE_ASSIGNEE,
+                titre: "Nouvelle tâche assignée",
+                message:
+                  nbTaches +
+                  " tâche(s) de " +
+                  libelleChantier(chantier) +
+                  " vous ont été affectées.",
+                lien: "/chantiers/" + chantierId,
+              });
+            }
             setAfficherAffectationMasse(false);
           }}
         />

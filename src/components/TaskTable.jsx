@@ -4,6 +4,8 @@ import { db } from "../firebase";
 import { normaliserAssignes } from "../lib/assignes";
 import { estTactile } from "../lib/tactile";
 import { champsAvancement } from "../lib/statutTache";
+import { useAuth } from "../contexts/AuthContext";
+import { creerNotification, TYPE_TACHE_ASSIGNEE } from "../lib/notifications";
 import PersonMultiSelect from "./PersonMultiSelect";
 
 const STATUTS_TASK = [
@@ -95,6 +97,7 @@ function valeurColonne(t, colonne, nomChantier) {
 // Les colonnes sont redimensionnables (glisser le bord d'un en-tête) ;
 // la taille est mémorisée pour toute l'appli.
 export default function TaskTable({ taches, peutGerer, utilisateurs, electriciens = [], onDelete, afficherChantier, nomChantier }) {
+  const { profile } = useAuth();
   const [largeurs, setLargeurs] = useState(chargerLargeurs);
   const [tri, setTri] = useState({ colonne: null, sens: 1 });
   const [filtres, setFiltres] = useState({});
@@ -202,14 +205,44 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
     setFiltres((f) => ({ ...f, [colonne]: valeur }));
   };
 
+  // Notifie les personnes nouvellement ajoutées à l'affectation d'une
+  // tâche (pas celles déjà affectées avant ce changement, et jamais
+  // soi-même si on s'auto-affecte).
+  const notifierNouveauxAssignes = async (t, ancienneValeur, nouvelleValeur) => {
+    const anciens = normaliserAssignes(ancienneValeur);
+    const nouveaux = normaliserAssignes(nouvelleValeur).filter((nom) => !anciens.includes(nom));
+    if (nouveaux.length === 0) return;
+    const libelleChantierTache =
+      afficherChantier && t.chantierId && typeof nomChantier === "function"
+        ? " (" + nomChantier(t.chantierId) + ")"
+        : "";
+    await Promise.all(
+      nouveaux
+        .filter((nom) => nom !== profile?.nom)
+        .map((nom) => {
+          const u = utilisateurs.find((x) => x.nom === nom);
+          if (!u) return null;
+          return creerNotification({
+            destinataireId: u.id,
+            type: TYPE_TACHE_ASSIGNEE,
+            titre: "Nouvelle tâche assignée",
+            message: t.titre + libelleChantierTache,
+            lien: t.chantierId ? "/chantiers/" + t.chantierId : "/taches",
+          });
+        })
+    );
+  };
+
   const changerChamp = async (t, champ, valeur) => {
     if (t._source === "regitem") {
       if (champ === "statut" || champ === "assigneA") {
         await updateDoc(doc(db, "regitems", t.id), { [champ]: valeur });
+        if (champ === "assigneA") await notifierNouveauxAssignes(t, t.assigneA, valeur);
       }
       return;
     }
     await updateDoc(doc(db, "tasks", t.id), { [champ]: valeur });
+    if (champ === "assigneA") await notifierNouveauxAssignes(t, t.assigneA, valeur);
   };
 
   // Variante multi-champs (même règle que changerChamp pour les regitems :

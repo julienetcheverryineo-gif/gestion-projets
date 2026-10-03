@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
 import { calculerAvancementChantier, useSyncStatutEnCours } from "../lib/avancement";
@@ -6,6 +6,7 @@ import { normaliserAssignes } from "../lib/assignes";
 import { libelleChantier } from "../lib/usePlanningData";
 import { estChantierAutomatisme } from "../components/SiteFormModal";
 import { useAuth } from "../contexts/AuthContext";
+import { creerNotificationUnique, TYPE_TACHE_RETARD } from "../lib/notifications";
 
 export default function Dashboard() {
   const { profile } = useAuth();
@@ -104,6 +105,28 @@ export default function Dashboard() {
     () => mesTachesToutes.filter((t) => inclureTerminees || t.statut !== "termine"),
     [mesTachesToutes, inclureTerminees]
   );
+
+  // Notifie l'utilisateur connecté de ses propres tâches en retard, une
+  // seule fois par tâche (id déterministe) : évite de reposter la même
+  // alerte à chaque visite du tableau de bord tant que la tâche reste en
+  // retard. Pas de serveur dédié ici (pas de Cloud Function planifiée) :
+  // la détection se fait au moment où la personne concernée charge cette
+  // page — un visiteur occasionnel ne déclenchera donc pas d'alerte avant
+  // sa prochaine connexion.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const enRetard = mesTachesToutes.filter((t) => estEnRetard(t));
+    enRetard.forEach((t) => {
+      creerNotificationUnique("retard-" + t.id + "-" + profile.id, {
+        destinataireId: profile.id,
+        type: TYPE_TACHE_RETARD,
+        titre: "Tâche en retard",
+        message: t.titre + (t.chantierId ? " (" + nomChantier(t.chantierId) + ")" : ""),
+        lien: t.chantierId ? "/chantiers/" + t.chantierId : "/taches",
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesTachesToutes, profile?.id]);
 
   return (
     <div className="page">

@@ -1,16 +1,47 @@
 import { useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
+import { useCollection } from "../lib/firestoreHooks";
+import { creerNotification, TYPE_RESERVE_CLIENT } from "../lib/notifications";
+import { libelleChantier } from "../lib/usePlanningData";
 
 // Formulaire de saisie d'une réserve côté espace client : volontairement
 // réduit aux champs utiles à un client (pas de responsable de levée, pas
 // d'échéance — c'est l'équipe INEO qui pilote le traitement une fois la
 // réserve reçue).
-export default function ReserveClientFormModal({ chantierId, nomSignalant, onClose }) {
+export default function ReserveClientFormModal({ chantierId, chantier, nomSignalant, onClose }) {
   const [designation, setDesignation] = useState("");
   const [remarque, setRemarque] = useState("");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
+  // Lecture de la liste des utilisateurs autorisée côté règles Firestore
+  // pour tout connecté (y compris un compte client) : sert uniquement à
+  // déterminer qui prévenir côté équipe interne.
+  const { documents: utilisateurs } = useCollection("users", "email");
+
+  const notifierEquipe = async () => {
+    const destinataires = new Set();
+    for (const u of utilisateurs) {
+      const estResponsableEquipe = u.role === "admin" || u.role === "chef_de_projet";
+      const estEquipeChantier =
+        chantier?.automaticiens?.includes(u.nom) ||
+        u.nom === chantier?.responsableChantier ||
+        u.nom === chantier?.ra;
+      if (estResponsableEquipe || estEquipeChantier) destinataires.add(u.id);
+    }
+    const libelle = chantier ? libelleChantier(chantier) : "un chantier";
+    await Promise.all(
+      [...destinataires].map((id) =>
+        creerNotification({
+          destinataireId: id,
+          type: TYPE_RESERVE_CLIENT,
+          titre: "Nouvelle réserve client",
+          message: (nomSignalant || "Un client") + " a signalé : " + designation + " — " + libelle,
+          lien: "/chantiers/" + chantierId,
+        })
+      )
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,6 +59,7 @@ export default function ReserveClientFormModal({ chantierId, nomSignalant, onClo
         statut: "ouverte",
         creeLe: serverTimestamp(),
       });
+      await notifierEquipe();
       onClose();
     } catch (err) {
       console.error("Erreur création de la réserve:", err);
