@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
-import { useCollection } from "../lib/firestoreHooks";
 import { creerNotification, TYPE_RESERVE_CLIENT } from "../lib/notifications";
 import { libelleChantier } from "../lib/usePlanningData";
 
@@ -9,19 +8,27 @@ import { libelleChantier } from "../lib/usePlanningData";
 // réduit aux champs utiles à un client (pas de responsable de levée, pas
 // d'échéance — c'est l'équipe INEO qui pilote le traitement une fois la
 // réserve reçue).
-export default function ReserveClientFormModal({ chantierId, chantier, nomSignalant, onClose }) {
+//
+// `utilisateurs` est fourni par la page parente (EspaceClient), chargé dès
+// l'arrivée sur la page plutôt qu'à l'ouverture de cette modale : un envoi
+// rapide pouvait sinon partir avant la fin du tout premier chargement de la
+// liste, laissant `notifierEquipe` sans personne à prévenir (silencieusement,
+// aucune erreur ne remonte dans ce cas).
+export default function ReserveClientFormModal({
+  chantierId,
+  chantier,
+  nomSignalant,
+  utilisateurs,
+  onClose,
+}) {
   const [designation, setDesignation] = useState("");
   const [remarque, setRemarque] = useState("");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
-  // Lecture de la liste des utilisateurs autorisée côté règles Firestore
-  // pour tout connecté (y compris un compte client) : sert uniquement à
-  // déterminer qui prévenir côté équipe interne.
-  const { documents: utilisateurs } = useCollection("users", "email");
 
   const notifierEquipe = async () => {
     const destinataires = new Set();
-    for (const u of utilisateurs) {
+    for (const u of utilisateurs || []) {
       const estResponsableEquipe = u.role === "admin" || u.role === "chef_de_projet";
       const estEquipeChantier =
         chantier?.automaticiens?.includes(u.nom) ||

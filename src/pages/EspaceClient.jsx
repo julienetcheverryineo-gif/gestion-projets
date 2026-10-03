@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { useCollectionParChantiers, useCollectionParIds } from "../lib/firestoreHooks";
+import { useCollection, useCollectionParChantiers, useCollectionParIds } from "../lib/firestoreHooks";
 import { libelleChantier } from "../lib/usePlanningData";
 import ReserveClientFormModal from "../components/ReserveClientFormModal";
 import logoIneo from "../assets/logo-ineo.png";
@@ -19,6 +19,12 @@ export default function EspaceClient() {
     useCollectionParIds("sites", chantierIds);
   const { documents: reserves, chargement: chargementReserves } =
     useCollectionParChantiers("reserves", chantierIds);
+  // Chargé dès l'arrivée sur la page (pas seulement à l'ouverture de la
+  // modale) : sert à déterminer qui prévenir côté équipe interne quand le
+  // client envoie une réserve. Si on le chargeait seulement à l'ouverture
+  // de la modale, un envoi rapide pouvait partir avant la fin du premier
+  // chargement, avec une liste vide → personne n'était notifié, en silence.
+  const { documents: utilisateurs } = useCollection("users", "email");
 
   const chantiersTries = useMemo(
     () => [...chantiers].sort((a, b) => libelleChantier(a).localeCompare(libelleChantier(b))),
@@ -184,6 +190,7 @@ export default function EspaceClient() {
           chantierId={chantierActif.id}
           chantier={chantierActif}
           nomSignalant={profile?.nom}
+          utilisateurs={utilisateurs}
           onClose={() => setAfficherForm(false)}
         />
       )}
