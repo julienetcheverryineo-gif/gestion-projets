@@ -2,6 +2,7 @@ import { useState } from "react";
 import { formatStatutTache, formatDateCourte } from "../lib/formatage";
 import { arrondirHeures } from "../lib/usePlanningData";
 import { normaliserAssignes } from "../lib/assignes";
+import { pourcentageAvancementTache } from "../lib/avancement";
 
 // Remplace le Gantt (barres sur une frise de plusieurs mois) par une
 // liste de cartes sur petit écran : faire défiler une frise au pixel
@@ -180,7 +181,13 @@ export function ParPersonneMobile({ groupes, nomChantier, avancementParChantier,
                 (max, t) => (t.echeance > max ? t.echeance : max),
                 sg.taches[0].echeance
               );
-              const heures = sg.taches.reduce((s, t) => s + Number(t.heuresPrevues || 0), 0);
+              // Heures restantes, pas le volume d'origine — même règle que
+              // le Gantt desktop et la Charge du service (voir
+              // usePlanningData.js).
+              const heures = sg.taches.reduce(
+                (s, t) => s + Number(t.heuresPrevues || 0) * (1 - pourcentageAvancementTache(t) / 100),
+                0
+              );
               const avancement = avancementParChantier?.get(sg.cle) ?? null;
               return (
                 <div key={cleUnique}>

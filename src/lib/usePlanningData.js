@@ -187,7 +187,14 @@ export function usePlanningData() {
         groupe.taches[0].echeance
       );
       const tachesDuChantier = tachesVisibles.filter((t) => (t.chantierId || "aaffecter") === cle);
-      const heuresTotal = tachesDuChantier.reduce((s, t) => s + Number(t.heuresPrevues || 0), 0);
+      // Heures RESTANTES (pas le volume d'origine) : même règle que la
+      // charge du service plus bas — une tâche déjà avancée a déjà
+      // consommé une partie de son volume, le reste à faire est ce qui
+      // reflète la charge réelle à venir sur ce chantier.
+      const heuresTotal = tachesDuChantier.reduce(
+        (s, t) => s + Number(t.heuresPrevues || 0) * (1 - pourcentageAvancementTache(t) / 100),
+        0
+      );
       // Qui a une tâche EN COURS sur ce chantier en ce moment — affiché à
       // côté des heures sur la barre, pour voir d'un coup d'œil qui y
       // travaille activement sans ouvrir le détail. On se fie au statut
