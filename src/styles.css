@@ -128,10 +128,41 @@ a {
   width: 68px;
   padding: 20px 8px;
 }
+/* Menu réduit (68px) : le logo ET la cloche de notifications ne tiennent
+   pas côte à côte sur une seule ligne dans une colonne aussi étroite (le
+   logo seul, à sa taille normale, dépasse déjà la largeur disponible) —
+   ça les faisait déborder et se chevaucher de façon disgracieuse. On
+   empile donc logo et cloche verticalement, et on réduit un peu le logo
+   pour qu'il tienne vraiment dans la colonne. */
 .sidebar-reduite .sidebar-brand {
   padding-left: 0;
   padding-right: 0;
+  flex-direction: column;
   justify-content: center;
+  gap: 10px;
+}
+.sidebar-reduite .logo-chip {
+  padding: 4px 6px;
+}
+.sidebar-reduite .logo-chip img {
+  height: 15px;
+}
+.sidebar-reduite .notif-bell-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.sidebar-reduite .notif-bell-bouton {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 0;
+}
+.sidebar-reduite .notif-bell-bouton:hover {
+  border-color: var(--accent);
 }
 .sidebar-reduite .sidebar-toggle {
   justify-content: center;
