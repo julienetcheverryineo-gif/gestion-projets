@@ -58,7 +58,6 @@ export async function getMessagingSafe() {
   return null;
 }
 
-// À remplacer par la vraie clé, disponible dans la console Firebase :
-// Paramètres du projet > Cloud Messaging > Certificats Web Push >
-// "Générer une paire de clés".
-export const VAPID_KEY = "REMPLACER_PAR_VOTRE_CLE_VAPID";
+// Clé disponible dans la console Firebase : Paramètres du projet >
+// Cloud Messaging > Certificats Web Push > "Générer une paire de clés".
+export const VAPID_KEY = "BG_F3V1PD-noAWFWsfzX6Y3DvtkEpP9g3ZGjHsK87cijo3wwlrbrxiTEc-zikSjc5gEEN1QQV8gmHCJH39fFJNQ";
