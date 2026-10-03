@@ -17,6 +17,7 @@ import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
+import { exporterGoat } from "../lib/exportGoat";
 
 // Largeurs des 2 colonnes d'identification figées (gel de volets, comme
 // dans Excel) : n°, Désignation restent visibles quand on défile vers
@@ -1231,16 +1232,27 @@ export default function ElectriciteSiteDetail() {
             {chantier.responsableChantier ? " · " + chantier.responsableChantier : ""}
           </p>
         </div>
-        {peutGerer && (
-          <div className="header-actions-row">
-            <button className="btn-ghost" onClick={() => setAfficherFormulaire(true)}>
-              Modifier le chantier
+        <div className="header-actions-row">
+          {devis.length > 0 && (
+            <button
+              className="btn-ghost"
+              onClick={() => exporterGoat({ chantier, lignesChantier })}
+              title="Génère le fichier d'import GOAT (onglets Fourniture / Main d'œuvre) à partir du Récap synthèse tous devis de ce chantier"
+            >
+              Exporter GOAT
             </button>
-            <button className="btn-primary" onClick={() => setAfficherImport(true)}>
-              Importer une minute
-            </button>
-          </div>
-        )}
+          )}
+          {peutGerer && (
+            <>
+              <button className="btn-ghost" onClick={() => setAfficherFormulaire(true)}>
+                Modifier le chantier
+              </button>
+              <button className="btn-primary" onClick={() => setAfficherImport(true)}>
+                Importer une minute
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {devis.length === 0 ? (
