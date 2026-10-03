@@ -69,17 +69,37 @@ function resumerPoste(libelle) {
     .slice(0, 8);
 }
 
+// Certains Types de FO sont des sous-codes à 3 chiffres d'un code parent à
+// 2 chiffres (ex: Eclairage bureau/industriel/sdV = 151/152/153, qui sont
+// tous trois du 15 "Eclairage" ; Photovoltaïque = 321-324, qui sont tous du
+// 32). Pris isolément, ces sous-codes n'ont pas de correspondance SAP (seul
+// le code parent en a une) — on les ramène donc sur leur code parent QUAND
+// celui-ci a une correspondance SAP connue, pour qu'ils se retrouvent
+// sommés sur une seule ligne Fourniture (ex: "151"+"152"+"153" → une seule
+// ligne ECLN/ECLAIRAGE) plutôt que trois lignes orphelines sans code SAP.
+// Ne s'applique qu'à la Fourniture : côté Main d'œuvre, chaque sous-type
+// garde sa propre ligne (pas de notion de code SAP à retrouver là-bas).
+function codeParentFourniture(code) {
+  if (!SAP_PAR_CODE_QDV.has(code) && /^\d{3,}$/.test(code)) {
+    const parent = code.slice(0, 2);
+    if (SAP_PAR_CODE_QDV.has(parent)) return parent;
+  }
+  return code;
+}
+
 // Somme d'un champ chiffré (coutTotalFo ou tempsTotalHeures), groupée par
 // Type de FO — même regroupement que le Récap du chantier (voir
 // calculerRecap dans ElectriciteSiteDetail.jsx), sur le même périmètre
-// "tous devis du chantier".
-function sommeParTypeFo(lignes, champValeur) {
+// "tous devis du chantier". `normaliserCode` permet de fusionner plusieurs
+// codes sous une même clé avant de sommer (voir codeParentFourniture).
+function sommeParTypeFo(lignes, champValeur, normaliserCode) {
   const parType = new Map();
   lignes.forEach((l) => {
     const valeur = l[champValeur] || 0;
     if (!valeur) return;
-    const code = codeTypeFo(l.typeFo);
-    if (!code) return;
+    const codeBrut = codeTypeFo(l.typeFo);
+    if (!codeBrut) return;
+    const code = normaliserCode ? normaliserCode(codeBrut) : codeBrut;
     if (!parType.has(code)) {
       parType.set(code, { code, libelle: libelleTypeFo(l.typeFo), valeur: 0 });
     }
@@ -102,16 +122,19 @@ function feuilleAvecEntetes(lignes, entetes) {
 //
 // - Fourniture : une ligne par Type de FO présent dans le Bilan
 //   Fournitures, Besoin/GO et Libellé via la correspondance Code SAP (voir
-//   lib/correspondanceSapQdv.js) — à défaut de correspondance connue, on
-//   reprend tel quel le code/libellé du Type de FO plutôt que de perdre le
-//   budget. Budget € = somme du coût total FO. Tout le reste à 0.
+//   lib/correspondanceSapQdv.js) — les sous-codes à 3 chiffres d'un code
+//   parent connu (ex: 151/152/153 → 15 "Eclairage") sont sommés sur la
+//   ligne du parent (voir codeParentFourniture) ; à défaut de
+//   correspondance connue, on reprend tel quel le code/libellé du Type de
+//   FO plutôt que de perdre le budget. Budget € = somme du coût total FO.
+//   Tout le reste à 0.
 // - Main d'œuvre : une ligne par Type de FO présent dans le Bilan Main
 //   d'œuvre, Poste = résumé 8 caractères du libellé, Budget H = somme des
 //   heures prévues. Tout le reste à 0.
 export function exporterGoat({ chantier, lignesChantier }) {
   const lignesChiffrables = lignesChantier.filter((l) => !l.estPoste);
 
-  const fournitures = sommeParTypeFo(lignesChiffrables, "coutTotalFo").map((t) => {
+  const fournitures = sommeParTypeFo(lignesChiffrables, "coutTotalFo", codeParentFourniture).map((t) => {
     const sap = SAP_PAR_CODE_QDV.get(t.code);
     return {
       Type: "Fourniture",
