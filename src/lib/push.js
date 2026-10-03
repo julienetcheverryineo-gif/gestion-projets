@@ -52,8 +52,8 @@ export async function ecouterNotificationsPremierPlan() {
   if (!messaging) return;
   onMessage(messaging, (payload) => {
     if (etatPermissionPush() !== "granted") return;
-    const titre = payload.notification?.title || payload.data?.titre || "Pilotage de projets";
-    const corps = payload.notification?.body || payload.data?.message || "";
+    const titre = payload.data?.titre || "Pilotage de projets";
+    const corps = payload.data?.message || "";
     const lien = payload.data?.lien || "/";
     const notif = new Notification(titre, { body: corps, icon: "/icon-192.png" });
     notif.onclick = () => {

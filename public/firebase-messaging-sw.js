@@ -22,10 +22,14 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Message volontairement envoyé en "data-only" côté Cloud Function (voir
+// functions/index.js) : pas de champ payload.notification, donc pas
+// d'affichage automatique par Firebase en plus de celui-ci — un seul
+// affichage, ici.
 messaging.onBackgroundMessage((payload) => {
-  const titre = payload.notification?.title || payload.data?.titre || "Pilotage de projets";
+  const titre = payload.data?.titre || "Pilotage de projets";
   const options = {
-    body: payload.notification?.body || payload.data?.message || "",
+    body: payload.data?.message || "",
     icon: "/icon-192.png",
     badge: "/icon-192.png",
     data: { lien: payload.data?.lien || "/" },

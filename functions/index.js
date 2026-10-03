@@ -39,15 +39,17 @@ exports.envoyerPushSurNotification = onDocumentCreated(
     const tokens = snapUtilisateur.data()?.fcmTokens || [];
     if (tokens.length === 0) return;
 
+    // Volontairement PAS de champ `notification` ici : quand il est présent,
+    // Firebase Messaging affiche la notification tout seul côté navigateur
+    // ET continue d'invoquer onBackgroundMessage dans le service worker, qui
+    // l'affiche une seconde fois (bug connu du SDK) — d'où les doublons
+    // observés. En envoyant uniquement des données, seul notre propre code
+    // (onBackgroundMessage / onMessage) affiche la notification, une fois.
     const message = {
       tokens,
-      notification: {
-        title: notif.titre || "Pilotage de projets",
-        body: notif.message || "",
-      },
       data: {
         lien: notif.lien || "/",
-        titre: notif.titre || "",
+        titre: notif.titre || "Pilotage de projets",
         message: notif.message || "",
       },
       webpush: {
