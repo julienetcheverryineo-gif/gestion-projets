@@ -11,6 +11,7 @@ import Planning from "./pages/Planning";
 import ReservesGlobal from "./pages/ReservesGlobal";
 import Notes from "./pages/Notes";
 import Users from "./pages/Users";
+import Statistiques from "./pages/Statistiques";
 import ElectriciteChantiers from "./pages/ElectriciteChantiers";
 import ElectriciteSiteDetail from "./pages/ElectriciteSiteDetail";
 import ElectricitePlanDeCharge from "./pages/ElectricitePlanDeCharge";
@@ -44,6 +45,14 @@ export default function App() {
               element={
                 <ProtectedRoute requireAdmin>
                   <Users />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="statistiques"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <Statistiques />
                 </ProtectedRoute>
               }
             />

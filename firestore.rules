@@ -122,6 +122,16 @@ service cloud.firestore {
         (resource.data.userId == request.auth.uid || estChefOuAdmin());
     }
 
+    // Journal des connexions (statistiques d'usage, page admin) : chacun
+    // ne peut journaliser que sa propre connexion (usurpation impossible),
+    // lecture réservée aux chefs de projet/admins, pas de modification ni
+    // de suppression (c'est un historique).
+    match /connexions/{connexionId} {
+      allow read: if estChefOuAdmin();
+      allow create: if estConnecte() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     // Notes (par chantier si chantierId renseigné, générales sinon) :
     // lecture pour tous les connectés, chacun ne peut créer que ses
     // propres notes (usurpation impossible), modification/suppression par

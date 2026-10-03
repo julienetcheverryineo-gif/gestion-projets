@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 const AuthContext = createContext(null);
@@ -57,7 +57,19 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     setCompteDesactive(false);
-    return signInWithEmailAndPassword(auth, email, password);
+    const identifiants = await signInWithEmailAndPassword(auth, email, password);
+    // Journalisation de la connexion (pour les statistiques d'usage côté
+    // admin) : best-effort, ne doit jamais bloquer la connexion elle-même.
+    try {
+      await addDoc(collection(db, "connexions"), {
+        userId: identifiants.user.uid,
+        email: identifiants.user.email,
+        horodatage: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Erreur journalisation de la connexion:", err);
+    }
+    return identifiants;
   };
 
   const logout = () => signOut(auth);

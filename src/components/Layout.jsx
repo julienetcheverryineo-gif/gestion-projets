@@ -147,6 +147,20 @@ export default function Layout() {
               {!reduite && <span className="nav-link-texte">Utilisateurs</span>}
             </NavLink>
           )}
+          {isAdmin && !enEspaceElectricite && (
+            <NavLink
+              to="/statistiques"
+              title={reduite ? "Statistiques" : undefined}
+              className={({ isActive }) =>
+                "nav-link" + (isActive ? " nav-link-active" : "")
+              }
+            >
+              <span className="nav-link-icone" aria-hidden="true">
+                📊
+              </span>
+              {!reduite && <span className="nav-link-texte">Statistiques</span>}
+            </NavLink>
+          )}
         </nav>
 
         <div className="sidebar-footer">
