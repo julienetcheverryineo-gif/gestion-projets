@@ -24,7 +24,7 @@ function CartePeriode({ nom, debut, fin, heures, avancement, personnesEnCours, o
       </div>
       {personnesEnCours && personnesEnCours.length > 0 && (
         <div className="planning-mobile-carte-meta">
-          <span>En cours : {personnesEnCours.join(", ")}</span>
+          <span>Affecté à : {personnesEnCours.join(", ")}</span>
         </div>
       )}
       {avancement !== null && avancement !== undefined && (

@@ -229,7 +229,7 @@ export default function Planning() {
                                 " h au total" +
                                 (cb.avancement !== null ? " — " + cb.avancement + "% fait" : "") +
                                 (cb.personnesEnCours.length > 0
-                                  ? " — en cours : " + cb.personnesEnCours.join(", ")
+                                  ? " — affecté à : " + cb.personnesEnCours.join(", ")
                                   : "") +
                                 (estAffecte ? " — cliquer pour ouvrir le chantier" : "")
                               }

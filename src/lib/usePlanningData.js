@@ -195,21 +195,18 @@ export function usePlanningData() {
         (s, t) => s + Number(t.heuresPrevues || 0) * (1 - pourcentageAvancementTache(t) / 100),
         0
       );
-      // Qui a une tâche EN COURS sur ce chantier en ce moment — affiché à
+      // Qui est affecté à du travail RESTANT sur ce chantier — affiché à
       // côté des heures sur la barre, pour voir d'un coup d'œil qui y
-      // travaille activement sans ouvrir le détail. On se fie au statut
-      // "en cours" ET à un % d'avancement entre 0 et 100 (pas seulement
-      // au statut) : beaucoup de tâches ont un avancement renseigné sans
-      // que le statut ait suivi, donc s'en tenir au seul statut en
-      // oubliait une bonne partie des gens réellement au travail.
+      // travaille sans ouvrir le détail. Doit correspondre exactement aux
+      // tâches qui alimentent heuresTotal ci-dessus (heures restantes) :
+      // une tâche pas encore commencée ("à faire", 0 %) compte toujours
+      // pour ses heures restantes, donc son responsable doit apparaître
+      // ici aussi — se limiter au statut "en cours" oubliait tous les
+      // responsables de tâches pas encore démarrées.
       const personnesEnCours = [
         ...new Set(
           tachesDuChantier
-            .filter(
-              (t) =>
-                t.statut === "en_cours" ||
-                (t.avancement !== null && t.avancement !== undefined && t.avancement > 0 && t.avancement < 100)
-            )
+            .filter((t) => Number(t.heuresPrevues || 0) > 0 && pourcentageAvancementTache(t) < 100)
             .flatMap((t) => normaliserAssignes(t.assigneA))
         ),
       ];
