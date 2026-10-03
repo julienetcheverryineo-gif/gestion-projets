@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { usePlanningData, joursEntre, libelleMois, arrondirHeures, PLAFOND_MENSUEL } from "../lib/usePlanningData";
 import { useEcranEtroit } from "../lib/useEcranEtroit";
 import { normaliserAssignes } from "../lib/assignes";
+import { pourcentageAvancementTache, estEnRetardTache } from "../lib/avancement";
 import { estimerLargeurTexte } from "../lib/texte";
 import FiltreChantier from "../components/FiltreChantier";
 import TacheGanttModal from "../components/TacheGanttModal";
@@ -16,6 +17,17 @@ const VUES = [
   { cle: "personne", label: "Par personne" },
   { cle: "charge", label: "Charge du service" },
 ];
+
+// État visuel d'une barre (tâche ou chantier) : vert si terminé, rouge si
+// en retard (voir estEnRetardTache/estEnRetardParDates), sinon la couleur
+// "normale" de la barre (bleu marine pour un chantier, bleu ciel pour une
+// tâche — voir les classes .gantt-barre-* et .gantt-barre-chantier-track
+// dans styles.css).
+function etatBarre(avancement, enRetard) {
+  if (avancement !== null && avancement >= 100) return "termine";
+  if (enRetard) return "retard";
+  return "normal";
+}
 
 const LARGEUR_TITRE_DEFAUT = 180;
 const CLE_LARGEUR_TITRE = "planningTitreWidth";
@@ -263,6 +275,7 @@ export default function Planning() {
                               left={cb.left}
                               largeur={cb.largeur}
                               avancement={cb.avancement}
+                              etat={etatBarre(cb.avancement, cb.enRetard)}
                               label={[
                                 arrondirHeures(cb.heuresTotal) + " h",
                                 cb.personnesEnCours.length > 0
@@ -372,6 +385,7 @@ export default function Planning() {
                                   left={cb.left}
                                   largeur={cb.largeur}
                                   avancement={cb.avancement}
+                                  etat={etatBarre(cb.avancement, cb.enRetard)}
                                   label={[
                                     arrondirHeures(cb.heuresTotal) + " h",
                                     cb.personnesEnCours.length > 0
@@ -447,7 +461,6 @@ export default function Planning() {
                     groupes={automaticiensGantt}
                     gantt={gantt}
                     nomChantier={nomChantier}
-                    avancementParChantier={avancementParChantier}
                     largeurTitre={largeurTitre}
                     demarrerRedimension={demarrerRedimension}
                     onCliquerTache={setTacheEnEdition}
@@ -472,7 +485,6 @@ export default function Planning() {
                     groupes={electriciensGantt}
                     gantt={gantt}
                     nomChantier={nomChantier}
-                    avancementParChantier={avancementParChantier}
                     largeurTitre={largeurTitre}
                     demarrerRedimension={demarrerRedimension}
                     onCliquerTache={setTacheEnEdition}
@@ -534,29 +546,29 @@ function EmptyGantt() {
   );
 }
 
-// Barre "chantier" (consolidé, ou ligne dépliable de la vue Par
-// personne) : pilule pleine dans la couleur d'avancement (la part FAITE,
-// vive) avec la part restante peinte par-dessus en teinte pâle de la
-// même couleur (.gantt-barre-chantier-fill) — deux tons pleins, sans
-// aucune transparence, contrairement à l'ancien voile blanc translucide
-// qui rendait la barre délavée. L'étiquette (heures, responsables,
-// nombre de tâches...) suit la même règle que les barres de tâche du
-// Gantt détaillé (voir LigneTache plus bas), pour un rendu homogène
-// entre les deux vues : elle reste DANS la barre tant qu'elle y tient,
-// et ne sort à côté que si la barre est trop courte pour l'accueillir.
-function BarreChantierAvancement({ left, largeur, avancement, label, title, onClick }) {
+// Barre "chantier" (consolidé, détaillé, ou ligne dépliable de la vue Par
+// personne) : un fond en teinte transparente (la durée totale du
+// chantier) sur lequel se remplit, depuis la gauche, un ton plein et
+// opaque au fil de l'avancement — la couleur dépend de l'état (voir
+// etatBarre) : bleu marine en temps normal, rouge en retard, vert plein
+// une fois terminé. L'étiquette (heures, responsables, nombre de
+// tâches...) suit la même règle que les barres de tâche du Gantt détaillé
+// (voir LigneTache plus bas), pour un rendu homogène entre les deux vues :
+// elle reste DANS la barre tant qu'elle y tient, et ne sort à côté que si
+// la barre est trop courte pour l'accueillir.
+function BarreChantierAvancement({ left, largeur, avancement, etat, label, title, onClick }) {
   const labelTientDedans = !label || estimerLargeurTexte(label) <= largeur - 16;
   return (
     <>
       <button
         type="button"
-        className="gantt-barre-chantier-track"
+        className={"gantt-barre-chantier-track etat-" + etat}
         style={{ left, width: largeur }}
         title={title}
         onClick={onClick}
       >
-        {avancement !== null && avancement < 100 && (
-          <span className="gantt-barre-chantier-fill" style={{ width: 100 - avancement + "%" }} />
+        {avancement !== null && avancement > 0 && (
+          <span className="gantt-barre-chantier-fill" style={{ width: avancement + "%" }} />
         )}
         {label && labelTientDedans && (
           <span className="gantt-barre-label-interne">{label}</span>
@@ -609,14 +621,17 @@ function LigneTache({
 }) {
   const left = joursEntre(gantt.debutTimeline, t.dateDebut) * gantt.pxParJour;
   const largeur = Math.max(6, (joursEntre(t.dateDebut, t.echeance) + 1) * gantt.pxParJour);
-  const avancement =
-    t.avancement !== null && t.avancement !== undefined
-      ? Math.max(0, Math.min(100, Number(t.avancement)))
-      : null;
+  // pourcentageAvancementTache (et non une lecture directe de t.avancement)
+  // pour qu'une tâche "terminée" sans champ Avancement renseigné compte
+  // bien pour 100 % ici aussi (même règle que partout ailleurs dans
+  // l'appli — voir lib/avancement.js).
+  const avancement = pourcentageAvancementTache(t);
+  const enRetard = estEnRetardTache(t);
+  const etat = etatBarre(avancement, enRetard);
   const responsables = afficherResponsable ? normaliserAssignes(t.assigneA) : [];
   const label = [
     t.heuresPrevues ? t.heuresPrevues + " h" : null,
-    avancement !== null ? avancement + "%" : null,
+    avancement + "%",
     responsables.length > 0 ? responsables.join(", ") : null,
   ]
     .filter(Boolean)
@@ -639,7 +654,7 @@ function LigneTache({
         )}
         <button
           type="button"
-          className={"gantt-barre gantt-barre-cliquable gantt-barre-" + (t.statut ?? "a_faire")}
+          className={"gantt-barre gantt-barre-cliquable gantt-barre-" + etat}
           style={{ left, width: largeur }}
           title={
             titre +
@@ -647,14 +662,17 @@ function LigneTache({
             t.dateDebut +
             " → " +
             t.echeance +
-            (avancement !== null ? " — " + avancement + "% fait" : "") +
+            " — " +
+            avancement +
+            "% fait" +
+            (enRetard ? " — en retard" : "") +
             (responsables.length > 0 ? " — " + responsables.join(", ") : "") +
             " — cliquer pour recaler"
           }
           onClick={onClick}
         >
-          {avancement !== null && avancement < 100 && (
-            <span className="gantt-barre-remplissage" style={{ width: 100 - avancement + "%" }} />
+          {avancement > 0 && (
+            <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
           )}
           {label && labelTientDedans && (
             <span className="gantt-barre-label-interne">{label}</span>
@@ -701,6 +719,7 @@ function LigneChantierPliable({ sousGroupe, gantt, largeurTitre, demarrerRedimen
   const left = joursEntre(gantt.debutTimeline, debut) * gantt.pxParJour;
   const largeur = Math.max(6, (joursEntre(debut, fin) + 1) * gantt.pxParJour);
   const avancement = sousGroupe.avancement;
+  const etat = etatBarre(avancement, sousGroupe.enRetard);
 
   return (
     <div className="gantt-ligne">
@@ -724,6 +743,7 @@ function LigneChantierPliable({ sousGroupe, gantt, largeurTitre, demarrerRedimen
           left={left}
           largeur={largeur}
           avancement={avancement}
+          etat={etat}
           label={avancement !== null ? avancement + "%" : null}
           title={
             sousGroupe.nom +
@@ -743,7 +763,6 @@ function GanttParPersonne({
   groupes,
   gantt,
   nomChantier,
-  avancementParChantier,
   largeurTitre = 180,
   demarrerRedimension,
   onCliquerTache,
@@ -789,7 +808,11 @@ function GanttParPersonne({
                 return (
                   <div key={cleUnique}>
                     <LigneChantierPliable
-                      sousGroupe={{ ...sg, avancement: avancementParChantier.get(sg.cle) ?? null }}
+                      sousGroupe={{
+                        ...sg,
+                        avancement: gantt.chantierBarsParCle.get(sg.cle)?.avancement ?? null,
+                        enRetard: gantt.chantierBarsParCle.get(sg.cle)?.enRetard ?? false,
+                      }}
                       gantt={gantt}
                       largeurTitre={largeurTitre}
                       demarrerRedimension={demarrerRedimension}

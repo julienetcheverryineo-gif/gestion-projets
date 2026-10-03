@@ -1,7 +1,40 @@
 import { useEffect } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { joursEntre } from "./dates";
+import { joursEntre, formatDateLocale } from "./dates";
+
+// Marge de tolérance (en points de %) avant de signaler un retard : sans
+// elle, une tâche tout juste commencée (ex. 1 jour après son début sur 30)
+// basculerait en rouge dès le premier jour pour quelques % d'écart — pas
+// très utile. Au-delà de cette marge, l'écart entre ce qui est fait et ce
+// qui DEVRAIT l'être à la date du jour est jugé significatif.
+const TOLERANCE_RETARD = 10;
+
+// Une tâche (ou un chantier) est "en retard" si, à la date du jour, son
+// avancement réel est significativement inférieur à l'avancement qu'on
+// attendrait d'une progression linéaire entre ses dates de début et de
+// fin — ça couvre aussi bien une tâche pas encore commencée alors que sa
+// date de début est passée, que des tâches commencées mais qui traînent.
+// Pas de retard tant que la date de début n'est pas arrivée ; au-delà de
+// l'échéance (et pas encore à 100 %), toujours en retard quel que soit
+// l'avancement.
+export function estEnRetardParDates(dateDebut, echeance, pourcentage) {
+  if (!dateDebut || !echeance) return false;
+  if (pourcentage >= 100) return false;
+  const aujourdHui = formatDateLocale(new Date());
+  if (aujourdHui <= dateDebut) return false;
+  if (aujourdHui > echeance) return true;
+  const dureeTotale = Math.max(1, joursEntre(dateDebut, echeance));
+  const joursEcoules = joursEntre(dateDebut, aujourdHui);
+  const attendu = Math.min(100, (joursEcoules / dureeTotale) * 100);
+  return pourcentage < attendu - TOLERANCE_RETARD;
+}
+
+// Même règle appliquée directement à une tâche (voir Gantt).
+export function estEnRetardTache(t) {
+  if (t.statut === "termine") return false;
+  return estEnRetardParDates(t.dateDebut, t.echeance, pourcentageAvancementTache(t));
+}
 
 // Avancement d'un chantier en % : moyenne de l'avancement de ses tâches
 // (collection "tasks"), pondérée par leur DURÉE (nombre de jours entre

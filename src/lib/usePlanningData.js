@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useCollection } from "../lib/firestoreHooks";
 import { normaliserAssignes } from "../lib/assignes";
-import { calculerAvancementChantier, pourcentageAvancementTache } from "./avancement";
+import { calculerAvancementChantier, pourcentageAvancementTache, estEnRetardParDates } from "./avancement";
 
 export const PLAFOND_MENSUEL = 156;
 
@@ -23,6 +23,19 @@ export function libelleMois(cle) {
     "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc.",
   ];
   return noms[Number(mois) - 1] + " " + annee;
+}
+
+// Numéro de semaine ISO 8601 (1-53) : la semaine qui contient le premier
+// jeudi de l'année est la semaine 1. Calcul standard en passant par le
+// jeudi de la semaine de "date" plutôt que par "date" elle-même, pour que
+// les jours à cheval sur deux années (fin déc./début janv.) retombent
+// toujours sur le bon numéro.
+function numeroSemaineISO(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const jourSemaineISO = d.getUTCDay() || 7; // 1=lundi..7=dimanche
+  d.setUTCDate(d.getUTCDate() + 4 - jourSemaineISO);
+  const debutAnnee = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - debutAnnee) / 86400000 + 1) / 7);
 }
 
 export function arrondirHeures(h) {
@@ -164,22 +177,20 @@ export function usePlanningData() {
       curseur = new Date(curseur.getFullYear(), curseur.getMonth() + 1, 1);
     }
 
-    // Numéros de semaine affichés sous les mois (voir EnteteMois) : pas le
-    // numéro ISO de l'année, mais le rang du lundi DANS SON MOIS ("S1" =
-    // premier lundi du mois, "S2" = deuxième, etc.) — plus lisible qu'un
-    // numéro de semaine absolu sur une frise qui s'étale sur plusieurs mois.
+    // Numéros de semaine affichés sous les mois (voir EnteteMois) : le
+    // numéro ISO 8601 de la semaine dans l'année (celui qu'on retrouve sur
+    // un agenda/calendrier classique), pas un rang remis à zéro à chaque
+    // mois — plus facile à recouper avec les plannings externes (Teams,
+    // Outlook...).
     const semaines = [];
     let curseurSemaine = new Date(debutTimeline);
     const jourSemaine = curseurSemaine.getDay(); // 0=dimanche..6=samedi
     curseurSemaine.setDate(curseurSemaine.getDate() - (jourSemaine === 0 ? 6 : jourSemaine - 1));
-    const rangParMois = {};
     while (curseurSemaine <= finObj) {
       const semaineStr = formatDateLocale(curseurSemaine);
-      const moisDeLaSemaine = semaineStr.slice(0, 7);
-      rangParMois[moisDeLaSemaine] = (rangParMois[moisDeLaSemaine] || 0) + 1;
       semaines.push({
         cle: semaineStr,
-        label: "S" + rangParMois[moisDeLaSemaine],
+        label: "S" + numeroSemaineISO(curseurSemaine),
         left: joursEntre(debutTimeline, semaineStr) * pxParJour,
         largeur: 7 * pxParJour,
       });
@@ -248,6 +259,7 @@ export function usePlanningData() {
         personnesEnCours,
         nombreTaches: tachesRestantes.length,
         avancement,
+        enRetard: cle !== "aaffecter" ? estEnRetardParDates(debut, fin, avancement) : false,
       };
     });
 

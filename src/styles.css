@@ -1645,7 +1645,17 @@ th.elec-col-mo {
   left: 0;
   z-index: 2;
   background: var(--panel);
-  box-shadow: 2px 0 4px rgba(46, 53, 56, 0.06);
+  /* Ombre signalant que la colonne des noms flotte au-dessus du
+     contenu pendant un défilement horizontal — UNIQUEMENT sur son bord
+     droit. Un spread négatif plus grand que le flou (ici -6 pour un
+     flou de 6) rétrécit d'abord la "boîte" d'où part l'ombre avant de la
+     décaler et de la flouter : en haut/bas, l'ombre n'a alors presque
+     plus de quoi dépasser et disparaît, alors qu'à droite le décalage
+     (offset-x) la fait quand même déborder largement. Sans ce rétrécissement,
+     le flou débordait aussi en haut et en bas de chaque ligne et dessinait
+     un filet visible autour du nom (bug remonté par l'utilisateur, qui le
+     décrivait comme un effet de "transparence" sous le nom des chantiers). */
+  box-shadow: 6px 0 6px -6px rgba(46, 53, 56, 0.22);
 }
 .gantt-ligne-titre .col-resizer {
   right: 2px;
@@ -1696,31 +1706,39 @@ th.elec-col-mo {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-/* Avancement d'une tâche : DEUX tons pleins de la même couleur, aucune
-   transparence — la part FAITE (le fond de la barre, .gantt-barre-xxx
-   ci-dessous) dans le ton vif, la part RESTANTE peinte par-dessus en
-   teinte pâle de la même couleur (.gantt-barre-remplissage, posé à
-   DROITE puisque c'est la fin de la barre qui reste à faire). L'ancienne
-   version posait un voile blanc translucide (rgba) sur la part faite :
-   ça la rendait délavée et laissait deviner la grille derrière — d'où
-   le rendu "transparent, pas beau" remonté par l'utilisateur. Chaque
-   ton pâle est défini juste en dessous, par statut. */
+/* Avancement d'une tâche : le fond de la barre (.gantt-barre-xxx
+   ci-dessous) est une teinte VOLONTAIREMENT transparente représentant
+   toute la durée de la tâche, et .gantt-barre-remplissage vient peindre
+   par-dessus, depuis la GAUCHE, un ton plein et opaque dont la largeur
+   grandit avec l'avancement (ex. 40% d'avancement → le remplissage
+   couvre 40% de la barre). La couleur dépend de l'état de la tâche
+   (voir etatBarre dans Planning.jsx) : bleu ciel en temps normal, rouge
+   si en retard, vert une fois terminée. */
 .gantt-barre-remplissage {
   position: absolute;
-  right: 0;
+  left: 0;
   top: 0;
   bottom: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
   pointer-events: none;
 }
-.gantt-barre-a_faire .gantt-barre-remplissage {
-  background: #c3cad1;
+.gantt-barre-normal {
+  background: rgba(58, 141, 199, 0.25);
 }
-.gantt-barre-en_cours .gantt-barre-remplissage {
-  background: #a9c8e6;
+.gantt-barre-normal .gantt-barre-remplissage {
+  background: #1f5c92;
+}
+.gantt-barre-retard {
+  background: rgba(200, 67, 63, 0.25);
+}
+.gantt-barre-retard .gantt-barre-remplissage {
+  background: var(--danger);
+}
+.gantt-barre-termine {
+  background: var(--accent);
 }
 .gantt-barre-termine .gantt-barre-remplissage {
-  background: #a6ddc1;
+  background: var(--accent);
 }
 /* Étiquette DANS la barre d'une tâche (heures, %, responsable...) :
    c'est le cas normal, tant que le texte tient dans la largeur de la
@@ -1752,11 +1770,13 @@ th.elec-col-mo {
   white-space: nowrap;
   font-family: var(--font-ui);
 }
-/* Barre "chantier" (Gantt consolidé, et ligne chantier dépliable de la
-   vue Par personne) : même construction deux-tons pleins que les barres
-   de tâche ci-dessus, dans le vert de marque INEO plutôt que le bleu
-   des statuts de tâche — pour qu'on distingue au premier coup d'œil une
-   barre récapitulative de chantier d'une barre de tâche individuelle. */
+/* Barre "chantier" (Gantt consolidé, détaillé, et ligne chantier
+   dépliable de la vue Par personne) : même principe que les barres de
+   tâche (fond transparent = durée totale, remplissage plein depuis la
+   gauche = avancement), mais en bleu marine plutôt qu'en bleu ciel pour
+   qu'on distingue au premier coup d'œil une barre récapitulative de
+   chantier d'une barre de tâche individuelle — rouge si en retard, vert
+   plein (couleur de marque INEO) une fois terminé, comme pour les tâches. */
 .gantt-barre-chantier-track {
   position: absolute;
   top: 3px;
@@ -1764,7 +1784,6 @@ th.elec-col-mo {
   border: none;
   padding: 0;
   border-radius: 999px;
-  background: var(--accent);
   cursor: pointer;
   overflow: hidden;
   display: flex;
@@ -1779,20 +1798,28 @@ th.elec-col-mo {
 }
 .gantt-barre-chantier-fill {
   position: absolute;
-  right: 0;
+  left: 0;
   top: 0;
   bottom: 0;
-  background: #a6ddc1;
-  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
   pointer-events: none;
 }
-.gantt-barre-a_faire {
-  background: #6b7680;
+.gantt-barre-chantier-track.etat-normal {
+  background: rgba(27, 51, 88, 0.25);
 }
-.gantt-barre-en_cours {
-  background: #2f6fb0;
+.gantt-barre-chantier-track.etat-normal .gantt-barre-chantier-fill {
+  background: #1b3358;
 }
-.gantt-barre-termine {
+.gantt-barre-chantier-track.etat-retard {
+  background: rgba(200, 67, 63, 0.25);
+}
+.gantt-barre-chantier-track.etat-retard .gantt-barre-chantier-fill {
+  background: var(--danger);
+}
+.gantt-barre-chantier-track.etat-termine {
+  background: var(--accent);
+}
+.gantt-barre-chantier-track.etat-termine .gantt-barre-chantier-fill {
   background: var(--accent);
 }
 .gantt-aujourdhui {
