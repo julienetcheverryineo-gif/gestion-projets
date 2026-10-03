@@ -261,6 +261,11 @@ export function usePlanningData() {
       mois,
       parChantier,
       chantierBars,
+      // Même clé que parChantier (construite depuis la même Map) : permet
+      // au Gantt détaillé d'afficher, sur la ligne d'en-tête de chaque
+      // chantier, la même barre récapitulative (durée, avancement,
+      // responsables, nombre de tâches) que le Gantt consolidé.
+      chantierBarsParCle: new Map(chantierBars.map((cb) => [cb.cle, cb])),
       personneGroupes,
       ligneAujourdHui,
     };

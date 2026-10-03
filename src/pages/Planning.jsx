@@ -95,6 +95,19 @@ export default function Planning() {
   const ecranEtroit = useEcranEtroit();
   const navigate = useNavigate();
 
+  // Gantt détaillé : chantiers repliés (masquent leurs tâches, ne
+  // laissent que la ligne récapitulative) — vide par défaut, tout
+  // déplié.
+  const [chantiersDetailReplies, setChantiersDetailReplies] = useState(() => new Set());
+  const basculerChantierDetail = (cle) => {
+    setChantiersDetailReplies((actuel) => {
+      const suivant = new Set(actuel);
+      if (suivant.has(cle)) suivant.delete(cle);
+      else suivant.add(cle);
+      return suivant;
+    });
+  };
+
   // Gantt consolidé : cliquer le nom du chantier ou sa barre ouvre sa
   // fiche — sauf pour le groupe "aaffecter" (tâches sans chantier), qui
   // n'a pas de fiche à ouvrir.
@@ -272,25 +285,89 @@ export default function Planning() {
                 <div className="hscroll-auto" style={{ overflowX: "auto" }}>
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
-                    {[...gantt.parChantier.entries()].map(([cle, groupe]) => (
-                      <div key={cle} className="gantt-groupe">
-                        <div className="gantt-groupe-titre" style={{ width: largeurTitre }} title={groupe.nom}>
-                          {groupe.nom}
+                    {[...gantt.parChantier.entries()].map(([cle, groupe]) => {
+                      const cb = gantt.chantierBarsParCle.get(cle);
+                      const replie = chantiersDetailReplies.has(cle);
+                      return (
+                        <div key={cle} className="gantt-groupe">
+                          <div className="gantt-ligne gantt-ligne-groupe">
+                            <div
+                              className="gantt-ligne-titre gantt-groupe-titre gantt-ligne-titre-cliquable"
+                              style={{ width: largeurTitre }}
+                              title={
+                                groupe.nom + " — cliquer pour " + (replie ? "déplier" : "replier") + " le chantier"
+                              }
+                              onClick={() => basculerChantierDetail(cle)}
+                            >
+                              <span style={{ marginRight: 4, display: "inline-block", width: 10 }}>
+                                {replie ? "▸" : "▾"}
+                              </span>
+                              {groupe.nom}
+                              {demarrerRedimension && (
+                                <span
+                                  className="col-resizer"
+                                  onMouseDown={demarrerRedimension}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              )}
+                            </div>
+                            <div className="gantt-piste" style={{ width: gantt.largeurTotale }}>
+                              {gantt.ligneAujourdHui !== null && (
+                                <div className="gantt-aujourdhui" style={{ left: gantt.ligneAujourdHui }} />
+                              )}
+                              {cb && (
+                                <BarreChantierAvancement
+                                  left={cb.left}
+                                  largeur={cb.largeur}
+                                  avancement={cb.avancement}
+                                  label={[
+                                    arrondirHeures(cb.heuresTotal) + " h",
+                                    cb.personnesEnCours.length > 0
+                                      ? "Resp : " + cb.personnesEnCours.join(", ")
+                                      : null,
+                                    "Tâches : " + cb.nombreTaches,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" — ")}
+                                  title={
+                                    groupe.nom +
+                                    " — " +
+                                    arrondirHeures(cb.heuresTotal) +
+                                    " h restantes" +
+                                    (cb.avancement !== null ? " — " + cb.avancement + "% fait" : "") +
+                                    (cb.personnesEnCours.length > 0
+                                      ? " — Resp : " + cb.personnesEnCours.join(", ")
+                                      : "") +
+                                    " — " +
+                                    cb.nombreTaches +
+                                    " tâche" +
+                                    (cb.nombreTaches > 1 ? "s" : "") +
+                                    " restante" +
+                                    (cb.nombreTaches > 1 ? "s" : "") +
+                                    " — cliquer pour " +
+                                    (replie ? "déplier" : "replier")
+                                  }
+                                  onClick={() => basculerChantierDetail(cle)}
+                                />
+                              )}
+                            </div>
+                          </div>
+                          {!replie &&
+                            groupe.taches.map((t) => (
+                              <LigneTache
+                                key={t.id}
+                                titre={t.titre}
+                                tache={t}
+                                gantt={gantt}
+                                largeurTitre={largeurTitre}
+                                demarrerRedimension={demarrerRedimension}
+                                afficherResponsable
+                                onClick={() => setTacheEnEdition(t)}
+                              />
+                            ))}
                         </div>
-                        {groupe.taches.map((t) => (
-                          <LigneTache
-                            key={t.id}
-                            titre={t.titre}
-                            tache={t}
-                            gantt={gantt}
-                            largeurTitre={largeurTitre}
-                            demarrerRedimension={demarrerRedimension}
-                            afficherResponsable
-                            onClick={() => setTacheEnEdition(t)}
-                          />
-                        ))}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

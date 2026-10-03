@@ -1515,6 +1515,13 @@ th.elec-col-mo {
   z-index: 2;
   background: var(--panel);
 }
+/* Gantt détaillé : la ligne d'en-tête de chaque chantier combine
+   .gantt-ligne-titre (ligne normale, dans la grille flex avec sa piste)
+   et .gantt-groupe-titre (juste pour le style gras) — sans la marge de
+   cette dernière, pensée pour l'ancien titre hors grille. */
+.gantt-ligne-titre.gantt-groupe-titre {
+  margin: 0;
+}
 .gantt-ligne {
   display: flex;
   align-items: center;
