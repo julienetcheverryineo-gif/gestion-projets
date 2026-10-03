@@ -21,6 +21,7 @@ const NAV_ITEMS_AUTOMATISME = [
 const NAV_ITEMS_ELECTRICITE = [
   { to: "/electricite", label: "Chantiers", end: true, icone: "🏗️" },
   { to: "/electricite/plan-de-charge", label: "Plan de charge", icone: "📊" },
+  { to: "/electricite/import-sap", label: "Import SAP", icone: "📥" },
 ];
 
 // Un simple reload() peut resservir une version en cache (c'est ce qui
