@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useCollection } from "../lib/firestoreHooks";
 import { normaliserAssignes } from "../lib/assignes";
-import { calculerAvancementChantier } from "./avancement";
+import { calculerAvancementChantier, pourcentageAvancementTache } from "./avancement";
 
 export const PLAFOND_MENSUEL = 156;
 
@@ -266,7 +266,14 @@ export function usePlanningData() {
   const charge = useMemo(() => {
     const parPersonne = new Map();
     for (const t of tachesVisibles) {
-      const heures = Number(t.heuresPrevues || 0);
+      const heuresPrevues = Number(t.heuresPrevues || 0);
+      if (heuresPrevues <= 0) continue;
+      // La charge du service doit refléter le travail RESTANT, pas le
+      // volume d'origine de la tâche : une tâche de 16h à 50% ne pèse plus
+      // que 8h sur les mois à venir (le reste a déjà été fait). Une tâche
+      // à 100% (ou au statut "Terminé") ne pèse donc plus du tout.
+      const pctAvancement = pourcentageAvancementTache(t);
+      const heures = heuresPrevues * (1 - pctAvancement / 100);
       if (heures <= 0) continue;
       const noms = normaliserAssignes(t.assigneA);
       if (noms.length === 0) continue;

@@ -12,6 +12,16 @@ import { joursEntre } from "./dates";
 // commencée). Les tâches sans dates comptent pour un jour (poids
 // minimal, faute de mieux pour les pondérer). Ne regarde plus les items
 // d'équipement régulé — uniquement les tâches (voir demande explicite).
+// % d'avancement d'UNE tâche (0-100) : une tâche "terminée" compte pour
+// 100 % même sans avoir renseigné le champ Avancement ; sinon on prend ce
+// champ (0 par défaut, tâche pas commencée). Centralisé ici pour que le
+// calcul des heures RESTANTES (voir usePlanningData.js, charge du service)
+// utilise exactement la même règle que l'avancement d'un chantier.
+export function pourcentageAvancementTache(t) {
+  if (t.statut === "termine") return 100;
+  return Math.max(0, Math.min(100, Number(t.avancement) || 0));
+}
+
 export function calculerAvancementChantier(chantierId, { taches }) {
   const tachesDuChantier = taches.filter((t) => t.chantierId === chantierId);
   if (tachesDuChantier.length === 0) return null;
@@ -21,8 +31,7 @@ export function calculerAvancementChantier(chantierId, { taches }) {
   for (const t of tachesDuChantier) {
     const duree =
       t.dateDebut && t.echeance ? Math.max(1, joursEntre(t.dateDebut, t.echeance) + 1) : 1;
-    const pct =
-      t.statut === "termine" ? 100 : Math.max(0, Math.min(100, Number(t.avancement) || 0));
+    const pct = pourcentageAvancementTache(t);
     poidsTotal += duree;
     poidsFait += duree * (pct / 100);
   }
