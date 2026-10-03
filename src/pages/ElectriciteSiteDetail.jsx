@@ -435,35 +435,14 @@ function tsDateSap(texte) {
   return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0;
 }
 
-// Suivi SAP d'un chantier : dès que son champ "Compte" correspond au code
-// OTP d'un import SAP (page Import SAP, voir lib/parseSapExports.js),
-// affiche les achats et heures réels remontés pour ce chantier.
-// N'affiche rien quand il n'y a pas de correspondance (compte non
-// renseigné, ou aucune ligne importée pour ce code pour l'instant) — le
-// rapprochement se fait tout seul au fur et à mesure des imports.
-function SuiviSap({ chantier }) {
-  const otp = otpDepuisCompte(chantier.compte);
-  const { documents: lignesFo, chargement: chargementFo } = useCollection("sapLignesFo");
-  const { documents: lignesMo, chargement: chargementMo } = useCollection("sapLignesMo");
+// Suivi SAP d'un chantier : achats et heures réels remontés de SAP (page
+// Import SAP, voir lib/parseSapExports.js) pour le code OTP correspondant
+// au champ "Compte" du chantier. Les données (déjà filtrées sur cet OTP)
+// et le bouton qui affiche ce panneau sont gérés par le composant parent
+// — n'existe que lorsqu'une correspondance a été trouvée (voir
+// ElectriciteSiteDetail).
+function PanneauSap({ otp, achats, heures }) {
   const [onglet, setOnglet] = useState("fo");
-
-  const achats = useMemo(
-    () =>
-      otp
-        ? lignesFo.filter((l) => l.otp === otp).sort((a, b) => tsDateSap(b.dateDoc) - tsDateSap(a.dateDoc))
-        : [],
-    [lignesFo, otp]
-  );
-  const heures = useMemo(
-    () =>
-      otp
-        ? lignesMo.filter((l) => l.otp === otp).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
-        : [],
-    [lignesMo, otp]
-  );
-
-  if (!otp || chargementFo || chargementMo) return null;
-  if (achats.length === 0 && heures.length === 0) return null;
 
   const colonnes = onglet === "fo" ? COLONNES_SAP_FO : COLONNES_SAP_MO;
   const lignes = onglet === "fo" ? achats : heures;
@@ -1025,6 +1004,29 @@ export default function ElectriciteSiteDetail() {
   const { documents: tousDevis } = useCollection("elecDevis");
   const { documents: toutesLignes } = useCollection("elecLignes");
   const { documents: tousGroupes } = useCollection("elecGroupes");
+  const { documents: sapLignesFo } = useCollection("sapLignesFo");
+  const { documents: sapLignesMo } = useCollection("sapLignesMo");
+
+  // Code OTP correspondant au champ "Compte" de ce chantier (voir
+  // lib/parseSapExports.js) et lignes SAP importées qui s'y rattachent —
+  // vide tant que rien n'a été importé pour ce chantier.
+  const otpSap = useMemo(() => otpDepuisCompte(chantier?.compte), [chantier]);
+  const achatsSap = useMemo(
+    () =>
+      otpSap
+        ? sapLignesFo
+            .filter((l) => l.otp === otpSap)
+            .sort((a, b) => tsDateSap(b.dateDoc) - tsDateSap(a.dateDoc))
+        : [],
+    [sapLignesFo, otpSap]
+  );
+  const heuresSap = useMemo(
+    () =>
+      otpSap
+        ? sapLignesMo.filter((l) => l.otp === otpSap).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
+        : [],
+    [sapLignesMo, otpSap]
+  );
 
   const devis = tousDevis
     .filter((d) => d.chantierId === chantierId)
@@ -1378,8 +1380,6 @@ export default function ElectriciteSiteDetail() {
         </div>
       </header>
 
-      <SuiviSap chantier={chantier} />
-
       {devis.length === 0 ? (
         <div className="empty-state">
           <p className="empty-state-title">Aucun devis importé</p>
@@ -1413,6 +1413,14 @@ export default function ElectriciteSiteDetail() {
             >
               💰 Bilan Achats
             </button>
+            {(achatsSap.length > 0 || heuresSap.length > 0) && (
+              <button
+                className={recapActif === "sap" ? "btn-primary" : "btn-ghost"}
+                onClick={() => setRecapActif(recapActif === "sap" ? null : "sap")}
+              >
+                📡 SAP
+              </button>
+            )}
           </div>
 
           <div className="chantier-actions-bar">
@@ -1453,7 +1461,11 @@ export default function ElectriciteSiteDetail() {
             </>
           )}
 
-          {(recapActif === "fo" || recapActif === "mo") && (
+          {recapActif === "sap" && (
+            <PanneauSap otp={otpSap} achats={achatsSap} heures={heuresSap} />
+          )}
+
+    {(recapActif === "fo" || recapActif === "mo") && (
             <>
               <TableauRecap
                 titre={titreRecap}
