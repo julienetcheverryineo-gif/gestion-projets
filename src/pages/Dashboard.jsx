@@ -5,8 +5,10 @@ import { calculerAvancementChantier, useSyncStatutEnCours } from "../lib/avancem
 import { normaliserAssignes } from "../lib/assignes";
 import { libelleChantier } from "../lib/usePlanningData";
 import { estChantierAutomatisme } from "../components/SiteFormModal";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Dashboard() {
+  const { profile } = useAuth();
   const { documents: tousChantiers, chargement: chargementChantiers } =
     useCollection("sites");
   // Comme la page Chantiers : seuls les chantiers rattachés à l'espace
@@ -19,7 +21,6 @@ export default function Dashboard() {
   const { documents: reserves } = useCollection("reserves");
 
   const [inclureTerminees, setInclureTerminees] = useState(false);
-  const [personneOuverte, setPersonneOuverte] = useState(null);
 
   // Passe automatiquement un chantier "Actif" en "En cours" dès qu'une de
   // ses tâches a démarré (voir lib/avancement.js).
@@ -83,27 +84,26 @@ export default function Dashboard() {
   const avancementChantier = (chantierId) =>
     calculerAvancementChantier(chantierId, { regEquipements, regItems, taches });
 
-  // --- Charge par automaticien ---
-  const tachesRetenuesCharge = useMemo(
-    () => toutesLesTaches.filter((t) => inclureTerminees || t.statut !== "termine"),
-    [toutesLesTaches, inclureTerminees]
-  );
+  // --- Mes chantiers (dont je suis responsable) ---
+  const mesChantiers = useMemo(() => {
+    if (!profile?.nom) return [];
+    return chantiers.filter(
+      (c) => c.responsableChantier === profile.nom || c.ra === profile.nom
+    );
+  }, [chantiers, profile]);
 
-  const parPersonne = useMemo(() => {
-    const map = new Map();
-    for (const t of tachesRetenuesCharge) {
-      const noms = normaliserAssignes(t.assigneA);
-      const cles = noms.length > 0 ? noms : ["À affecter"];
-      for (const nom of cles) {
-        if (!map.has(nom)) map.set(nom, { nom, taches: [], totalHeures: 0, chantiers: new Set() });
-        const entree = map.get(nom);
-        entree.taches.push(t);
-        entree.totalHeures += Number(t.heuresPrevues || 0);
-        if (t.chantierId) entree.chantiers.add(nomChantier(t.chantierId));
-      }
-    }
-    return [...map.values()].sort((a, b) => b.totalHeures - a.totalHeures);
-  }, [tachesRetenuesCharge, chantiers]);
+  // --- Mes tâches (qui me sont assignées) ---
+  const mesTachesToutes = useMemo(() => {
+    if (!profile?.nom) return [];
+    return toutesLesTaches.filter((t) =>
+      normaliserAssignes(t.assigneA).includes(profile.nom)
+    );
+  }, [toutesLesTaches, profile]);
+
+  const mesTaches = useMemo(
+    () => mesTachesToutes.filter((t) => inclureTerminees || t.statut !== "termine"),
+    [mesTachesToutes, inclureTerminees]
+  );
 
   return (
     <div className="page">
@@ -141,21 +141,21 @@ export default function Dashboard() {
           <div className="reg-item-columns">
             <section className="panel">
               <div className="panel-header">
-                <h2>Chantiers</h2>
+                <h2>Mes chantiers</h2>
                 <Link to="/chantiers" className="link">
                   Voir tous les chantiers
                 </Link>
               </div>
-              {chantiers.length === 0 ? (
+              {mesChantiers.length === 0 ? (
                 <EmptyState
-                  titre="Aucun chantier pour l'instant"
-                  description="Créez votre premier chantier pour commencer à suivre vos équipements régulés."
-                  lienTexte="Créer un chantier"
+                  titre="Aucun chantier dont vous êtes responsable"
+                  description="Les chantiers où vous êtes désigné responsable ou RA apparaîtront ici."
+                  lienTexte="Voir tous les chantiers"
                   lienVers="/chantiers"
                 />
               ) : (
                 <ul className="simple-list">
-                  {chantiers
+                  {mesChantiers
                     .filter((c) => c.statut !== "termine")
                     .slice(0, 8)
                     .map((c) => {
@@ -178,7 +178,10 @@ export default function Dashboard() {
 
             <section className="panel">
               <div className="panel-header">
-                <h2>Charge par automaticien</h2>
+                <h2>Mes tâches</h2>
+                <Link to="/taches" className="link">
+                  Voir toutes les tâches
+                </Link>
               </div>
               <label className="export-filtre-checkbox" style={{ marginBottom: 12 }}>
                 <input
@@ -189,124 +192,55 @@ export default function Dashboard() {
                 Inclure les tâches terminées
               </label>
 
-              {parPersonne.length === 0 ? (
+              {mesTaches.length === 0 ? (
                 <EmptyState
-                  titre="Aucune tâche"
-                  description="Les tâches créées apparaîtront ici, réparties par personne assignée."
+                  titre="Aucune tâche assignée"
+                  description="Les tâches qui vous sont assignées apparaîtront ici."
                   lienTexte="Voir les tâches"
                   lienVers="/taches"
                 />
               ) : (
-                <div className="lot-list">
-                  {parPersonne.map((p) => {
-                    const ouvert = personneOuverte === p.nom;
-                    return (
-                      <div key={p.nom} className="lot-card">
-                        <div
-                          className="lot-card-header"
-                          onClick={() => setPersonneOuverte(ouvert ? null : p.nom)}
-                        >
-                          <div>
-                            <span className="lot-card-toggle">{ouvert ? "▾" : "▸"}</span>
-                            <strong>{p.nom}</strong>
-                            <span className="simple-list-meta" style={{ marginLeft: 10 }}>
-                              {p.taches.length} tâche(s)
-                            </span>
-                          </div>
-                          <span className="kanban-count">{p.totalHeures} h</span>
-                        </div>
-
-                        {ouvert && (
-                          <div className="lot-card-body hscroll-auto" style={{ overflowX: "auto" }}>
-                            <table className="data-table">
-                              <thead>
-                                <tr>
-                                  <th>Chantier</th>
-                                  <th>Tâche</th>
-                                  <th>Compte</th>
-                                  <th>Heures</th>
-                                  <th>Date fin</th>
-                                  <th>Statut</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {p.taches.map((t) => (
-                                  <tr key={t.id}>
-                                    <td data-label="Chantier" style={{ fontFamily: "var(--font-ui)" }}>
-                                      {t.chantierId ? (
-                                        <Link to={"/chantiers/" + t.chantierId}>
-                                          {nomChantier(t.chantierId)}
-                                        </Link>
-                                      ) : (
-                                        "À affecter"
-                                      )}
-                                    </td>
-                                    <td data-label="Tâche" style={{ fontFamily: "var(--font-ui)" }}>
-                                      {t.titre}
-                                    </td>
-                                    <td data-label="Compte">{compteChantier(t.chantierId) || "—"}</td>
-                                    <td data-label="Heures">{t.heuresPrevues || "—"}</td>
-                                    <td data-label="Date fin">{t.echeance || "—"}</td>
-                                    <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
-                                      {formatStatutTache(t.statut)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          </div>
-
-          <section className={"panel" + (stats.tachesEnRetard > 0 ? " panel-alert" : "")}>
-            <div className="panel-header">
-              <h2>Tâches en retard</h2>
-              <Link to="/taches" className="link">
-                Voir toutes les tâches
-              </Link>
-            </div>
-            {stats.tachesEnRetard === 0 ? (
-              <p className="empty-state-description" style={{ margin: "10px 0" }}>
-                Aucune tâche en retard.
-              </p>
-            ) : (
-              <div className="hscroll-auto" style={{ overflowX: "auto" }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Chantier</th>
-                      <th>Tâche</th>
-                      <th>Échéance dépassée</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {toutesLesTaches
-                      .filter((t) => estEnRetard(t))
-                      .slice(0, 8)
-                      .map((t) => (
+                <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Chantier</th>
+                        <th>Tâche</th>
+                        <th>Compte</th>
+                        <th>Heures</th>
+                        <th>Date fin</th>
+                        <th>Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mesTaches.map((t) => (
                         <tr key={t.id}>
-                          <td data-label="Chantier">
+                          <td data-label="Chantier" style={{ fontFamily: "var(--font-ui)" }}>
                             {t.chantierId ? (
-                              <Link to={"/chantiers/" + t.chantierId}>{nomChantier(t.chantierId)}</Link>
+                              <Link to={"/chantiers/" + t.chantierId}>
+                                {nomChantier(t.chantierId)}
+                              </Link>
                             ) : (
                               "À affecter"
                             )}
                           </td>
-                          <td data-label="Tâche">{t.titre}</td>
-                          <td data-label="Échéance dépassée">{t.echeance}</td>
+                          <td data-label="Tâche" style={{ fontFamily: "var(--font-ui)" }}>
+                            {t.titre}
+                          </td>
+                          <td data-label="Compte">{compteChantier(t.chantierId) || "—"}</td>
+                          <td data-label="Heures">{t.heuresPrevues || "—"}</td>
+                          <td data-label="Date fin">{t.echeance || "—"}</td>
+                          <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
+                            {formatStatutTache(t.statut)}
+                          </td>
                         </tr>
                       ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
 
           <section className={"panel" + (stats.reservesEnRetard > 0 ? " panel-alert" : "")}>
             <div className="panel-header">
@@ -346,6 +280,50 @@ export default function Dashboard() {
                           <td data-label="Désignation">{r.designation || "—"}</td>
                           <td data-label="Responsable">{r.responsable || "—"}</td>
                           <td data-label="Échéance dépassée">{r.dateEcheance}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className={"panel" + (stats.tachesEnRetard > 0 ? " panel-alert" : "")}>
+            <div className="panel-header">
+              <h2>Tâches en retard</h2>
+              <Link to="/taches" className="link">
+                Voir toutes les tâches
+              </Link>
+            </div>
+            {stats.tachesEnRetard === 0 ? (
+              <p className="empty-state-description" style={{ margin: "10px 0" }}>
+                Aucune tâche en retard.
+              </p>
+            ) : (
+              <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Chantier</th>
+                      <th>Tâche</th>
+                      <th>Échéance dépassée</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {toutesLesTaches
+                      .filter((t) => estEnRetard(t))
+                      .slice(0, 8)
+                      .map((t) => (
+                        <tr key={t.id}>
+                          <td data-label="Chantier">
+                            {t.chantierId ? (
+                              <Link to={"/chantiers/" + t.chantierId}>{nomChantier(t.chantierId)}</Link>
+                            ) : (
+                              "À affecter"
+                            )}
+                          </td>
+                          <td data-label="Tâche">{t.titre}</td>
+                          <td data-label="Échéance dépassée">{t.echeance}</td>
                         </tr>
                       ))}
                   </tbody>
