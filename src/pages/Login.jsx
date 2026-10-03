@@ -17,13 +17,18 @@ export default function Login() {
   // ProtectedRoute nous aurait renvoyés direct vers /connexion — obligeant
   // à se reconnecter une seconde fois pour que ça "prenne". On navigue
   // plutôt dès que le contexte confirme que l'utilisateur est authentifié.
-  // Le RA Électricité arrive directement dans l'espace Électricité ; les
-  // autres profils sur le tableau de bord Automatisme & GTB comme avant.
+  // Le RA Électricité arrive directement dans l'espace Électricité, un
+  // compte client dans son espace dédié (réserves) ; les autres profils
+  // sur le tableau de bord Automatisme & GTB comme avant.
   useEffect(() => {
     if (user) {
-      navigate(profile?.role === "ra_electricite" ? "/electricite" : "/", {
-        replace: true,
-      });
+      const destination =
+        profile?.role === "ra_electricite"
+          ? "/electricite"
+          : profile?.role === "client"
+            ? "/espace-client"
+            : "/";
+      navigate(destination, { replace: true });
     }
   }, [user, profile, navigate]);
 

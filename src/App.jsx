@@ -15,6 +15,7 @@ import Statistiques from "./pages/Statistiques";
 import ElectriciteChantiers from "./pages/ElectriciteChantiers";
 import ElectriciteSiteDetail from "./pages/ElectriciteSiteDetail";
 import ElectricitePlanDeCharge from "./pages/ElectricitePlanDeCharge";
+import EspaceClient from "./pages/EspaceClient";
 
 export default function App() {
   return (
@@ -23,9 +24,17 @@ export default function App() {
         <Routes>
           <Route path="/connexion" element={<Login />} />
           <Route
+            path="/espace-client"
+            element={
+              <ProtectedRoute requireClient>
+                <EspaceClient />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute blockClient>
                 <Layout />
               </ProtectedRoute>
             }

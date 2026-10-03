@@ -22,6 +22,19 @@ service cloud.firestore {
       return estConnecte() && (monRole() == 'ra_electricite' || estChefOuAdmin());
     }
 
+    // Compte client (externe) : accès restreint aux seuls chantiers pour
+    // lesquels il a été explicitement autorisé (voir sites.clientsAutorises),
+    // affecté par un admin depuis la page Utilisateurs.
+    function estClient() {
+      return estConnecte() && monRole() == 'client';
+    }
+
+    function chantierAutoriseAuClient(chantierId) {
+      return chantierId != null &&
+        request.auth.uid in
+          get(/databases/$(database)/documents/sites/$(chantierId)).data.clientsAutorises;
+    }
+
     // Chaque utilisateur peut lire/modifier son propre profil.
     // Seuls les chefs de projet / admins peuvent changer un rôle.
     match /users/{userId} {
@@ -56,20 +69,28 @@ service cloud.firestore {
         (resource.data.userId == request.auth.uid || estChefOuAdmin());
     }
 
-    // Levées de réserves : lecture pour tous, tout connecté peut créer/mettre
-    // à jour (cocher une réserve levée sur le terrain), suppression réservée
-    // aux chefs de projet/admins
+    // Levées de réserves : lecture/création pour tous les connectés — sauf
+    // un compte client, cantonné aux réserves de ses chantiers autorisés.
+    // Mise à jour (statut, etc.) réservée à l'équipe interne : un client
+    // saisit et suit ses réserves, il ne modifie pas leur traitement.
+    // Suppression réservée aux chefs de projet/admins.
     match /reserves/{reserveId} {
-      allow read: if estConnecte();
-      allow create, update: if estConnecte();
+      allow read: if estConnecte() &&
+        (!estClient() || chantierAutoriseAuClient(resource.data.chantierId));
+      allow create: if estConnecte() &&
+        (!estClient() || chantierAutoriseAuClient(request.resource.data.chantierId));
+      allow update: if estConnecte() && !estClient();
       allow delete: if estChefOuAdmin();
     }
 
-    // Chantiers : lecture pour tous les connectés, écriture réservée aux
-    // chefs de projet/admins (+ RA Électricité, pour ses chantiers
-    // service électricité).
+    // Chantiers : lecture pour tous les connectés — sauf un compte client,
+    // cantonné aux chantiers listés dans son champ clientsAutorises.
+    // Écriture réservée aux chefs de projet/admins (+ RA Électricité, pour
+    // ses chantiers service électricité) ; c'est aussi par cette voie que
+    // la page Utilisateurs affecte/retire un client à un chantier.
     match /sites/{siteId} {
-      allow read: if estConnecte();
+      allow read: if estConnecte() &&
+        (!estClient() || request.auth.uid in resource.data.clientsAutorises);
       allow create, update, delete: if estGestionnaireElec();
     }
 

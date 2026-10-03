@@ -2973,3 +2973,157 @@ textarea:focus {
   white-space: nowrap;
   display: block;
 }
+
+/* ---------- Espace client (comptes "client", page autonome) ---------- */
+.espace-client-shell {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.espace-client-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.espace-client-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.espace-client-body {
+  flex: 1;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+.espace-client-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.espace-client-tab {
+  font-family: var(--font-ui);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.espace-client-tab-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.espace-client-chantier-titre {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.espace-client-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.espace-client-stat {
+  background: var(--panel);
+  border: 1px solid var(--ring);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  text-align: center;
+}
+.espace-client-stat-valeur {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+.espace-client-stat-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.espace-client-bouton-signaler {
+  width: 100%;
+  margin-top: 16px;
+  padding: 13px;
+  font-size: 1rem;
+}
+
+.espace-client-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.espace-client-carte {
+  background: var(--panel);
+  border: 1px solid var(--ring);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+}
+
+.espace-client-carte-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.espace-client-badge {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.espace-client-badge-ouverte {
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn);
+}
+.espace-client-badge-levee {
+  background: var(--accent-dim);
+  color: var(--accent-ink);
+}
+
+.espace-client-carte-titre {
+  font-weight: 500;
+}
+
+.espace-client-carte-remarque {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin-top: 6px;
+}
+
+@media (max-width: 520px) {
+  .espace-client-header {
+    padding: 12px 14px;
+  }
+  .espace-client-body {
+    padding: 16px 12px 40px;
+  }
+}
