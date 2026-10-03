@@ -11,7 +11,16 @@ import { pourcentageAvancementTache } from "../lib/avancement";
 // regroupement (par chantier, par personne) et le tri chronologique,
 // juste sans la frise.
 
-function CartePeriode({ nom, debut, fin, heures, avancement, personnesEnCours, onClick }) {
+function CartePeriode({ nom, debut, fin, heures, avancement, personnesEnCours, nombreTaches, onClick }) {
+  // Même étiquette "Resp : ... — Tâches : N" que les barres du Gantt
+  // desktop (consolidé et détaillé), pour un rendu homogène entre les
+  // deux vues.
+  const ligneAffectation = [
+    personnesEnCours && personnesEnCours.length > 0 ? "Resp : " + personnesEnCours.join(", ") : null,
+    nombreTaches !== undefined && nombreTaches !== null ? "Tâches : " + nombreTaches : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
   const contenu = (
     <>
       <div className="planning-mobile-carte-titre">{nom}</div>
@@ -22,9 +31,9 @@ function CartePeriode({ nom, debut, fin, heures, avancement, personnesEnCours, o
         {heures ? <span>{arrondirHeures(heures)} h</span> : null}
         {avancement !== null && avancement !== undefined ? <span>{avancement}%</span> : null}
       </div>
-      {personnesEnCours && personnesEnCours.length > 0 && (
+      {ligneAffectation && (
         <div className="planning-mobile-carte-meta">
-          <span>Affecté à : {personnesEnCours.join(", ")}</span>
+          <span>{ligneAffectation}</span>
         </div>
       )}
       {avancement !== null && avancement !== undefined && (
@@ -95,6 +104,7 @@ export function ConsolideMobile({ chantierBars, onCliquerChantier }) {
           heures={cb.heuresTotal}
           avancement={cb.avancement}
           personnesEnCours={cb.personnesEnCours}
+          nombreTaches={cb.nombreTaches}
           onClick={
             cb.cle !== "aaffecter" && onCliquerChantier ? () => onCliquerChantier(cb.cle) : undefined
           }

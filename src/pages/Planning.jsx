@@ -215,22 +215,30 @@ export default function Planning() {
                               left={cb.left}
                               largeur={cb.largeur}
                               avancement={cb.avancement}
-                              label={
-                                arrondirHeures(cb.heuresTotal) +
-                                " h" +
-                                (cb.personnesEnCours.length > 0
-                                  ? " / " + cb.personnesEnCours.join(", ")
-                                  : "")
-                              }
+                              label={[
+                                arrondirHeures(cb.heuresTotal) + " h",
+                                cb.personnesEnCours.length > 0
+                                  ? "Resp : " + cb.personnesEnCours.join(", ")
+                                  : null,
+                                "Tâches : " + cb.nombreTaches,
+                              ]
+                                .filter(Boolean)
+                                .join(" — ")}
                               title={
                                 cb.nom +
                                 " — " +
                                 arrondirHeures(cb.heuresTotal) +
-                                " h au total" +
+                                " h restantes" +
                                 (cb.avancement !== null ? " — " + cb.avancement + "% fait" : "") +
                                 (cb.personnesEnCours.length > 0
-                                  ? " — affecté à : " + cb.personnesEnCours.join(", ")
+                                  ? " — Resp : " + cb.personnesEnCours.join(", ")
                                   : "") +
+                                " — " +
+                                cb.nombreTaches +
+                                " tâche" +
+                                (cb.nombreTaches > 1 ? "s" : "") +
+                                " restante" +
+                                (cb.nombreTaches > 1 ? "s" : "") +
                                 (estAffecte ? " — cliquer pour ouvrir le chantier" : "")
                               }
                               onClick={estAffecte ? () => ouvrirChantierDepuisGantt(cb.cle) : undefined}
@@ -400,10 +408,13 @@ function EmptyGantt() {
 // Barre "chantier" (consolidé, ou ligne dépliable de la vue Par
 // personne) : une piste claire avec un remplissage plein qui avance
 // selon l'avancement (au lieu de l'ancien survol blanc translucide sur
-// fond bleu plein, peu lisible) — l'étiquette (heures, noms...) est
-// affichée à côté, en dehors de la barre, pour rester lisible quelle
-// que soit la part remplie.
+// fond bleu plein, peu lisible). L'étiquette (heures, responsables,
+// nombre de tâches...) suit la même règle que les barres de tâche du
+// Gantt détaillé (voir LigneTache plus bas), pour un rendu homogène
+// entre les deux vues : elle reste DANS la barre tant qu'elle y tient,
+// et ne sort à côté que si la barre est trop courte pour l'accueillir.
 function BarreChantierAvancement({ left, largeur, avancement, label, title, onClick }) {
+  const labelTientDedans = !label || estimerLargeurTexte(label) <= largeur - 10;
   return (
     <>
       <button
@@ -416,8 +427,11 @@ function BarreChantierAvancement({ left, largeur, avancement, label, title, onCl
         {avancement !== null && (
           <span className="gantt-barre-chantier-fill" style={{ width: avancement + "%" }} />
         )}
+        {label && labelTientDedans && (
+          <span className="gantt-barre-label-interne">{label}</span>
+        )}
       </button>
-      {label && (
+      {label && !labelTientDedans && (
         <span className="gantt-barre-label" style={{ left: left + largeur + 6 }}>
           {label}
         </span>

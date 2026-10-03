@@ -195,20 +195,20 @@ export function usePlanningData() {
         (s, t) => s + Number(t.heuresPrevues || 0) * (1 - pourcentageAvancementTache(t) / 100),
         0
       );
-      // Qui est affecté à du travail RESTANT sur ce chantier — affiché à
-      // côté des heures sur la barre, pour voir d'un coup d'œil qui y
-      // travaille sans ouvrir le détail. Doit correspondre exactement aux
-      // tâches qui alimentent heuresTotal ci-dessus (heures restantes) :
-      // une tâche pas encore commencée ("à faire", 0 %) compte toujours
-      // pour ses heures restantes, donc son responsable doit apparaître
-      // ici aussi — se limiter au statut "en cours" oubliait tous les
-      // responsables de tâches pas encore démarrées.
+      // Tâches qui portent encore du travail (pas à 100 %) — c'est ce
+      // sous-ensemble qui alimente heuresTotal ci-dessus (heures
+      // restantes), les noms de leurs responsables (personnesEnCours) et
+      // leur nombre (nombreTaches), pour que les trois informations de la
+      // barre restent cohérentes entre elles. Une tâche pas encore
+      // commencée ("à faire", 0 %) compte toujours pour ses heures
+      // restantes, donc son responsable doit apparaître ici aussi — se
+      // limiter au statut "en cours" oubliait tous les responsables de
+      // tâches pas encore démarrées.
+      const tachesRestantes = tachesDuChantier.filter(
+        (t) => Number(t.heuresPrevues || 0) > 0 && pourcentageAvancementTache(t) < 100
+      );
       const personnesEnCours = [
-        ...new Set(
-          tachesDuChantier
-            .filter((t) => Number(t.heuresPrevues || 0) > 0 && pourcentageAvancementTache(t) < 100)
-            .flatMap((t) => normaliserAssignes(t.assigneA))
-        ),
+        ...new Set(tachesRestantes.flatMap((t) => normaliserAssignes(t.assigneA))),
       ];
       const avancement = cle !== "aaffecter" ? calculerAvancementChantier(cle, { taches }) : null;
       return {
@@ -220,6 +220,7 @@ export function usePlanningData() {
         largeur: Math.max(6, (joursEntre(debut, fin) + 1) * pxParJour),
         heuresTotal,
         personnesEnCours,
+        nombreTaches: tachesRestantes.length,
         avancement,
       };
     });
