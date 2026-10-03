@@ -43,6 +43,20 @@ export async function activerNotificationsPush(uid) {
   }
 }
 
+// Pastille sur l'icône de l'appli (écran d'accueil iOS/Android, dock sur
+// desktop) avec le nombre de notifications non lues. API encore partielle :
+// pas supportée partout (ex: Safari en onglet classique, Firefox), donc on
+// vérifie sa présence avant utilisation — simple no-op sinon.
+export function mettreAJourPastilleAppli(nombre) {
+  if (!("setAppBadge" in navigator)) return;
+  try {
+    if (nombre > 0) navigator.setAppBadge(nombre).catch(() => {});
+    else navigator.clearAppBadge?.().catch(() => {});
+  } catch {
+    // API indisponible dans ce contexte : on ignore simplement.
+  }
+}
+
 // Notifications reçues pendant que l'onglet est au premier plan : Firebase
 // Messaging ne les affiche pas tout seul dans ce cas (contrairement au
 // service worker en arrière-plan), donc on le fait nous-mêmes avec l'API

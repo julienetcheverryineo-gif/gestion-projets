@@ -35,6 +35,16 @@ messaging.onBackgroundMessage((payload) => {
     data: { lien: payload.data?.lien || "/" },
   };
   self.registration.showNotification(titre, options);
+
+  // Pastille sur l'icône : le compteur en direct (NotificationsBell) ne
+  // tourne que quand l'appli est ouverte, donc c'est ici qu'on la met à
+  // jour quand le push arrive appli fermée/en arrière-plan. API encore
+  // partielle (pas Firefox) : no-op silencieux si absente.
+  if ("setAppBadge" in self.registration) {
+    const nonLues = Number(payload.data?.badge || 0);
+    if (nonLues > 0) self.registration.setAppBadge(nonLues).catch(() => {});
+    else self.registration.clearAppBadge?.().catch(() => {});
+  }
 });
 
 // Clic sur la notification système : ramène au premier plan un onglet déjà

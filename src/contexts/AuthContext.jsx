@@ -6,6 +6,7 @@ import {
 } from "firebase/auth";
 import { addDoc, collection, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { mettreAJourPastilleAppli } from "../lib/push";
 
 const AuthContext = createContext(null);
 
@@ -72,7 +73,13 @@ export function AuthProvider({ children }) {
     return identifiants;
   };
 
-  const logout = () => signOut(auth);
+  // Vide la pastille de l'icône avant de couper la session : sinon elle
+  // resterait affichée (avec le compte du dernier utilisateur) jusqu'à ce
+  // qu'un autre compte se connecte et la remette à jour.
+  const logout = () => {
+    mettreAJourPastilleAppli(0);
+    return signOut(auth);
+  };
 
   const isChefDeProjet = profile?.role === "chef_de_projet";
   const isAdmin = profile?.role === "admin";

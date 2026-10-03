@@ -7,7 +7,11 @@ import {
   marquerNotificationsLues,
   useNotifications,
 } from "../lib/notifications";
-import { activerNotificationsPush, etatPermissionPush } from "../lib/push";
+import {
+  activerNotificationsPush,
+  etatPermissionPush,
+  mettreAJourPastilleAppli,
+} from "../lib/push";
 
 function formatRelatif(creeLe) {
   if (!creeLe?.toDate) return "";
@@ -58,6 +62,15 @@ export default function NotificationsBell() {
   }, [ouvert]);
 
   const nonLues = notifications.filter((n) => !n.lu);
+
+  // Tant que l'appli est ouverte (même en arrière-plan tant que le
+  // processus n'est pas suspendu), on tient la pastille de l'icône à jour
+  // en direct. Quand l'appli est fermée, c'est le service worker qui prend
+  // le relais à la réception d'un push (voir onBackgroundMessage).
+  useEffect(() => {
+    mettreAJourPastilleAppli(nonLues.length);
+  }, [nonLues.length]);
+
   const permissionPush = etatPermissionPush();
   const proposerActivationPush =
     permissionPush !== "indisponible" && permissionPush !== "granted";

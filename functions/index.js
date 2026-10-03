@@ -39,6 +39,23 @@ exports.envoyerPushSurNotification = onDocumentCreated(
     const tokens = snapUtilisateur.data()?.fcmTokens || [];
     if (tokens.length === 0) return;
 
+    // Nombre de non-lues à ce moment précis : transmis dans le push pour que
+    // le service worker puisse mettre à jour la pastille de l'icône même
+    // appli fermée (le compteur en direct ne tourne que quand l'appli est
+    // ouverte). Best-effort : une erreur ici ne doit pas empêcher l'envoi.
+    let nonLues = 0;
+    try {
+      const snapNonLues = await db
+        .collection("notifications")
+        .where("destinataireId", "==", notif.destinataireId)
+        .where("lu", "==", false)
+        .count()
+        .get();
+      nonLues = snapNonLues.data().count;
+    } catch (err) {
+      console.error("Erreur comptage des notifications non lues:", err);
+    }
+
     // Volontairement PAS de champ `notification` ici : quand il est présent,
     // Firebase Messaging affiche la notification tout seul côté navigateur
     // ET continue d'invoquer onBackgroundMessage dans le service worker, qui
@@ -51,6 +68,7 @@ exports.envoyerPushSurNotification = onDocumentCreated(
         lien: notif.lien || "/",
         titre: notif.titre || "Pilotage de projets",
         message: notif.message || "",
+        badge: String(nonLues),
       },
       webpush: {
         fcmOptions: { link: notif.lien || "/" },
