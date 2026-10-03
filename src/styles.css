@@ -1891,6 +1891,13 @@ th.charge-table-col-personne {
   font-family: var(--font-ui);
 }
 
+/* Petit texte d'alerte générique (ex: "Non planifiée", "À affecter") dans
+   une cellule de tableau, à côté d'une vraie valeur affichée normalement. */
+.texte-attention {
+  color: var(--danger);
+  font-style: italic;
+}
+
 .taches-flag-icone {
   display: inline-flex;
   align-items: center;

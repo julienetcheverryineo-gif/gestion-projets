@@ -176,7 +176,7 @@ export default function Dashboard() {
                       <th>Chantier</th>
                       <th>Désignation</th>
                       <th>Responsable</th>
-                      <th>Échéance dépassée</th>
+                      <th>Échéance</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -193,8 +193,12 @@ export default function Dashboard() {
                             )}
                           </td>
                           <td data-label="Désignation">{r.designation || "—"}</td>
-                          <td data-label="Responsable">{r.responsable || "—"}</td>
-                          <td data-label="Échéance dépassée">{r.dateEcheance}</td>
+                          <td data-label="Responsable">
+                            {r.responsable || <span className="texte-attention">À affecter</span>}
+                          </td>
+                          <td data-label="Échéance">
+                            {r.dateEcheance || <span className="texte-attention">Non planifiée</span>}
+                          </td>
                         </tr>
                       ))}
                   </tbody>
@@ -355,8 +359,15 @@ function estEnRetard(tache) {
   return new Date(tache.echeance) < new Date(new Date().toDateString());
 }
 
+// Une réserve est "en retard" soit parce que son échéance est dépassée,
+// soit parce qu'elle n'a encore ni échéance ni responsable (typiquement une
+// réserve tout juste signalée par un client depuis l'Espace Client) : dans
+// les deux cas, elle a besoin d'une action d'un admin/chef de projet
+// (planifier une date, affecter quelqu'un), donc elle mérite de remonter
+// ici pour ne pas être oubliée.
 function estReserveEnRetard(reserve) {
-  if (!reserve.dateEcheance || reserve.statut === "levee") return false;
+  if (reserve.statut === "levee") return false;
+  if (!reserve.dateEcheance) return true;
   return new Date(reserve.dateEcheance) < new Date(new Date().toDateString());
 }
 
