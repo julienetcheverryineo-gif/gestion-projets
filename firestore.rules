@@ -112,6 +112,23 @@ service cloud.firestore {
       allow create, update, delete: if estGestionnaireElec();
     }
 
+    // Imports bruts des exports SAP (achats + pointages), page "Import
+    // SAP" côté Électricité : mêmes droits que les devis Électricité
+    // (lecture pour tous les connectés, gestion réservée au RA
+    // Électricité / chefs de projet / admins).
+    match /sapImports/{importId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estGestionnaireElec();
+    }
+    match /sapLignesFo/{ligneId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estGestionnaireElec();
+    }
+    match /sapLignesMo/{ligneId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estGestionnaireElec();
+    }
+
     // Lots techniques : lecture pour tous, gestion réservée aux chefs de projet/admins
     match /lots/{lotId} {
       allow read: if estConnecte();
