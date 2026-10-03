@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ecouterNotificationsPremierPlan } from "../lib/push";
@@ -33,6 +33,49 @@ function actualiserSansCache() {
   window.location.href = url.toString();
 }
 
+// Boutons précédent/suivant dans le pied de menu : l'appli tourne en
+// PWA installée (pas de chrome navigateur, donc pas de bouton retour),
+// d'où le besoin d'un équivalent interne. React Router ne donne pas
+// directement "peut-on reculer/avancer", donc on reconstruit sa propre
+// pile à partir de location.key (identifiant stable fourni par la
+// librairie "history" : une même page, visitée via précédent/suivant,
+// garde la même clé — ce qui permet de distinguer un retour en arrière
+// d'une navigation vers une page réellement nouvelle).
+function useHistoriqueNavigation() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pileRef = useRef([]);
+  const indexRef = useRef(-1);
+  const [peutReculer, setPeutReculer] = useState(false);
+  const [peutAvancer, setPeutAvancer] = useState(false);
+
+  useEffect(() => {
+    const pile = pileRef.current;
+    const indexExistant = pile.indexOf(location.key);
+    if (indexExistant !== -1) {
+      // Retrouve une entrée déjà connue : c'est un retour (précédent)
+      // ou une avance (suivant), pas une nouvelle navigation.
+      indexRef.current = indexExistant;
+    } else {
+      // Nouvelle page : tronque ce qui suivait la position actuelle
+      // (on ne peut plus "avancer" vers l'ancienne suite une fois
+      // qu'on est reparti sur une nouvelle branche) puis l'empile.
+      pile.splice(indexRef.current + 1);
+      pile.push(location.key);
+      indexRef.current = pile.length - 1;
+    }
+    setPeutReculer(indexRef.current > 0);
+    setPeutAvancer(indexRef.current < pile.length - 1);
+  }, [location.key]);
+
+  return {
+    peutReculer,
+    peutAvancer,
+    reculer: () => navigate(-1),
+    avancer: () => navigate(1),
+  };
+}
+
 const CLE_SIDEBAR_REDUITE = "sidebarReduite";
 
 function chargerSidebarReduite() {
@@ -48,6 +91,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [reduite, setReduite] = useState(chargerSidebarReduite);
+  const { peutReculer, peutAvancer, reculer, avancer } = useHistoriqueNavigation();
 
   const estRAElectricite = profile?.role === "ra_electricite";
   // Administrateur et RA Électricité peuvent basculer librement entre les
@@ -175,6 +219,28 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
+          <div className="sidebar-historique">
+            <button
+              type="button"
+              className="btn-ghost btn-historique"
+              onClick={reculer}
+              disabled={!peutReculer}
+              title="Page précédente"
+              aria-label="Page précédente"
+            >
+              {reduite ? "←" : "← Préc."}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost btn-historique"
+              onClick={avancer}
+              disabled={!peutAvancer}
+              title="Page suivante"
+              aria-label="Page suivante"
+            >
+              {reduite ? "→" : "Suiv. →"}
+            </button>
+          </div>
           {!reduite && (
             <div className="user-chip">
               <span className="user-role-dot" data-role={profile?.role} />
@@ -224,6 +290,26 @@ export default function Layout() {
             <img src={logoIneo} alt="INEO — une marque d'EQUANS" />
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn-ghost btn-historique"
+              onClick={reculer}
+              disabled={!peutReculer}
+              aria-label="Page précédente"
+              title="Page précédente"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="btn-ghost btn-historique"
+              onClick={avancer}
+              disabled={!peutAvancer}
+              aria-label="Page suivante"
+              title="Page suivante"
+            >
+              →
+            </button>
             <NotificationsBell />
             {peutBasculerEspaces && (
               <button
