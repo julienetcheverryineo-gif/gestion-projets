@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlanningData, joursEntre, libelleMois, arrondirHeures, PLAFOND_MENSUEL } from "../lib/usePlanningData";
 import { useEcranEtroit } from "../lib/useEcranEtroit";
@@ -74,6 +74,35 @@ function useLargeurTitre() {
   return { largeurTitre, demarrerRedimension };
 }
 
+// Hauteur du conteneur scrollable d'un Gantt (voir .gantt-scroll dans
+// styles.css) : mesurée dynamiquement — distance entre le haut du
+// conteneur et le bas de la fenêtre, moins une petite marge — plutôt
+// qu'une limite fixe (ex. 65vh) qui laissait un gros vide sous le
+// tableau sur un grand écran ou le coupait trop court sur un petit.
+// Recalculée à l'ouverture, au redimensionnement de la fenêtre, et
+// chaque fois que "dependance" change (ex. bascule entre vues, pour
+// re-mesurer le nouveau conteneur monté à la même place). useLayoutEffect
+// (plutôt que useEffect) pour que le premier rendu affiche déjà la
+// bonne hauteur, sans à-coup visible.
+function useHauteurGantt(dependance) {
+  const ref = useRef(null);
+  const [hauteur, setHauteur] = useState(500);
+
+  useLayoutEffect(() => {
+    function recalculer() {
+      if (!ref.current) return;
+      const haut = ref.current.getBoundingClientRect().top;
+      const disponible = window.innerHeight - haut - 24;
+      setHauteur(Math.max(240, Math.round(disponible)));
+    }
+    recalculer();
+    window.addEventListener("resize", recalculer);
+    return () => window.removeEventListener("resize", recalculer);
+  }, [dependance]);
+
+  return { ref, hauteur };
+}
+
 export default function Planning() {
   const {
     chargement,
@@ -94,6 +123,8 @@ export default function Planning() {
   const { largeurTitre, demarrerRedimension } = useLargeurTitre();
   const ecranEtroit = useEcranEtroit();
   const navigate = useNavigate();
+  const { ref: consolideScrollRef, hauteur: consolideHauteur } = useHauteurGantt(vue === "consolide");
+  const { ref: detailleScrollRef, hauteur: detailleHauteur } = useHauteurGantt(vue === "detaille");
 
   // Gantt détaillé : chantiers repliés (masquent leurs tâches, ne
   // laissent que la ligne récapitulative) — vide par défaut, tout
@@ -200,7 +231,11 @@ export default function Planning() {
               ) : ecranEtroit ? (
                 <ConsolideMobile chantierBars={gantt.chantierBars} onCliquerChantier={ouvrirChantierDepuisGantt} />
               ) : (
-                <div className="hscroll-auto gantt-scroll">
+                <div
+                  className="hscroll-auto gantt-scroll"
+                  ref={consolideScrollRef}
+                  style={{ maxHeight: consolideHauteur }}
+                >
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
                     {gantt.chantierBars.map((cb) => {
@@ -282,7 +317,11 @@ export default function Planning() {
               ) : ecranEtroit ? (
                 <DetailleMobile parChantier={gantt.parChantier} onCliquerTache={setTacheEnEdition} />
               ) : (
-                <div className="hscroll-auto gantt-scroll">
+                <div
+                  className="hscroll-auto gantt-scroll"
+                  ref={detailleScrollRef}
+                  style={{ maxHeight: detailleHauteur }}
+                >
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
                     {[...gantt.parChantier.entries()].map(([cle, groupe]) => {
@@ -695,6 +734,11 @@ function GanttParPersonne({
   onCliquerTache,
 }) {
   const [chantiersOuverts, setChantiersOuverts] = useState(() => new Set());
+  // Mesure sa propre hauteur disponible (plutôt que de réutiliser celle
+  // du Consolidé/Détaillé) : la vue "Par personne" affiche DEUX de ces
+  // Gantt l'un sous l'autre (Automaticiens puis Électriciens), chacun à
+  // une position verticale différente dans la page.
+  const { ref: scrollRef, hauteur } = useHauteurGantt(groupes.length);
 
   if (groupes.length === 0) {
     return (
@@ -714,7 +758,7 @@ function GanttParPersonne({
   };
 
   return (
-    <div className="hscroll-auto gantt-scroll">
+    <div className="hscroll-auto gantt-scroll" ref={scrollRef} style={{ maxHeight: hauteur }}>
       <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
         <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
         {groupes.map((groupe) => {

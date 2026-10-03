@@ -1522,11 +1522,17 @@ th.elec-col-mo {
    défilement horizontal (barres larges) ET vertical, borné en hauteur
    pour que la ligne des mois ci-dessus ait un vrai axe de scroll auquel
    se figer — sans hauteur bornée ici, c'est la page entière qui défile
-   et "sticky" n'a alors aucun effet. */
+   et "sticky" n'a alors aucun effet. La hauteur réelle est calculée en
+   JS (voir useHauteurGantt dans Planning.jsx, posée en style inline sur
+   cet élément) pour remplir tout l'espace dispo sous la ligne des mois
+   jusqu'au bas de la fenêtre, quelle que soit la taille de l'écran —
+   une limite fixe ici (ex. 65vh) laissait un vide sous le tableau sur
+   un grand écran. Ce max-height ne sert que de repli avant que le JS
+   n'ait mesuré (premier rendu, ou JS indisponible). */
 .gantt-scroll {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: min(65vh, 620px);
+  max-height: 70vh;
 }
 .gantt-mois-label {
   position: absolute;
