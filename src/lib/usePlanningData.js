@@ -164,6 +164,32 @@ export function usePlanningData() {
       curseur = new Date(curseur.getFullYear(), curseur.getMonth() + 1, 1);
     }
 
+    // Numéros de semaine affichés sous les mois (voir EnteteMois) : pas le
+    // numéro ISO de l'année, mais le rang du lundi DANS SON MOIS ("S1" =
+    // premier lundi du mois, "S2" = deuxième, etc.) — plus lisible qu'un
+    // numéro de semaine absolu sur une frise qui s'étale sur plusieurs mois.
+    const semaines = [];
+    let curseurSemaine = new Date(debutTimeline);
+    const jourSemaine = curseurSemaine.getDay(); // 0=dimanche..6=samedi
+    curseurSemaine.setDate(curseurSemaine.getDate() - (jourSemaine === 0 ? 6 : jourSemaine - 1));
+    const rangParMois = {};
+    while (curseurSemaine <= finObj) {
+      const semaineStr = formatDateLocale(curseurSemaine);
+      const moisDeLaSemaine = semaineStr.slice(0, 7);
+      rangParMois[moisDeLaSemaine] = (rangParMois[moisDeLaSemaine] || 0) + 1;
+      semaines.push({
+        cle: semaineStr,
+        label: "S" + rangParMois[moisDeLaSemaine],
+        left: joursEntre(debutTimeline, semaineStr) * pxParJour,
+        largeur: 7 * pxParJour,
+      });
+      curseurSemaine = new Date(
+        curseurSemaine.getFullYear(),
+        curseurSemaine.getMonth(),
+        curseurSemaine.getDate() + 7
+      );
+    }
+
     const parChantier = new Map();
     for (const t of tachesGantt) {
       const cle = t.chantierId || "aaffecter";
@@ -259,6 +285,7 @@ export function usePlanningData() {
       pxParJour,
       largeurTotale,
       mois,
+      semaines,
       parChantier,
       chantierBars,
       // Même clé que parChantier (construite depuis la même Map) : permet

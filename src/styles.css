@@ -1507,16 +1507,24 @@ th.elec-col-mo {
 }
 
 /* ---------- Gantt ---------- */
-/* Ligne des mois figée en haut du conteneur scrollable (voir
-   .gantt-scroll ci-dessous) : reste visible pendant qu'on fait défiler
-   les chantiers/tâches verticalement, tout en suivant le défilement
-   HORIZONTAL (sticky ne fige que l'axe top, pas left) pour rester
-   alignée avec les barres en dessous. */
+/* Ligne des mois + semaines, figée en haut du conteneur scrollable
+   (voir .gantt-scroll ci-dessous) : reste visible pendant qu'on fait
+   défiler les chantiers/tâches verticalement, tout en suivant le
+   défilement HORIZONTAL (sticky ne fige que l'axe top, pas left) pour
+   rester alignée avec les barres en dessous. padding-left (et non
+   margin-left, voir EnteteMois dans Planning.jsx) pour que cette zone
+   sticky/opaque couvre AUSSI le coin en haut à gauche, au-dessus de la
+   colonne des noms — sans ça ce coin n'appartenait à aucun élément
+   opaque et laissait les lignes qui défilent dessous transparaître dès
+   qu'elles passaient par cette position (bug remonté par l'utilisateur :
+   on y voyait le bout d'une étiquette de barre flotter sous l'en-tête). */
 .gantt-mois-header {
   position: sticky;
   top: 0;
   z-index: 3;
   background: var(--panel);
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
 }
 /* Conteneur scrollable d'un Gantt (consolidé, détaillé, par personne) :
    défilement horizontal (barres larges) ET vertical, borné en hauteur
@@ -1534,6 +1542,10 @@ th.elec-col-mo {
   overflow-y: auto;
   max-height: 70vh;
 }
+.gantt-mois-rangee {
+  position: relative;
+  height: 24px;
+}
 .gantt-mois-label {
   position: absolute;
   top: 0;
@@ -1543,6 +1555,25 @@ th.elec-col-mo {
   border-left: 1px solid var(--border);
   padding-left: 6px;
   height: 100%;
+}
+/* Rangée des numéros de semaine (S1, S2... — rang du lundi dans son
+   mois, voir le calcul dans usePlanningData.js), sous celle des mois. */
+.gantt-semaine-rangee {
+  position: relative;
+  height: 16px;
+}
+.gantt-semaine-label {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.8;
+  border-left: 1px solid var(--border);
+  padding-left: 4px;
+  box-sizing: border-box;
+  font-family: var(--font-mono);
 }
 .gantt-groupe {
   margin-top: 10px;
@@ -1628,7 +1659,7 @@ th.elec-col-mo {
 }
 .gantt-piste {
   position: relative;
-  height: 22px;
+  height: 24px;
   background: repeating-linear-gradient(
     to right,
     transparent,
@@ -1637,12 +1668,18 @@ th.elec-col-mo {
     var(--border) 30px
   );
 }
+/* Barres en pilule (plutôt que les anciens rectangles à coins à peine
+   arrondis de 4px) : c'est ce format, plein et bien rond, qui donne
+   leur allure aux Gantt "propres" (vs. un simple rectangle grisâtre).
+   border-radius: 999px fait toujours une capsule parfaite quelle que
+   soit la hauteur. */
 .gantt-barre {
   position: absolute;
   top: 3px;
-  height: 16px;
-  border-radius: 4px;
+  height: 18px;
+  border-radius: 999px;
   background: var(--text-muted);
+  box-shadow: 0 1px 2px rgba(46, 53, 56, 0.18);
 }
 .gantt-barre-cliquable {
   border: none;
@@ -1651,35 +1688,52 @@ th.elec-col-mo {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
-  border-radius: 4px;
+  overflow: hidden;
+  border-radius: 999px;
 }
 .gantt-barre-cliquable:hover {
-  filter: brightness(0.92);
+  filter: brightness(0.95);
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+/* Avancement d'une tâche : DEUX tons pleins de la même couleur, aucune
+   transparence — la part FAITE (le fond de la barre, .gantt-barre-xxx
+   ci-dessous) dans le ton vif, la part RESTANTE peinte par-dessus en
+   teinte pâle de la même couleur (.gantt-barre-remplissage, posé à
+   DROITE puisque c'est la fin de la barre qui reste à faire). L'ancienne
+   version posait un voile blanc translucide (rgba) sur la part faite :
+   ça la rendait délavée et laissait deviner la grille derrière — d'où
+   le rendu "transparent, pas beau" remonté par l'utilisateur. Chaque
+   ton pâle est défini juste en dessous, par statut. */
 .gantt-barre-remplissage {
   position: absolute;
-  left: 0;
+  right: 0;
   top: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.55);
-  border-right: 1px solid rgba(255, 255, 255, 0.8);
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
   pointer-events: none;
+}
+.gantt-barre-a_faire .gantt-barre-remplissage {
+  background: #c3cad1;
+}
+.gantt-barre-en_cours .gantt-barre-remplissage {
+  background: #a9c8e6;
+}
+.gantt-barre-termine .gantt-barre-remplissage {
+  background: #a6ddc1;
 }
 /* Étiquette DANS la barre d'une tâche (heures, %, responsable...) :
    c'est le cas normal, tant que le texte tient dans la largeur de la
    barre (voir estimerLargeurTexte dans lib/texte.js). Un ombrage léger
    garde le texte lisible quelle que soit la couleur de la barre
-   (à faire/en cours/terminé) et par-dessus le remplissage d'avancement. */
+   (à faire/en cours/terminé) et par-dessus les deux tons d'avancement. */
 .gantt-barre-label-interne {
   position: relative;
   z-index: 1;
   color: #fff;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  padding: 0 5px;
+  padding: 0 8px;
   white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   font-family: var(--font-ui);
@@ -1691,7 +1745,7 @@ th.elec-col-mo {
    "chantier" ci-dessous. */
 .gantt-barre-label {
   position: absolute;
-  top: 3px;
+  top: 4px;
   font-size: 0.72rem;
   font-weight: 500;
   color: var(--text-muted);
@@ -1699,42 +1753,41 @@ th.elec-col-mo {
   font-family: var(--font-ui);
 }
 /* Barre "chantier" (Gantt consolidé, et ligne chantier dépliable de la
-   vue Par personne) : même construction que les barres de tâche du
-   Gantt détaillé (fond plein + voile blanc translucide qui avance selon
-   l'avancement) — pour un rendu homogène entre les deux vues, et pour
-   que le texte blanc de l'étiquette (voir .gantt-barre-label-interne)
-   reste lisible quelle que soit la part remplie, contrairement à
-   l'ancienne piste très claire. */
+   vue Par personne) : même construction deux-tons pleins que les barres
+   de tâche ci-dessus, dans le vert de marque INEO plutôt que le bleu
+   des statuts de tâche — pour qu'on distingue au premier coup d'œil une
+   barre récapitulative de chantier d'une barre de tâche individuelle. */
 .gantt-barre-chantier-track {
   position: absolute;
   top: 3px;
-  height: 16px;
+  height: 18px;
   border: none;
   padding: 0;
-  border-radius: 4px;
-  background: #2f6fb0;
+  border-radius: 999px;
+  background: var(--accent);
   cursor: pointer;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 1px 2px rgba(46, 53, 56, 0.18);
 }
 .gantt-barre-chantier-track:hover {
-  filter: brightness(0.92);
-  outline: 2px solid var(--accent);
+  filter: brightness(0.95);
+  outline: 2px solid var(--accent-ink);
   outline-offset: 1px;
 }
 .gantt-barre-chantier-fill {
   position: absolute;
-  left: 0;
+  right: 0;
   top: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.55);
-  border-right: 1px solid rgba(255, 255, 255, 0.8);
+  background: #a6ddc1;
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
   pointer-events: none;
 }
 .gantt-barre-a_faire {
-  background: #9aa5b1;
+  background: #6b7680;
 }
 .gantt-barre-en_cours {
   background: #2f6fb0;

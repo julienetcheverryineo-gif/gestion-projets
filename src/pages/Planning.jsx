@@ -535,15 +535,17 @@ function EmptyGantt() {
 }
 
 // Barre "chantier" (consolidé, ou ligne dépliable de la vue Par
-// personne) : une piste claire avec un remplissage plein qui avance
-// selon l'avancement (au lieu de l'ancien survol blanc translucide sur
-// fond bleu plein, peu lisible). L'étiquette (heures, responsables,
+// personne) : pilule pleine dans la couleur d'avancement (la part FAITE,
+// vive) avec la part restante peinte par-dessus en teinte pâle de la
+// même couleur (.gantt-barre-chantier-fill) — deux tons pleins, sans
+// aucune transparence, contrairement à l'ancien voile blanc translucide
+// qui rendait la barre délavée. L'étiquette (heures, responsables,
 // nombre de tâches...) suit la même règle que les barres de tâche du
 // Gantt détaillé (voir LigneTache plus bas), pour un rendu homogène
 // entre les deux vues : elle reste DANS la barre tant qu'elle y tient,
 // et ne sort à côté que si la barre est trop courte pour l'accueillir.
 function BarreChantierAvancement({ left, largeur, avancement, label, title, onClick }) {
-  const labelTientDedans = !label || estimerLargeurTexte(label) <= largeur - 10;
+  const labelTientDedans = !label || estimerLargeurTexte(label) <= largeur - 16;
   return (
     <>
       <button
@@ -553,8 +555,8 @@ function BarreChantierAvancement({ left, largeur, avancement, label, title, onCl
         title={title}
         onClick={onClick}
       >
-        {avancement !== null && (
-          <span className="gantt-barre-chantier-fill" style={{ width: avancement + "%" }} />
+        {avancement !== null && avancement < 100 && (
+          <span className="gantt-barre-chantier-fill" style={{ width: 100 - avancement + "%" }} />
         )}
         {label && labelTientDedans && (
           <span className="gantt-barre-label-interne">{label}</span>
@@ -569,13 +571,26 @@ function BarreChantierAvancement({ left, largeur, avancement, label, title, onCl
   );
 }
 
+// En-tête des dates, figée en haut du Gantt (voir .gantt-mois-header) :
+// mois + semaines. Utilise un padding-left (plutôt qu'un margin-left)
+// pour que la zone sticky couvre AUSSI le coin en haut à gauche
+// (au-dessus de la colonne des noms) — sans ça, ce coin n'appartient à
+// aucun élément opaque et laisse voir, par transparence, les barres des
+// lignes qui défilent dessous dès qu'elles passent par cette position.
 function EnteteMois({ gantt, largeurTitre = 180 }) {
   return (
-    <div className="gantt-mois-header" style={{ marginLeft: largeurTitre }}>
-      <div style={{ position: "relative", height: 24, width: gantt.largeurTotale }}>
+    <div className="gantt-mois-header" style={{ paddingLeft: largeurTitre }}>
+      <div className="gantt-mois-rangee" style={{ width: gantt.largeurTotale }}>
         {gantt.mois.map((m) => (
           <div key={m.cle} className="gantt-mois-label" style={{ left: m.left }}>
             {m.label}
+          </div>
+        ))}
+      </div>
+      <div className="gantt-semaine-rangee" style={{ width: gantt.largeurTotale }}>
+        {gantt.semaines.map((s) => (
+          <div key={s.cle} className="gantt-semaine-label" style={{ left: s.left, width: s.largeur }}>
+            {s.label}
           </div>
         ))}
       </div>
@@ -609,7 +624,7 @@ function LigneTache({
   // Le texte reste DANS la barre (comme avant), en blanc, tant qu'il y
   // tient ; il ne sort à côté (sur le fond de la page) que si la barre
   // est trop courte pour l'accueillir sans être coupé.
-  const labelTientDedans = !label || estimerLargeurTexte(label) <= largeur - 10;
+  const labelTientDedans = !label || estimerLargeurTexte(label) <= largeur - 16;
   return (
     <div className="gantt-ligne">
       <div className="gantt-ligne-titre" style={{ width: largeurTitre }} title={titre}>
@@ -638,8 +653,8 @@ function LigneTache({
           }
           onClick={onClick}
         >
-          {avancement !== null && (
-            <span className="gantt-barre-remplissage" style={{ width: avancement + "%" }} />
+          {avancement !== null && avancement < 100 && (
+            <span className="gantt-barre-remplissage" style={{ width: 100 - avancement + "%" }} />
           )}
           {label && labelTientDedans && (
             <span className="gantt-barre-label-interne">{label}</span>
