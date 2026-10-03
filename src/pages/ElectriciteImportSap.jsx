@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   addDoc,
   collection,
@@ -227,6 +227,190 @@ function HistoriqueImports() {
   );
 }
 
+// Colonnes affichées et champs interrogés par la recherche libre, pour
+// chacune des deux collections de lignes importées.
+const CONSULTATION = {
+  fo: {
+    collectionLignes: "sapLignesFo",
+    colonnes: [
+      { champ: "otp", label: "OTP" },
+      { champ: "dateDoc", label: "Date" },
+      { champ: "grOr", label: "Code SAP" },
+      { champ: "nomFournisseur", label: "Fournisseur" },
+      { champ: "designation", label: "Désignation" },
+      { champ: "quantite", label: "Qté", numerique: true },
+      { champ: "valNette", label: "Val. nette €", numerique: true },
+    ],
+    champsRecherche: ["otp", "designation", "grOr", "nomFournisseur", "reference", "docAchat"],
+    champValeur: "valNette",
+    labelTotal: "Val. nette totale",
+    suffixeTotal: " €",
+  },
+  mo: {
+    collectionLignes: "sapLignesMo",
+    colonnes: [
+      { champ: "otp", label: "OTP" },
+      { champ: "date", label: "Date" },
+      { champ: "nomPrenom", label: "Personne" },
+      { champ: "designationImputation", label: "Chantier (désignation)" },
+      { champ: "typAct", label: "Type activité" },
+      { champ: "heures", label: "Heures", numerique: true },
+    ],
+    champsRecherche: ["otp", "nomPrenom", "designationImputation", "typAct", "matricule"],
+    champValeur: "heures",
+    labelTotal: "Heures totales",
+    suffixeTotal: " h",
+  },
+};
+
+function formatValeur(v, numerique) {
+  if (v === null || v === undefined || v === "") return "";
+  if (!numerique) return String(v);
+  const n = Number(v) || 0;
+  return n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+}
+
+// Recherche/filtre/affichage progressif pour un onglet (Fourniture ou
+// Main d'œuvre) — remontée avec une clé différente par onglet (voir
+// VueConsultation) pour repartir d'un état propre en changeant d'onglet,
+// plutôt qu'un useEffect de réinitialisation.
+function TableauConsultation({ config }) {
+  const { documents: lignes, chargement } = useCollection(config.collectionLignes);
+  const [recherche, setRecherche] = useState("");
+  const [otpFiltre, setOtpFiltre] = useState("");
+  const [nbAffiches, setNbAffiches] = useState(50);
+
+  const otpsDisponibles = useMemo(
+    () => [...new Set(lignes.map((l) => l.otp).filter(Boolean))].sort(),
+    [lignes]
+  );
+
+  const filtrees = useMemo(() => {
+    const termes = recherche.trim().toLowerCase();
+    return lignes.filter((l) => {
+      if (otpFiltre && l.otp !== otpFiltre) return false;
+      if (!termes) return true;
+      return config.champsRecherche.some((c) => String(l[c] ?? "").toLowerCase().includes(termes));
+    });
+  }, [lignes, recherche, otpFiltre, config]);
+
+  const total = useMemo(
+    () => filtrees.reduce((s, l) => s + (Number(l[config.champValeur]) || 0), 0),
+    [filtrees, config]
+  );
+
+  return (
+    <>
+      {chargement ? (
+        <p className="page-loading">Chargement…</p>
+      ) : lignes.length === 0 ? (
+        <p className="empty-state-description">Aucune ligne importée pour le moment.</p>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <input
+              placeholder="Rechercher…"
+              value={recherche}
+              onChange={(e) => {
+                setNbAffiches(50);
+                setRecherche(e.target.value);
+              }}
+              style={{ minWidth: 220, flex: "1 1 220px" }}
+            />
+            <select
+              value={otpFiltre}
+              onChange={(e) => {
+                setNbAffiches(50);
+                setOtpFiltre(e.target.value);
+              }}
+            >
+              <option value="">Tous les chantiers (OTP)</option>
+              {otpsDisponibles.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <p className="page-subtitle" style={{ marginBottom: 8 }}>
+            {filtrees.length} ligne(s) — {config.labelTotal} :{" "}
+            <strong>
+              {formatValeur(total, true)}
+              {config.suffixeTotal}
+            </strong>
+          </p>
+
+          <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  {config.colonnes.map((c) => (
+                    <th key={c.champ}>{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtrees.slice(0, nbAffiches).map((l) => (
+                  <tr key={l.id}>
+                    {config.colonnes.map((c) => (
+                      <td key={c.champ} data-label={c.label}>
+                        {formatValeur(l[c.champ], c.numerique)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filtrees.length > nbAffiches && (
+            <button
+              className="btn-ghost"
+              style={{ marginTop: 12 }}
+              onClick={() => setNbAffiches((n) => n + 50)}
+            >
+              Afficher plus ({filtrees.length - nbAffiches} restante(s))
+            </button>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+// Vue en lecture seule des lignes déjà importées — recherche libre, filtre
+// par chantier (code OTP), affichage progressif (les imports comptent
+// plusieurs centaines à plusieurs milliers de lignes). Le tableau est
+// remonté avec une clé différente par onglet pour repartir d'un état
+// propre (recherche, filtre, pagination) en changeant d'onglet.
+function VueConsultation() {
+  const [onglet, setOnglet] = useState("fo");
+
+  return (
+    <div className="panel" style={{ padding: 20 }}>
+      <h2 style={{ marginTop: 0 }}>Consultation</h2>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button
+          className={onglet === "fo" ? "btn-primary" : "btn-ghost"}
+          onClick={() => setOnglet("fo")}
+        >
+          Achats (Fourniture)
+        </button>
+        <button
+          className={onglet === "mo" ? "btn-primary" : "btn-ghost"}
+          onClick={() => setOnglet("mo")}
+        >
+          Pointages (Main d'œuvre)
+        </button>
+      </div>
+
+      <TableauConsultation key={onglet} config={CONSULTATION[onglet]} />
+    </div>
+  );
+}
+
 export default function ElectriciteImportSap() {
   const { isAdmin, profile } = useAuth();
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
@@ -260,6 +444,7 @@ export default function ElectriciteImportSap() {
         <BlocImport type="fo" config={TYPES.fo} />
         <BlocImport type="mo" config={TYPES.mo} />
         <HistoriqueImports />
+        <VueConsultation />
       </div>
     </div>
   );
