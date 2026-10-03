@@ -1486,8 +1486,26 @@ th.elec-col-mo {
 }
 
 /* ---------- Gantt ---------- */
+/* Ligne des mois figée en haut du conteneur scrollable (voir
+   .gantt-scroll ci-dessous) : reste visible pendant qu'on fait défiler
+   les chantiers/tâches verticalement, tout en suivant le défilement
+   HORIZONTAL (sticky ne fige que l'axe top, pas left) pour rester
+   alignée avec les barres en dessous. */
 .gantt-mois-header {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--panel);
+}
+/* Conteneur scrollable d'un Gantt (consolidé, détaillé, par personne) :
+   défilement horizontal (barres larges) ET vertical, borné en hauteur
+   pour que la ligne des mois ci-dessus ait un vrai axe de scroll auquel
+   se figer — sans hauteur bornée ici, c'est la page entière qui défile
+   et "sticky" n'a alors aucun effet. */
+.gantt-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(65vh, 620px);
 }
 .gantt-mois-label {
   position: absolute;
@@ -1518,9 +1536,36 @@ th.elec-col-mo {
 /* Gantt détaillé : la ligne d'en-tête de chaque chantier combine
    .gantt-ligne-titre (ligne normale, dans la grille flex avec sa piste)
    et .gantt-groupe-titre (juste pour le style gras) — sans la marge de
-   cette dernière, pensée pour l'ancien titre hors grille. */
+   cette dernière, pensée pour l'ancien titre hors grille. Passe en flex
+   pour aligner le nom (tronqué par ellipsis) avec la flèche de repli et
+   le bouton d'ouverture du chantier. */
 .gantt-ligne-titre.gantt-groupe-titre {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.gantt-groupe-nom {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gantt-groupe-ouvrir {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 1px 3px;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.gantt-groupe-ouvrir:hover {
+  color: var(--accent);
+  background: var(--border);
 }
 .gantt-ligne {
   display: flex;

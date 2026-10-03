@@ -200,7 +200,7 @@ export default function Planning() {
               ) : ecranEtroit ? (
                 <ConsolideMobile chantierBars={gantt.chantierBars} onCliquerChantier={ouvrirChantierDepuisGantt} />
               ) : (
-                <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+                <div className="hscroll-auto gantt-scroll">
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
                     {gantt.chantierBars.map((cb) => {
@@ -282,7 +282,7 @@ export default function Planning() {
               ) : ecranEtroit ? (
                 <DetailleMobile parChantier={gantt.parChantier} onCliquerTache={setTacheEnEdition} />
               ) : (
-                <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+                <div className="hscroll-auto gantt-scroll">
                   <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
                     <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
                     {[...gantt.parChantier.entries()].map(([cle, groupe]) => {
@@ -299,10 +299,23 @@ export default function Planning() {
                               }
                               onClick={() => basculerChantierDetail(cle)}
                             >
-                              <span style={{ marginRight: 4, display: "inline-block", width: 10 }}>
+                              <span style={{ marginRight: 4, display: "inline-block", width: 10, flexShrink: 0 }}>
                                 {replie ? "▸" : "▾"}
                               </span>
-                              {groupe.nom}
+                              <span className="gantt-groupe-nom">{groupe.nom}</span>
+                              {cle !== "aaffecter" && (
+                                <button
+                                  type="button"
+                                  className="gantt-groupe-ouvrir"
+                                  title="Ouvrir le chantier"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    ouvrirChantierDepuisGantt(cle);
+                                  }}
+                                >
+                                  ↗
+                                </button>
+                              )}
                               {demarrerRedimension && (
                                 <span
                                   className="col-resizer"
@@ -701,7 +714,7 @@ function GanttParPersonne({
   };
 
   return (
-    <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+    <div className="hscroll-auto gantt-scroll">
       <div style={{ minWidth: gantt.largeurTotale + largeurTitre }}>
         <EnteteMois gantt={gantt} largeurTitre={largeurTitre} />
         {groupes.map((groupe) => {
