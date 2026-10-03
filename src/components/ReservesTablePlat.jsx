@@ -208,7 +208,7 @@ export default function ReservesTablePlat({
 
   return (
     <div className="hscroll-auto" style={{ overflowX: "auto" }}>
-    <table className="data-table" style={{ tableLayout: "fixed" }}>
+    <table className="data-table reserves-table-editable" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
           {afficherChantier && <Entete colonne="chantier">Chantier</Entete>}

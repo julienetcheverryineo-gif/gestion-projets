@@ -187,7 +187,9 @@ export default function Dashboard() {
                         <tr key={r.id}>
                           <td data-label="Chantier">
                             {r.chantierId ? (
-                              <Link to={"/chantiers/" + r.chantierId}>{nomChantier(r.chantierId)}</Link>
+                              <Link to={"/chantiers/" + r.chantierId + "?onglet=reserves"}>
+                                {nomChantier(r.chantierId)}
+                              </Link>
                             ) : (
                               "À affecter"
                             )}

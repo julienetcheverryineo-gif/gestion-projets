@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   marquerNotificationLue,
   marquerNotificationsLues,
+  supprimerNotification,
   useNotifications,
 } from "../lib/notifications";
 import {
@@ -85,6 +86,19 @@ export default function NotificationsBell() {
     await marquerNotificationsLues(nonLues.map((n) => n.id));
   };
 
+  // Suppression d'une notification précise : stopPropagation indispensable,
+  // le bouton est imbriqué dans la ligne cliquable (qui, elle, ouvre la
+  // notification) — sans ça, cliquer la croix déclencherait aussi l'ouverture.
+  const supprimerUne = async (e, id) => {
+    e.stopPropagation();
+    await supprimerNotification(id);
+  };
+
+  const toutEffacer = async () => {
+    if (!confirm("Supprimer toutes les notifications de la liste ?")) return;
+    await Promise.all(notifications.map((n) => supprimerNotification(n.id)));
+  };
+
   const activerPush = async () => {
     setActivationPush("en_cours");
     const ok = await activerNotificationsPush(user?.uid);
@@ -119,11 +133,18 @@ export default function NotificationsBell() {
             >
             <div className="notif-bell-entete">
               <strong>Notifications</strong>
-              {nonLues.length > 0 && (
-                <button type="button" className="link" onClick={toutMarquerLu}>
-                  Tout marquer comme lu
-                </button>
-              )}
+              <div style={{ display: "flex", gap: 10 }}>
+                {nonLues.length > 0 && (
+                  <button type="button" className="link" onClick={toutMarquerLu}>
+                    Tout marquer comme lu
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button type="button" className="link notif-bell-tout-effacer" onClick={toutEffacer}>
+                    Tout effacer
+                  </button>
+                )}
+              </div>
             </div>
 
             {proposerActivationPush && (
@@ -155,16 +176,29 @@ export default function NotificationsBell() {
             ) : (
               <div className="notif-bell-liste">
                 {notifications.slice(0, 30).map((n) => (
-                  <button
-                    type="button"
+                  <div
                     key={n.id}
-                    className={"notif-bell-item" + (n.lu ? "" : " notif-bell-item-non-lue")}
-                    onClick={() => ouvrirNotification(n)}
+                    className={"notif-bell-item-row" + (n.lu ? "" : " notif-bell-item-non-lue")}
                   >
-                    <div className="notif-bell-item-titre">{n.titre}</div>
-                    {n.message && <div className="notif-bell-item-message">{n.message}</div>}
-                    <div className="simple-list-meta">{formatRelatif(n.creeLe)}</div>
-                  </button>
+                    <button
+                      type="button"
+                      className="notif-bell-item"
+                      onClick={() => ouvrirNotification(n)}
+                    >
+                      <div className="notif-bell-item-titre">{n.titre}</div>
+                      {n.message && <div className="notif-bell-item-message">{n.message}</div>}
+                      <div className="simple-list-meta">{formatRelatif(n.creeLe)}</div>
+                    </button>
+                    <button
+                      type="button"
+                      className="notif-bell-item-supprimer"
+                      onClick={(e) => supprimerUne(e, n.id)}
+                      aria-label="Supprimer cette notification"
+                      title="Supprimer"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

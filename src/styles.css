@@ -1459,8 +1459,30 @@ th.elec-col-mo {
   background: var(--bg);
 }
 
-.task-table-editable {
+/* Tableaux à colonnes redimensionnables (largeurs déclarées en px par
+   colonne, mémorisées en localStorage) : sans ce width:auto, le
+   table-layout:fixed hérite du width:100% de .data-table et le navigateur
+   répartit l'espace en plus au prorata des colonnes déclarées — avec
+   border-collapse, les arrondis de cette répartition proportionnelle
+   (quelques dixièmes de pixel par colonne) peuvent cumuler jusqu'à
+   dépasser de quelques pixels la largeur du conteneur, faisant apparaître
+   un ascenseur horizontal inutile alors que tout semble tenir à l'œil.
+   width:auto fait prendre au tableau exactement la somme de ses colonnes
+   déclarées, sans cet arrondi cumulatif (même principe déjà appliqué à
+   .elec-lignes-table plus haut). */
+.task-table-editable,
+.reserves-table-editable {
   table-layout: fixed;
+}
+/* Sélecteur composé (.data-table + la classe) pour l'emporter sur
+   .data-table{width:100%}, définie plus bas dans ce fichier : à
+   spécificité égale entre deux classes simples, c'est l'ordre dans le
+   fichier qui tranche, et .data-table y est après — sans ce doublement,
+   width:100% gagnait silencieusement malgré les règles ci-dessus. */
+.data-table.task-table-editable,
+.data-table.reserves-table-editable {
+  width: auto;
+  min-width: 0;
 }
 
 /* ---------- Gantt ---------- */
@@ -3212,26 +3234,52 @@ textarea:focus {
   gap: 2px;
 }
 
+.notif-bell-item-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.notif-bell-item-row:last-child {
+  border-bottom: none;
+}
+.notif-bell-item-row:hover {
+  background: var(--panel-raised);
+}
+.notif-bell-item-non-lue {
+  background: color-mix(in srgb, var(--accent-dim) 40%, transparent);
+}
+
 .notif-bell-item {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--border);
   padding: 10px 6px;
   cursor: pointer;
   font-family: var(--font-ui);
   color: var(--text);
 }
-.notif-bell-item:last-child {
-  border-bottom: none;
+
+/* Croix rouge pour supprimer une notification précise (à côté d'un geste
+   "Tout effacer" dans l'en-tête, pour vider toute la liste d'un coup). */
+.notif-bell-item-supprimer {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 10px 10px;
 }
-.notif-bell-item:hover {
-  background: var(--panel-raised);
+.notif-bell-item-supprimer:hover {
+  color: #fff;
+  background: var(--danger);
 }
-.notif-bell-item-non-lue {
-  background: color-mix(in srgb, var(--accent-dim) 40%, transparent);
+.notif-bell-tout-effacer {
+  color: var(--danger);
 }
 .notif-bell-item-titre {
   font-weight: 600;
