@@ -138,110 +138,6 @@ export default function Dashboard() {
             <StatCard label="Heures prévues" valeur={stats.heuresPrevues} />
           </div>
 
-          <div className="reg-item-columns">
-            <section className="panel">
-              <div className="panel-header">
-                <h2>Mes chantiers</h2>
-                <Link to="/chantiers" className="link">
-                  Voir tous les chantiers
-                </Link>
-              </div>
-              {mesChantiers.length === 0 ? (
-                <EmptyState
-                  titre="Aucun chantier dont vous êtes responsable"
-                  description="Les chantiers où vous êtes désigné responsable ou RA apparaîtront ici."
-                  lienTexte="Voir tous les chantiers"
-                  lienVers="/chantiers"
-                />
-              ) : (
-                <ul className="simple-list">
-                  {mesChantiers
-                    .filter((c) => c.statut !== "termine")
-                    .slice(0, 8)
-                    .map((c) => {
-                      const pct = avancementChantier(c.id);
-                      return (
-                        <li key={c.id}>
-                          <span className={"status-dot status-" + (c.statut ?? "actif")} />
-                          <Link to={"/chantiers/" + c.id} className="simple-list-title">
-                            {nomChantier(c.id)}
-                          </Link>
-                          <span className="simple-list-meta">
-                            {pct !== null ? "Avancement : " + pct + "%" : "Aucune tâche datée"}
-                          </span>
-                        </li>
-                      );
-                    })}
-                </ul>
-              )}
-            </section>
-
-            <section className="panel">
-              <div className="panel-header">
-                <h2>Mes tâches</h2>
-                <Link to="/taches" className="link">
-                  Voir toutes les tâches
-                </Link>
-              </div>
-              <label className="export-filtre-checkbox" style={{ marginBottom: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={inclureTerminees}
-                  onChange={(e) => setInclureTerminees(e.target.checked)}
-                />
-                Inclure les tâches terminées
-              </label>
-
-              {mesTaches.length === 0 ? (
-                <EmptyState
-                  titre="Aucune tâche assignée"
-                  description="Les tâches qui vous sont assignées apparaîtront ici."
-                  lienTexte="Voir les tâches"
-                  lienVers="/taches"
-                />
-              ) : (
-                <div className="hscroll-auto" style={{ overflowX: "auto" }}>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Chantier</th>
-                        <th>Tâche</th>
-                        <th>Compte</th>
-                        <th>Heures</th>
-                        <th>Date fin</th>
-                        <th>Statut</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mesTaches.map((t) => (
-                        <tr key={t.id}>
-                          <td data-label="Chantier" style={{ fontFamily: "var(--font-ui)" }}>
-                            {t.chantierId ? (
-                              <Link to={"/chantiers/" + t.chantierId}>
-                                {nomChantier(t.chantierId)}
-                              </Link>
-                            ) : (
-                              "À affecter"
-                            )}
-                          </td>
-                          <td data-label="Tâche" style={{ fontFamily: "var(--font-ui)" }}>
-                            {t.titre}
-                          </td>
-                          <td data-label="Compte">{compteChantier(t.chantierId) || "—"}</td>
-                          <td data-label="Heures">{t.heuresPrevues || "—"}</td>
-                          <td data-label="Date fin">{t.echeance || "—"}</td>
-                          <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
-                            {formatStatutTache(t.statut)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          </div>
-
           <section className={"panel" + (stats.reservesEnRetard > 0 ? " panel-alert" : "")}>
             <div className="panel-header">
               <h2>Réserves en retard</h2>
@@ -326,6 +222,108 @@ export default function Dashboard() {
                           <td data-label="Échéance dépassée">{t.echeance}</td>
                         </tr>
                       ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Mes chantiers</h2>
+              <Link to="/chantiers" className="link">
+                Voir tous les chantiers
+              </Link>
+            </div>
+            {mesChantiers.length === 0 ? (
+              <EmptyState
+                titre="Aucun chantier dont vous êtes responsable"
+                description="Les chantiers où vous êtes désigné responsable ou RA apparaîtront ici."
+                lienTexte="Voir tous les chantiers"
+                lienVers="/chantiers"
+              />
+            ) : (
+              <ul className="simple-list">
+                {mesChantiers
+                  .filter((c) => c.statut !== "termine")
+                  .slice(0, 8)
+                  .map((c) => {
+                    const pct = avancementChantier(c.id);
+                    return (
+                      <li key={c.id}>
+                        <span className={"status-dot status-" + (c.statut ?? "actif")} />
+                        <Link to={"/chantiers/" + c.id} className="simple-list-title">
+                          {nomChantier(c.id)}
+                        </Link>
+                        <span className="simple-list-meta">
+                          {pct !== null ? "Avancement : " + pct + "%" : "Aucune tâche datée"}
+                        </span>
+                      </li>
+                    );
+                  })}
+              </ul>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Mes tâches</h2>
+              <Link to="/taches" className="link">
+                Voir toutes les tâches
+              </Link>
+            </div>
+            <label className="export-filtre-checkbox" style={{ marginBottom: 12 }}>
+              <input
+                type="checkbox"
+                checked={inclureTerminees}
+                onChange={(e) => setInclureTerminees(e.target.checked)}
+              />
+              Inclure les tâches terminées
+            </label>
+
+            {mesTaches.length === 0 ? (
+              <EmptyState
+                titre="Aucune tâche assignée"
+                description="Les tâches qui vous sont assignées apparaîtront ici."
+                lienTexte="Voir les tâches"
+                lienVers="/taches"
+              />
+            ) : (
+              <div className="hscroll-auto" style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Chantier</th>
+                      <th>Tâche</th>
+                      <th>Compte</th>
+                      <th>Heures</th>
+                      <th>Date fin</th>
+                      <th>Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mesTaches.map((t) => (
+                      <tr key={t.id}>
+                        <td data-label="Chantier" style={{ fontFamily: "var(--font-ui)" }}>
+                          {t.chantierId ? (
+                            <Link to={"/chantiers/" + t.chantierId}>
+                              {nomChantier(t.chantierId)}
+                            </Link>
+                          ) : (
+                            "À affecter"
+                          )}
+                        </td>
+                        <td data-label="Tâche" style={{ fontFamily: "var(--font-ui)" }}>
+                          {t.titre}
+                        </td>
+                        <td data-label="Compte">{compteChantier(t.chantierId) || "—"}</td>
+                        <td data-label="Heures">{t.heuresPrevues || "—"}</td>
+                        <td data-label="Date fin">{t.echeance || "—"}</td>
+                        <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
+                          {formatStatutTache(t.statut)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
