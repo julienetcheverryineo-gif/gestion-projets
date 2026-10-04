@@ -19,7 +19,10 @@ import { useCollection } from "../lib/firestoreHooks";
 // jour par l'équipe elle-même plutôt que figées dans le code — on
 // commence avec les tables d'échange Modbus des compteurs Socomec,
 // d'autres onglets viendront s'ajouter au même endroit.
-const ONGLETS = [{ cle: "modbus-socomec", label: "📋 Table échange modbus" }];
+const ONGLETS = [
+  { cle: "modbus-socomec", label: "📋 Table échange modbus" },
+  { cle: "procedures", label: "📘 Procédures" },
+];
 
 const TYPES_REGISTRE = ["uint16", "int16", "uint32", "int32", "float32", "bool", "string", "autre"];
 const ACCES_REGISTRE = [
@@ -709,6 +712,524 @@ function CompteursModbusTab() {
   );
 }
 
+// ---------------------------------------------------------------------
+// Onglet "Procédures" : fiches de procédure importées depuis un document
+// (ex. Word) et structurées en titres/paragraphes, avec un menu qui
+// reprend la table des matières du document pour naviguer dedans.
+// Même esprit que l'onglet Modbus : une collection "procedures" (une
+// fiche = un document importé) et une collection "procedureBlocs" (le
+// contenu, dans l'ordre), pour pouvoir en ajouter d'autres facilement
+// depuis l'application au fil du temps.
+// ---------------------------------------------------------------------
+
+const TYPES_BLOC = [
+  { value: "titre1", label: "Titre principal" },
+  { value: "titre2", label: "Sous-titre" },
+  { value: "titre3", label: "Sous-sous-titre" },
+  { value: "paragraphe", label: "Paragraphe" },
+  { value: "liste", label: "Élément de liste" },
+];
+const NIVEAUX_TITRE = { titre1: 1, titre2: 2, titre3: 3 };
+
+function ProcedureFormModal({ procedure, onClose }) {
+  const [titre, setTitre] = useState(procedure?.titre ?? "");
+  const [commentaire, setCommentaire] = useState(procedure?.commentaire ?? "");
+  const [enCours, setEnCours] = useState(false);
+
+  const enregistrer = async (e) => {
+    e.preventDefault();
+    setEnCours(true);
+    const donnees = { titre, commentaire };
+    if (procedure) {
+      await updateDoc(doc(db, "procedures", procedure.id), donnees);
+    } else {
+      await addDoc(collection(db, "procedures"), { ...donnees, creeLe: serverTimestamp() });
+    }
+    setEnCours(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>{procedure ? "Modifier la procédure" : "Nouvelle procédure"}</h2>
+        <form onSubmit={enregistrer} className="form">
+          <label>
+            Titre
+            <input value={titre} onChange={(e) => setTitre(e.target.value)} required />
+          </label>
+          <label>
+            Commentaire (optionnel)
+            <textarea
+              rows={3}
+              value={commentaire}
+              onChange={(e) => setCommentaire(e.target.value)}
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={enCours}>
+              {enCours ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BlocFormModal({ procedureId, bloc, nbExistants, onClose }) {
+  const [type, setType] = useState(bloc?.type ?? "paragraphe");
+  const [texte, setTexte] = useState(bloc?.texte ?? "");
+  const [enCours, setEnCours] = useState(false);
+
+  const enregistrer = async (e) => {
+    e.preventDefault();
+    setEnCours(true);
+    if (bloc) {
+      await updateDoc(doc(db, "procedureBlocs", bloc.id), { type, texte });
+    } else {
+      await addDoc(collection(db, "procedureBlocs"), {
+        procedureId,
+        type,
+        texte,
+        ordre: nbExistants,
+        creeLe: serverTimestamp(),
+      });
+    }
+    setEnCours(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>{bloc ? "Modifier le bloc" : "Ajouter un bloc"}</h2>
+        <form onSubmit={enregistrer} className="form">
+          <label>
+            Type
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              {TYPES_BLOC.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Texte
+            <textarea rows={5} value={texte} onChange={(e) => setTexte(e.target.value)} required />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={enCours}>
+              {enCours ? "Enregistrement…" : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Import d'un document entier en une fois, en collant un texte structuré
+// avec une syntaxe légère façon Markdown :
+//   # Titre principal     → titre1
+//   ## Sous-titre         → titre2
+//   ### Sous-sous-titre   → titre3
+//   - élément de liste    → liste
+//   texte normal          → paragraphe
+// Ce même format peut être régénéré pour importer d'autres documents à
+// l'avenir (export du document source vers ce format, comme pour les
+// tables Modbus collées depuis un tableur).
+function ImportDocumentModal({ procedureId, nbExistants, onClose }) {
+  const [texte, setTexte] = useState("");
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const blocs = texte
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => {
+      if (l.startsWith("### ")) return { type: "titre3", texte: l.slice(4).trim() };
+      if (l.startsWith("## ")) return { type: "titre2", texte: l.slice(3).trim() };
+      if (l.startsWith("# ")) return { type: "titre1", texte: l.slice(2).trim() };
+      if (l.startsWith("- ")) return { type: "liste", texte: l.slice(2).trim() };
+      return { type: "paragraphe", texte: l };
+    })
+    .filter((b) => b.texte);
+
+  const importer = async () => {
+    if (blocs.length === 0) return;
+    setEnCours(true);
+    setErreur("");
+    try {
+      // Même précaution que pour l'import de registres Modbus : un
+      // writeBatch Firestore est limité à 500 écritures.
+      const TAILLE_LOT = 450;
+      for (let depart = 0; depart < blocs.length; depart += TAILLE_LOT) {
+        const lot = blocs.slice(depart, depart + TAILLE_LOT);
+        const batch = writeBatch(db);
+        lot.forEach((b, i) => {
+          const ref = doc(collection(db, "procedureBlocs"));
+          batch.set(ref, {
+            ...b,
+            procedureId,
+            ordre: nbExistants + depart + i,
+            creeLe: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+      onClose();
+    } catch (err) {
+      setErreur("Erreur pendant l'import : " + err.message);
+    } finally {
+      setEnCours(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="import-popup" onClick={(e) => e.stopPropagation()}>
+        <h2>Coller un document</h2>
+        <p className="empty-state-description" style={{ margin: "0 0 10px" }}>
+          Collez le contenu structuré avec <code># Titre</code>, <code>## Sous-titre</code>,{" "}
+          <code>### Sous-sous-titre</code>, <code>- élément de liste</code>, le reste étant
+          considéré comme un paragraphe normal.
+        </p>
+        <textarea
+          rows={14}
+          value={texte}
+          onChange={(e) => setTexte(e.target.value)}
+          placeholder={"# PC\n## Excel\n### Ranger un tableau\nTexte du paragraphe…"}
+          style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.82rem" }}
+        />
+        <p className="page-subtitle" style={{ margin: "8px 0" }}>
+          {blocs.length} bloc(s) détecté(s)
+        </p>
+        {erreur && <div className="form-error">{erreur}</div>}
+        <div className="modal-actions">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={enCours || blocs.length === 0}
+            onClick={importer}
+          >
+            {enCours ? "Import…" : "Importer " + blocs.length + " bloc(s)"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function tableDesMatieres(blocs) {
+  return blocs
+    .filter((b) => NIVEAUX_TITRE[b.type])
+    .map((b) => ({ id: b.id, niveau: NIVEAUX_TITRE[b.type], texte: b.texte }));
+}
+
+function BlocContenu({ bloc, onModifier, onSupprimer }) {
+  const contenu = (
+    <div className="procedure-bloc-actions">
+      <button type="button" className="btn-ghost" onClick={onModifier}>
+        Modifier
+      </button>
+      <button type="button" className="btn-ghost btn-danger" onClick={onSupprimer}>
+        Supprimer
+      </button>
+    </div>
+  );
+
+  if (bloc.type === "titre1") {
+    return (
+      <div id={"bloc-" + bloc.id} className="procedure-bloc procedure-titre1">
+        <h2>{bloc.texte}</h2>
+        {contenu}
+      </div>
+    );
+  }
+  if (bloc.type === "titre2") {
+    return (
+      <div id={"bloc-" + bloc.id} className="procedure-bloc procedure-titre2">
+        <h3>{bloc.texte}</h3>
+        {contenu}
+      </div>
+    );
+  }
+  if (bloc.type === "titre3") {
+    return (
+      <div id={"bloc-" + bloc.id} className="procedure-bloc procedure-titre3">
+        <h4>{bloc.texte}</h4>
+        {contenu}
+      </div>
+    );
+  }
+  if (bloc.type === "liste") {
+    return (
+      <div className="procedure-bloc procedure-liste">
+        <li>{bloc.texte}</li>
+        {contenu}
+      </div>
+    );
+  }
+  return (
+    <div className="procedure-bloc procedure-paragraphe">
+      <p>{bloc.texte}</p>
+      {contenu}
+    </div>
+  );
+}
+
+function ProceduresTab() {
+  const { documents: proceduresBrutes, chargement: chargementProcedures } =
+    useCollection("procedures");
+  const { documents: blocsBruts, chargement: chargementBlocs } = useCollection("procedureBlocs");
+  const procedures = [...proceduresBrutes].sort((a, b) =>
+    (a.titre || "").localeCompare(b.titre || "", "fr", { numeric: true })
+  );
+
+  const [procedureSelectionneeId, setProcedureSelectionneeId] = useState(null);
+  const [afficherFormProcedure, setAfficherFormProcedure] = useState(false);
+  const [procedureEnEdition, setProcedureEnEdition] = useState(null);
+  const [afficherFormBloc, setAfficherFormBloc] = useState(false);
+  const [blocEnEdition, setBlocEnEdition] = useState(null);
+  const [afficherImport, setAfficherImport] = useState(false);
+  const [suppressionEnCours, setSuppressionEnCours] = useState(null);
+  const [rechercheProcedure, setRechercheProcedure] = useState("");
+
+  const procedureSelectionnee =
+    procedures.find((p) => p.id === procedureSelectionneeId) ?? procedures[0] ?? null;
+
+  const proceduresFiltrees = procedures.filter((p) =>
+    correspondARecherche(rechercheProcedure, [p.titre])
+  );
+
+  const blocs = procedureSelectionnee
+    ? blocsBruts
+        .filter((b) => b.procedureId === procedureSelectionnee.id)
+        .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
+    : [];
+  const sommaire = tableDesMatieres(blocs);
+
+  const supprimerProcedure = async (procedure) => {
+    if (
+      !confirm(
+        "Supprimer la procédure « " + procedure.titre + " » ? Tout son contenu sera aussi supprimé."
+      )
+    )
+      return;
+    setSuppressionEnCours(procedure.id);
+    const snap = await getDocs(
+      query(collection(db, "procedureBlocs"), where("procedureId", "==", procedure.id))
+    );
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    batch.delete(doc(db, "procedures", procedure.id));
+    await batch.commit();
+    setSuppressionEnCours(null);
+    if (procedureSelectionneeId === procedure.id) setProcedureSelectionneeId(null);
+  };
+
+  const supprimerBloc = async (bloc) => {
+    if (!confirm("Supprimer ce bloc ?")) return;
+    await deleteDoc(doc(db, "procedureBlocs", bloc.id));
+  };
+
+  const allerAuBloc = (blocId) => {
+    const el = document.getElementById("bloc-" + blocId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  if (chargementProcedures || chargementBlocs) {
+    return <p className="page-loading">Chargement…</p>;
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 20 }}>
+      <div className="panel" style={{ padding: 16, alignSelf: "start" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
+          <h3 style={{ margin: 0 }}>Procédures</h3>
+          <button
+            className="btn-ghost"
+            style={{ whiteSpace: "nowrap" }}
+            onClick={() => {
+              setProcedureEnEdition(null);
+              setAfficherFormProcedure(true);
+            }}
+          >
+            + Nouvelle
+          </button>
+        </div>
+        {procedures.length === 0 ? (
+          <p className="empty-state-description" style={{ margin: 0 }}>
+            Aucune procédure pour l'instant. Créez-en une, puis collez-y un document.
+          </p>
+        ) : (
+          <>
+            <input
+              placeholder="Rechercher une procédure…"
+              value={rechercheProcedure}
+              onChange={(e) => setRechercheProcedure(e.target.value)}
+              style={{ width: "100%", marginBottom: 8 }}
+            />
+            {proceduresFiltrees.length === 0 ? (
+              <p className="empty-state-description" style={{ margin: 0 }}>
+                Aucune procédure ne correspond.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {proceduresFiltrees.map((p) => (
+                  <button
+                    key={p.id}
+                    className={
+                      "btn-ghost" +
+                      (procedureSelectionnee?.id === p.id ? " btn-espace-actif" : "")
+                    }
+                    style={{ justifyContent: "flex-start", textAlign: "left" }}
+                    onClick={() => setProcedureSelectionneeId(p.id)}
+                  >
+                    {p.titre}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div>
+        {!procedureSelectionnee ? (
+          <div className="empty-state">
+            <p className="empty-state-title">Aucune procédure sélectionnée</p>
+            <p className="empty-state-description">
+              Choisissez une procédure dans la liste, ou créez-en une nouvelle.
+            </p>
+          </div>
+        ) : (
+          <div className="panel" style={{ padding: 20 }}>
+            <div className="panel-header" style={{ alignItems: "flex-start" }}>
+              <div>
+                <h2 style={{ marginBottom: 4 }}>{procedureSelectionnee.titre}</h2>
+                {procedureSelectionnee.commentaire && (
+                  <p className="page-subtitle" style={{ whiteSpace: "pre-wrap" }}>
+                    {procedureSelectionnee.commentaire}
+                  </p>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="btn-ghost"
+                  onClick={() => {
+                    setProcedureEnEdition(procedureSelectionnee);
+                    setAfficherFormProcedure(true);
+                  }}
+                >
+                  Modifier
+                </button>
+                <button
+                  className="btn-ghost btn-danger"
+                  onClick={() => supprimerProcedure(procedureSelectionnee)}
+                  disabled={suppressionEnCours === procedureSelectionnee.id}
+                >
+                  {suppressionEnCours === procedureSelectionnee.id
+                    ? "Suppression…"
+                    : "Supprimer la procédure"}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, margin: "12px 0 16px" }}>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setBlocEnEdition(null);
+                  setAfficherFormBloc(true);
+                }}
+              >
+                + Ajouter un bloc
+              </button>
+              <button className="btn-ghost" onClick={() => setAfficherImport(true)}>
+                📋 Coller un document
+              </button>
+            </div>
+
+            {blocs.length === 0 ? (
+              <p className="empty-state-description">
+                Aucun contenu pour cette procédure pour l'instant.
+              </p>
+            ) : (
+              <div className="procedure-layout">
+                {sommaire.length > 0 && (
+                  <nav className="procedure-sommaire">
+                    <p className="simple-list-meta" style={{ margin: "0 0 6px" }}>
+                      Table des matières
+                    </p>
+                    {sommaire.map((s) => (
+                      <button
+                        type="button"
+                        key={s.id}
+                        className={"procedure-sommaire-item procedure-sommaire-niveau" + s.niveau}
+                        onClick={() => allerAuBloc(s.id)}
+                      >
+                        {s.texte}
+                      </button>
+                    ))}
+                  </nav>
+                )}
+                <div className="procedure-contenu">
+                  {blocs.map((b) => (
+                    <BlocContenu
+                      key={b.id}
+                      bloc={b}
+                      onModifier={() => {
+                        setBlocEnEdition(b);
+                        setAfficherFormBloc(true);
+                      }}
+                      onSupprimer={() => supprimerBloc(b)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {afficherFormProcedure && (
+        <ProcedureFormModal
+          procedure={procedureEnEdition}
+          onClose={() => setAfficherFormProcedure(false)}
+        />
+      )}
+      {afficherFormBloc && procedureSelectionnee && (
+        <BlocFormModal
+          procedureId={procedureSelectionnee.id}
+          bloc={blocEnEdition}
+          nbExistants={blocs.length}
+          onClose={() => setAfficherFormBloc(false)}
+        />
+      )}
+      {afficherImport && procedureSelectionnee && (
+        <ImportDocumentModal
+          procedureId={procedureSelectionnee.id}
+          nbExistants={blocs.length}
+          onClose={() => setAfficherImport(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function Aide() {
   const [onglet, setOnglet] = useState(ONGLETS[0].cle);
 
@@ -736,6 +1257,7 @@ export default function Aide() {
       </div>
 
       {onglet === "modbus-socomec" && <CompteursModbusTab />}
+      {onglet === "procedures" && <ProceduresTab />}
     </div>
   );
 }

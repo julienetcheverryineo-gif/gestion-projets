@@ -145,6 +145,16 @@ service cloud.firestore {
       allow create, update: if estConnecte();
       allow delete: if estChefOuAdmin();
     }
+    match /procedures/{procedureId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
+    }
+    match /procedureBlocs/{blocId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
+    }
 
     // Lots techniques : lecture pour tous, gestion réservée aux chefs de projet/admins
     match /lots/{lotId} {
