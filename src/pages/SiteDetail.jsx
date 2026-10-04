@@ -18,6 +18,7 @@ import TaskTable from "../components/TaskTable";
 import ImportDatesTachesModal from "../components/ImportDatesTachesModal";
 import NotesPanel from "../components/NotesPanel";
 import TestsPanel from "../components/TestsPanel";
+import ListePointsPanel from "../components/ListePointsPanel";
 import { estTactile } from "../lib/tactile";
 import { equipeChantier, electriciensChantier } from "../lib/equipe";
 import { exporterTachesExcel } from "../lib/tachesExcel";
@@ -247,7 +248,17 @@ export default function SiteDetail() {
         >
           Tests
         </button>
+        <button
+          className={ongletActif === "liste-points" ? "btn-primary" : "btn-accent"}
+          onClick={() => setOngletActif("liste-points")}
+        >
+          Liste des points
+        </button>
       </div>
+
+      {ongletActif === "liste-points" && (
+        <ListePointsPanel chantierId={chantierId} peutGerer={peutGerer} />
+      )}
 
       {ongletActif === "notes" && (
         <section className="panel">
