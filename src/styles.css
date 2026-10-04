@@ -2198,6 +2198,15 @@ th.charge-table-col-personne {
 .procedure-liste li {
   line-height: 1.5;
 }
+.procedure-image {
+  margin: 10px 0 16px;
+}
+.procedure-image img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: block;
+}
 @media (max-width: 860px) {
   .procedure-layout {
     grid-template-columns: 1fr;

@@ -11,7 +11,9 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import mammoth from "mammoth";
+import { db, storage } from "../firebase";
 import { useCollection } from "../lib/firestoreHooks";
 
 // Page "Aide" côté Automatisme & GTB : pensée pour accueillir plusieurs
@@ -728,6 +730,7 @@ const TYPES_BLOC = [
   { value: "titre3", label: "Sous-sous-titre" },
   { value: "paragraphe", label: "Paragraphe" },
   { value: "liste", label: "Élément de liste" },
+  { value: "image", label: "Image (URL)" },
 ];
 const NIVEAUX_TITRE = { titre1: 1, titre2: 2, titre3: 3 };
 
@@ -932,6 +935,189 @@ function ImportDocumentModal({ procedureId, nbExistants, onClose }) {
   );
 }
 
+// Un sommaire Word natif (champ "Table des matières") est rendu par
+// mammoth comme de simples paragraphes "Titre<tab>12" (titre + tabulation
+// + numéro de page) : on les détecte à ce motif pour ne pas les importer
+// en double avec le sommaire généré par l'application elle-même à partir
+// des titres (voir tableDesMatieres).
+const RE_ENTREE_SOMMAIRE_WORD = /\t\s*\d+$/;
+
+function nettoyerTexte(texte) {
+  return texte.replace(/\t+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// Convertit le HTML produit par mammoth (titres, paragraphes, listes,
+// images) en blocs prêts à enregistrer. Mammoth reconnaît automatiquement
+// les styles Word "Heading 1/2/3" (→ h1/h2/h3) et les listes à puces/
+// numérotées (→ ul/ol + li) ; ce qu'il ne reconnaît pas reste du texte
+// normal, donc rien n'est perdu.
+function convertirHtmlEnBlocs(html) {
+  const document_ = new DOMParser().parseFromString(html, "text/html");
+  const blocs = [];
+  for (const el of document_.body.children) {
+    const tag = el.tagName;
+    if (tag === "H1") {
+      blocs.push({ type: "titre1", texte: nettoyerTexte(el.textContent) });
+    } else if (tag === "H2") {
+      blocs.push({ type: "titre2", texte: nettoyerTexte(el.textContent) });
+    } else if (tag === "H3" || tag === "H4" || tag === "H5" || tag === "H6") {
+      blocs.push({ type: "titre3", texte: nettoyerTexte(el.textContent) });
+    } else if (tag === "UL" || tag === "OL") {
+      for (const li of el.children) {
+        if (li.tagName === "LI" && li.textContent.trim()) {
+          blocs.push({ type: "liste", texte: nettoyerTexte(li.textContent) });
+        }
+      }
+    } else if (tag === "P") {
+      const texteBrut = el.textContent.trim();
+      const img = el.querySelector("img");
+      if (img && !texteBrut) {
+        blocs.push({ type: "image", texte: img.getAttribute("src") });
+      } else if (texteBrut && !RE_ENTREE_SOMMAIRE_WORD.test(texteBrut)) {
+        blocs.push({ type: "paragraphe", texte: nettoyerTexte(texteBrut) });
+      }
+    }
+  }
+  return blocs.filter((b) => b.texte);
+}
+
+// Transforme les octets d'une image embarquée dans le .docx (lus par
+// mammoth) en fichier dans Firebase Storage, et renvoie son URL de
+// téléchargement pour l'<img> généré. Nécessite que les règles Storage
+// (storage.rules) aient été déployées — sinon l'import échoue avec une
+// erreur de permission, récupérée par ImportWordModal.
+function convertisseurImages(procedureId) {
+  return mammoth.images.imgElement(async (image) => {
+    const base64 = await image.read("base64");
+    const octets = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const extension = (image.contentType || "image/png").split("/")[1] || "png";
+    const nomFichier =
+      Date.now() + "-" + Math.random().toString(36).slice(2) + "." + extension;
+    const reference = ref(storage, "procedures/" + procedureId + "/images/" + nomFichier);
+    await uploadBytes(reference, octets, { contentType: image.contentType });
+    const url = await getDownloadURL(reference);
+    return { src: url };
+  });
+}
+
+// Import direct d'un fichier Word (.docx) : conversion en HTML via
+// mammoth (dans le navigateur, sans passer par un serveur), upload des
+// images vers Firebase Storage, puis enregistrement des blocs obtenus.
+// Alternative à "Coller un document" quand on a le fichier source sous la
+// main plutôt qu'un texte déjà préparé.
+function ImportWordModal({ procedureId, nbExistants, onClose }) {
+  const [nomFichier, setNomFichier] = useState("");
+  const [blocs, setBlocs] = useState([]);
+  const [messagesAvertissement, setMessagesAvertissement] = useState([]);
+  const [analyseEnCours, setAnalyseEnCours] = useState(false);
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const choisirFichier = async (e) => {
+    const fichier = e.target.files?.[0];
+    if (!fichier) return;
+    setNomFichier(fichier.name);
+    setBlocs([]);
+    setMessagesAvertissement([]);
+    setErreur("");
+    setAnalyseEnCours(true);
+    try {
+      const arrayBuffer = await fichier.arrayBuffer();
+      const resultat = await mammoth.convertToHtml(
+        { arrayBuffer },
+        { convertImage: convertisseurImages(procedureId) }
+      );
+      setBlocs(convertirHtmlEnBlocs(resultat.value));
+      setMessagesAvertissement((resultat.messages || []).map((m) => m.message));
+    } catch (err) {
+      setErreur("Erreur pendant l'analyse du fichier : " + err.message);
+    } finally {
+      setAnalyseEnCours(false);
+    }
+  };
+
+  const importer = async () => {
+    if (blocs.length === 0) return;
+    setEnCours(true);
+    setErreur("");
+    try {
+      const TAILLE_LOT = 450;
+      for (let depart = 0; depart < blocs.length; depart += TAILLE_LOT) {
+        const lot = blocs.slice(depart, depart + TAILLE_LOT);
+        const batch = writeBatch(db);
+        lot.forEach((b, i) => {
+          const refDoc = doc(collection(db, "procedureBlocs"));
+          batch.set(refDoc, {
+            ...b,
+            procedureId,
+            ordre: nbExistants + depart + i,
+            creeLe: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+      onClose();
+    } catch (err) {
+      setErreur(
+        "Erreur pendant l'import : " +
+          err.message +
+          (err.code === "storage/unauthorized"
+            ? " — les règles Firebase Storage (storage.rules) doivent être déployées."
+            : "")
+      );
+    } finally {
+      setEnCours(false);
+    }
+  };
+
+  const nbImages = blocs.filter((b) => b.type === "image").length;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="import-popup" onClick={(e) => e.stopPropagation()}>
+        <h2>Importer un fichier Word (.docx)</h2>
+        <p className="empty-state-description" style={{ margin: "0 0 10px" }}>
+          Les titres (styles « Titre 1/2/3 »), paragraphes, listes à puces et images du document
+          sont importés automatiquement, avec la même structure que dans Word.
+        </p>
+        <input type="file" accept=".docx" onChange={choisirFichier} />
+        {analyseEnCours && <p className="page-loading">Analyse du document…</p>}
+        {!analyseEnCours && nomFichier && blocs.length > 0 && (
+          <p className="page-subtitle" style={{ margin: "10px 0" }}>
+            {nomFichier} : {blocs.length} bloc(s) détecté(s), dont {nbImages} image(s).
+          </p>
+        )}
+        {messagesAvertissement.length > 0 && (
+          <details style={{ margin: "6px 0" }}>
+            <summary className="simple-list-meta" style={{ cursor: "pointer" }}>
+              {messagesAvertissement.length} information(s) de conversion
+            </summary>
+            <ul style={{ margin: "6px 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+              {messagesAvertissement.slice(0, 20).map((m, i) => (
+                <li key={i}>{m}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+        {erreur && <div className="form-error">{erreur}</div>}
+        <div className="modal-actions">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={enCours || analyseEnCours || blocs.length === 0}
+            onClick={importer}
+          >
+            {enCours ? "Import…" : "Importer " + blocs.length + " bloc(s)"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function tableDesMatieres(blocs) {
   return blocs
     .filter((b) => NIVEAUX_TITRE[b.type])
@@ -982,6 +1168,14 @@ function BlocContenu({ bloc, onModifier, onSupprimer }) {
       </div>
     );
   }
+  if (bloc.type === "image") {
+    return (
+      <div className="procedure-bloc procedure-image">
+        <img src={bloc.texte} alt="" loading="lazy" />
+        {contenu}
+      </div>
+    );
+  }
   return (
     <div className="procedure-bloc procedure-paragraphe">
       <p>{bloc.texte}</p>
@@ -1004,6 +1198,7 @@ function ProceduresTab() {
   const [afficherFormBloc, setAfficherFormBloc] = useState(false);
   const [blocEnEdition, setBlocEnEdition] = useState(null);
   const [afficherImport, setAfficherImport] = useState(false);
+  const [afficherImportWord, setAfficherImportWord] = useState(false);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
   const [rechercheProcedure, setRechercheProcedure] = useState("");
 
@@ -1158,6 +1353,9 @@ function ProceduresTab() {
               >
                 + Ajouter un bloc
               </button>
+              <button className="btn-ghost" onClick={() => setAfficherImportWord(true)}>
+                📄 Importer un fichier Word
+              </button>
               <button className="btn-ghost" onClick={() => setAfficherImport(true)}>
                 📋 Coller un document
               </button>
@@ -1224,6 +1422,13 @@ function ProceduresTab() {
           procedureId={procedureSelectionnee.id}
           nbExistants={blocs.length}
           onClose={() => setAfficherImport(false)}
+        />
+      )}
+      {afficherImportWord && procedureSelectionnee && (
+        <ImportWordModal
+          procedureId={procedureSelectionnee.id}
+          nbExistants={blocs.length}
+          onClose={() => setAfficherImportWord(false)}
         />
       )}
     </div>
