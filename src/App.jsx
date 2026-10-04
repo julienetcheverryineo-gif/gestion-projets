@@ -17,6 +17,7 @@ import ElectriciteSiteDetail from "./pages/ElectriciteSiteDetail";
 import ElectricitePlanDeCharge from "./pages/ElectricitePlanDeCharge";
 import ElectriciteImportSap from "./pages/ElectriciteImportSap";
 import EspaceClient from "./pages/EspaceClient";
+import Aide from "./pages/Aide";
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="planning" element={<Planning />} />
             <Route path="reserves" element={<ReservesGlobal />} />
             <Route path="notes" element={<Notes />} />
+            <Route path="aide" element={<Aide />} />
             <Route path="electricite" element={<ElectriciteChantiers />} />
             <Route path="electricite/chantiers/:chantierId" element={<ElectriciteSiteDetail />} />
             <Route path="electricite/plan-de-charge" element={<ElectricitePlanDeCharge />} />

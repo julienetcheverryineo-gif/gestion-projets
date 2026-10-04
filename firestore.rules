@@ -129,6 +129,23 @@ service cloud.firestore {
       allow create, update, delete: if estGestionnaireElec();
     }
 
+    // Pages d'aide — tables d'échange Modbus des compteurs (et futures
+    // fiches similaires) : une base partagée que toute l'équipe alimente
+    // et met à jour au fil de l'eau, donc lecture/création/modification
+    // ouvertes à tout connecté ; suppression réservée aux chefs de
+    // projet/admins (éviter une suppression accidentelle d'une fiche de
+    // référence commune).
+    match /modbusCompteurs/{compteurId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
+    }
+    match /modbusRegistres/{registreId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
+    }
+
     // Lots techniques : lecture pour tous, gestion réservée aux chefs de projet/admins
     match /lots/{lotId} {
       allow read: if estConnecte();

@@ -12,6 +12,7 @@ const NAV_ITEMS_AUTOMATISME = [
   { to: "/planning", label: "Planning", icone: "📅" },
   { to: "/reserves", label: "Réserves", icone: "🧰" },
   { to: "/notes", label: "Notes", icone: "📝" },
+  { to: "/aide", label: "Aide", icone: "❓" },
 ];
 
 // L'espace Électricité est réservé à l'administrateur et au RA
