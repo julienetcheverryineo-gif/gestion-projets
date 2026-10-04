@@ -1459,6 +1459,31 @@ th.elec-col-mo {
   bottom: calc(100% + 4px);
 }
 
+/* Variante du panneau pour le choix de chantiers (Utilisateurs > accès
+   client) : liste potentiellement longue, donc champ de recherche en tête
+   et panneau plus large que celui des personnes. */
+.chantier-multiselect-panel {
+  width: 320px;
+  max-width: min(320px, 92vw);
+  max-height: 320px;
+}
+.chantier-multiselect-recherche {
+  flex: none;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+.chantier-multiselect-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
 .person-multiselect-separateur {
   font-size: 0.72rem;
   font-weight: 600;

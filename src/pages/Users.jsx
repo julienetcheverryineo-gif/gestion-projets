@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import {
   arrayRemove,
   arrayUnion,
@@ -16,6 +16,7 @@ import { db, auth, getSecondaryAuth } from "../firebase";
 import { useCollection } from "../lib/firestoreHooks";
 import { estChantierAutomatisme } from "../components/SiteFormModal";
 import { libelleChantier } from "../lib/usePlanningData";
+import ChantierMultiSelect from "../components/ChantierMultiSelect";
 
 const ROLES = [
   { value: "automaticien", label: "Automaticien" },
@@ -67,7 +68,6 @@ export default function Users() {
   const chantiers = tousChantiers.filter(estChantierAutomatisme);
   const [afficherAjout, setAfficherAjout] = useState(false);
   const [messageParUtilisateur, setMessageParUtilisateur] = useState({});
-  const [clientDeplie, setClientDeplie] = useState(null);
 
   const changerRole = async (userId, role) => {
     await updateDoc(doc(db, "users", userId), { role });
@@ -147,82 +147,54 @@ export default function Users() {
               const estClient = u.role === "client";
               const chantiersAffectes = u.chantierIds || [];
               return (
-                <Fragment key={u.id}>
-                  <tr style={{ opacity: u.actif === false ? 0.5 : 1 }}>
-                    <td data-label="Nom">{u.nom}</td>
-                    <td data-label="E-mail">{u.email}</td>
-                    <td data-label="Rôle">
-                      <select
-                        value={u.role}
-                        onChange={(e) => changerRole(u.id, e.target.value)}
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r.value} value={r.value}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td data-label="Statut">
-                      <button
-                        className={"btn-ghost" + (u.actif === false ? "" : " btn-danger")}
-                        onClick={() => basculerActif(u)}
-                      >
-                        {u.actif === false ? "Réactiver" : "Désactiver"}
-                      </button>
-                    </td>
-                    <td data-label="Chantiers">
-                      {estClient && (
-                        <button
-                          className="btn-ghost"
-                          onClick={() =>
-                            setClientDeplie(clientDeplie === u.id ? null : u.id)
-                          }
-                        >
-                          {chantiersAffectes.length} chantier(s)
-                          {clientDeplie === u.id ? " ▴" : " ▾"}
-                        </button>
-                      )}
-                    </td>
-                    <td>
-                      {messageParUtilisateur[u.id] ? (
-                        <span className="simple-list-meta">{messageParUtilisateur[u.id]}</span>
+                <tr key={u.id} style={{ opacity: u.actif === false ? 0.5 : 1 }}>
+                  <td data-label="Nom">{u.nom}</td>
+                  <td data-label="E-mail">{u.email}</td>
+                  <td data-label="Rôle">
+                    <select
+                      value={u.role}
+                      onChange={(e) => changerRole(u.id, e.target.value)}
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td data-label="Statut">
+                    <button
+                      className={"btn-ghost" + (u.actif === false ? "" : " btn-danger")}
+                      onClick={() => basculerActif(u)}
+                    >
+                      {u.actif === false ? "Réactiver" : "Désactiver"}
+                    </button>
+                  </td>
+                  <td data-label="Chantiers">
+                    {estClient &&
+                      (chantiers.length === 0 ? (
+                        <span className="empty-state-description">
+                          Aucun chantier Automatisme &amp; GTB
+                        </span>
                       ) : (
-                        <button className="btn-ghost" onClick={() => reinitialiserMotDePasse(u)}>
-                          Envoyer un e-mail de reset
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {estClient && clientDeplie === u.id && (
-                    <tr>
-                      <td colSpan={6} style={{ background: "var(--panel-raised)" }}>
-                        <div className="simple-list-meta" style={{ marginBottom: 8 }}>
-                          Chantiers (espace Automatisme &amp; GTB) auxquels {u.nom} a accès pour
-                          saisir et suivre ses réserves :
-                        </div>
-                        {chantiers.length === 0 ? (
-                          <p className="empty-state-description" style={{ margin: 0 }}>
-                            Aucun chantier Automatisme &amp; GTB pour l'instant.
-                          </p>
-                        ) : (
-                          <div className="team-checklist">
-                            {chantiers.map((c) => (
-                              <label key={c.id} className="team-checklist-item">
-                                <input
-                                  type="checkbox"
-                                  checked={chantiersAffectes.includes(c.id)}
-                                  onChange={() => basculerChantierClient(u, c.id)}
-                                />
-                                {libelleChantier(c)}
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                        <ChantierMultiSelect
+                          valeurs={chantiersAffectes}
+                          chantiers={chantiers}
+                          libelleChantier={libelleChantier}
+                          onToggle={(chantierId) => basculerChantierClient(u, chantierId)}
+                        />
+                      ))}
+                  </td>
+                  <td>
+                    {messageParUtilisateur[u.id] ? (
+                      <span className="simple-list-meta">{messageParUtilisateur[u.id]}</span>
+                    ) : (
+                      <button className="btn-ghost" onClick={() => reinitialiserMotDePasse(u)}>
+                        Envoyer un e-mail de reset
+                      </button>
+                    )}
+                  </td>
+                </tr>
               );
             })}
           </tbody>
