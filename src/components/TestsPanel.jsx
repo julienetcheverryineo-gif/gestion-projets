@@ -14,7 +14,7 @@ import {
 import { db } from "../firebase";
 import { useCollection } from "../lib/firestoreHooks";
 import { correspondARecherche } from "../lib/recherche";
-import { exporterTestsExcel, STATUTS_POINT } from "../lib/testsExcel";
+import { exporterTestsExcel, genererCompteRenduTests, STATUTS_POINT } from "../lib/testsExcel";
 import ImportTestsExcelModal from "./ImportTestsExcelModal";
 
 const TYPES_POINT = ["DI", "DO", "AI", "AO", "autre"];
@@ -248,7 +248,7 @@ function formatDateHeure(valeur) {
   return d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function TestsPanel({ chantierId, peutGerer, nomTesteur }) {
+export default function TestsPanel({ chantierId, peutGerer, nomTesteur, chantier }) {
   const { documents: toutesEquipements } = useCollection("testEquipements");
   const equipements = toutesEquipements
     .filter((e) => e.chantierId === chantierId)
@@ -278,8 +278,10 @@ export default function TestsPanel({ chantierId, peutGerer, nomTesteur }) {
   );
 
   const pointsChantier = tousPoints.filter((p) => p.chantierId === chantierId);
-  const nbTestes = pointsChantier.filter((p) => p.statut !== "non_teste").length;
+  const nbOk = pointsChantier.filter((p) => p.statut === "ok").length;
   const nbKo = pointsChantier.filter((p) => p.statut === "ko").length;
+  const nbAnnules = pointsChantier.filter((p) => p.statut === "annule").length;
+  const nbTestes = nbOk + nbKo + nbAnnules;
 
   const supprimerEquipement = async (equipement) => {
     if (
@@ -306,11 +308,11 @@ export default function TestsPanel({ chantierId, peutGerer, nomTesteur }) {
   };
 
   const changerStatut = async (point, statut) => {
-    const testeSurPlace = statut === "ok" || statut === "ko";
+    const decisionPrise = statut === "ok" || statut === "ko" || statut === "annule";
     await updateDoc(doc(db, "testPoints", point.id), {
       statut,
-      testePar: testeSurPlace ? nomTesteur : null,
-      testeLe: testeSurPlace ? serverTimestamp() : null,
+      testePar: decisionPrise ? nomTesteur : null,
+      testeLe: decisionPrise ? serverTimestamp() : null,
     });
   };
 
@@ -324,6 +326,14 @@ export default function TestsPanel({ chantierId, peutGerer, nomTesteur }) {
       <div className="panel-header">
         <h2>Tests point à point</h2>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {pointsChantier.length > 0 && (
+            <button
+              className="btn-ghost"
+              onClick={() => genererCompteRenduTests(pointsChantier, equipements, chantier, nomTesteur)}
+            >
+              📄 Générer le compte-rendu
+            </button>
+          )}
           {pointsChantier.length > 0 && (
             <button
               className="btn-ghost"
@@ -341,8 +351,9 @@ export default function TestsPanel({ chantierId, peutGerer, nomTesteur }) {
       </div>
       {pointsChantier.length > 0 && (
         <p className="page-subtitle" style={{ margin: "-6px 0 14px" }}>
-          {nbTestes} / {pointsChantier.length} point(s) testé(s) sur ce chantier
-          {nbKo > 0 && <strong style={{ color: "var(--danger)" }}> — {nbKo} en défaut (KO)</strong>}
+          {nbTestes} / {pointsChantier.length} point(s) traité(s) sur ce chantier — {nbOk} OK
+          {nbKo > 0 && <strong style={{ color: "var(--danger)" }}>, {nbKo} en défaut (KO)</strong>}
+          {nbAnnules > 0 && ", " + nbAnnules + " annulé(s)"}
         </p>
       )}
 

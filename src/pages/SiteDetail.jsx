@@ -270,7 +270,12 @@ export default function SiteDetail() {
       )}
 
       {ongletActif === "tests" && (
-        <TestsPanel chantierId={chantierId} peutGerer={peutGerer} nomTesteur={profile?.nom} />
+        <TestsPanel
+          chantierId={chantierId}
+          peutGerer={peutGerer}
+          nomTesteur={profile?.nom}
+          chantier={chantier}
+        />
       )}
 
       {ongletActif === "equipements" && (

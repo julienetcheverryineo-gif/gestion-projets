@@ -3647,6 +3647,7 @@ textarea:focus {
 .test-statut-btns {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
 }
 .test-statut-btn {
   border: 1px solid var(--border);
@@ -3672,6 +3673,12 @@ textarea:focus {
   background: var(--panel-muted, rgba(127, 127, 127, 0.15));
   color: var(--text);
   border-color: var(--border);
+}
+.test-statut-btn.actif.test-statut-annule {
+  background: var(--border);
+  color: var(--text-muted);
+  border-color: var(--border);
+  text-decoration: line-through;
 }
 .test-inline-input {
   width: 100%;
