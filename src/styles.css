@@ -1522,6 +1522,7 @@ th.elec-col-mo {
   cursor: pointer;
   text-align: left;
   width: calc(100% - 8px);
+  white-space: nowrap;
 }
 .th-tri-btn:hover {
   color: var(--accent);
@@ -2772,21 +2773,6 @@ textarea:focus {
   padding: 8px 6px;
   border-bottom: 1px solid var(--border);
 }
-/* En-tête de colonne cliquable pour trier un tableau (ex. table de
-   registres Modbus) : même rendu qu'un <th> normal, juste cliquable. */
-.th-tri-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.th-tri-btn:hover {
-  color: var(--text);
-}
 .data-table td {
   padding: 9px 6px;
   border-bottom: 1px solid var(--border);
@@ -3653,4 +3639,52 @@ textarea:focus {
     width: auto;
     max-width: none;
   }
+}
+
+/* Onglet "Tests" (fiche chantier) : boutons OK/KO/Non testé par point, et
+   champs texte édités en ligne dans le tableau (valeur mesurée,
+   commentaire). */
+.test-statut-btns {
+  display: flex;
+  gap: 4px;
+}
+.test-statut-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.test-statut-btn.actif.test-statut-ok {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.test-statut-btn.actif.test-statut-ko {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.test-statut-btn.actif.test-statut-non_teste {
+  background: var(--panel-muted, rgba(127, 127, 127, 0.15));
+  color: var(--text);
+  border-color: var(--border);
+}
+.test-inline-input {
+  width: 100%;
+  min-width: 110px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.test-inline-input:hover,
+.test-inline-input:focus {
+  border-color: var(--border);
+  background: var(--panel);
 }

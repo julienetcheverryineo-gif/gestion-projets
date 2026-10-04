@@ -59,6 +59,22 @@ service cloud.firestore {
       allow delete: if estChefOuAdmin();
     }
 
+    // Équipements de test (onglet "Tests" d'un chantier) : lecture pour
+    // tous, gestion réservée aux chefs de projet/admins
+    match /testEquipements/{equipementId} {
+      allow read: if estConnecte();
+      allow create, update, delete: if estChefOuAdmin();
+    }
+
+    // Points de test (DI/DO/AI/AO) : lecture pour tous, tout connecté peut
+    // enregistrer un résultat de test sur le terrain (statut/valeur
+    // mesurée/commentaire)
+    match /testPoints/{pointId} {
+      allow read: if estConnecte();
+      allow create, update: if estConnecte();
+      allow delete: if estChefOuAdmin();
+    }
+
     // Messages du chat par chantier : lecture pour tous les connectés,
     // chacun ne peut créer que ses propres messages (usurpation impossible),
     // suppression par l'auteur ou un chef de projet/admin (modération)

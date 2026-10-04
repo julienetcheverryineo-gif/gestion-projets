@@ -15,6 +15,7 @@ import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import mammoth from "mammoth";
 import { db, storage } from "../firebase";
 import { useCollection } from "../lib/firestoreHooks";
+import { correspondARecherche } from "../lib/recherche";
 
 // Page "Aide" côté Automatisme & GTB : pensée pour accueillir plusieurs
 // fiches de référence au fil du temps (onglets), alimentées et mises à
@@ -36,20 +37,6 @@ function formatAcces(v) {
   return ACCES_REGISTRE.find((a) => a.value === v)?.label ?? v;
 }
 
-// Découpe une recherche en plusieurs termes séparés par un espace ou un
-// point-virgule (ex. "puissance;tension" ou "puissance tension"), pour
-// filtrer sur plusieurs mots à la fois : une ligne correspond si au moins
-// un des termes est trouvé dans l'un des champs fournis.
-function correspondARecherche(recherche, champs) {
-  const termes = recherche
-    .trim()
-    .toLowerCase()
-    .split(/[\s;]+/)
-    .filter(Boolean);
-  if (termes.length === 0) return true;
-  const valeurs = champs.map((c) => String(c ?? "").toLowerCase());
-  return termes.some((t) => valeurs.some((v) => v.includes(t)));
-}
 
 // Colonnes triables du tableau de registres Modbus. L'adresse (ex.
 // "0106-0107") est comparée numériquement sur sa partie hexadécimale de
