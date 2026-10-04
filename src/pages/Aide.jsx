@@ -46,6 +46,59 @@ function correspondARecherche(recherche, champs) {
   return termes.some((t) => valeurs.some((v) => v.includes(t)));
 }
 
+// Colonnes triables du tableau de registres Modbus. L'adresse (ex.
+// "0106-0107") est comparée numériquement sur sa partie hexadécimale de
+// départ ; les autres colonnes sont comparées comme du texte.
+const COLONNES_TRIABLES_REGISTRE = [
+  { champ: "adresse", label: "Adresse" },
+  { champ: "designation", label: "Désignation" },
+  { champ: "type", label: "Type" },
+  { champ: "unite", label: "Unité" },
+  { champ: "acces", label: "Accès" },
+  { champ: "commentaire", label: "Commentaire" },
+];
+
+function valeurTriRegistre(registre, champ) {
+  if (champ === "adresse") {
+    const debut = String(registre.adresse || "").split("-")[0];
+    const n = parseInt(debut, 16);
+    return Number.isNaN(n) ? -1 : n;
+  }
+  if (champ === "acces") return formatAcces(registre.acces) || "";
+  return String(registre[champ] ?? "");
+}
+
+function trierRegistres(liste, triChamp, triSens) {
+  if (!triChamp) return liste;
+  const copie = [...liste];
+  copie.sort((a, b) => {
+    const va = valeurTriRegistre(a, triChamp);
+    const vb = valeurTriRegistre(b, triChamp);
+    const cmp =
+      typeof va === "number" && typeof vb === "number"
+        ? va - vb
+        : String(va).localeCompare(String(vb), "fr", { numeric: true });
+    return triSens === "desc" ? -cmp : cmp;
+  });
+  return copie;
+}
+
+function EnteteTriable({ champ, label, triChamp, triSens, onTrier }) {
+  const actif = triChamp === champ;
+  return (
+    <th>
+      <button
+        type="button"
+        className="th-tri-btn"
+        onClick={() => onTrier(champ)}
+        title={"Trier par " + label.toLowerCase()}
+      >
+        {label} {actif ? (triSens === "desc" ? "▾" : "▴") : ""}
+      </button>
+    </th>
+  );
+}
+
 function CompteurFormModal({ compteur, onClose }) {
   const [nom, setNom] = useState(compteur?.nom ?? "");
   const [commentaire, setCommentaire] = useState(compteur?.commentaire ?? "");
@@ -371,6 +424,18 @@ function CompteursModbusTab() {
 
   const [rechercheRegistre, setRechercheRegistre] = useState("");
   const [nbAffiches, setNbAffiches] = useState(50);
+  const [triChamp, setTriChamp] = useState(null);
+  const [triSens, setTriSens] = useState("asc");
+
+  const trier = (champ) => {
+    setNbAffiches(50);
+    if (triChamp === champ) {
+      setTriSens((s) => (s === "asc" ? "desc" : "asc"));
+    } else {
+      setTriChamp(champ);
+      setTriSens("asc");
+    }
+  };
 
   const registres = compteurSelectionne
     ? registresBruts
@@ -378,14 +443,18 @@ function CompteursModbusTab() {
         .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
     : [];
 
-  const registresFiltres = registres.filter((r) =>
-    correspondARecherche(rechercheRegistre, [
-      r.adresse,
-      r.designation,
-      r.type,
-      r.unite,
-      r.commentaire,
-    ])
+  const registresFiltres = trierRegistres(
+    registres.filter((r) =>
+      correspondARecherche(rechercheRegistre, [
+        r.adresse,
+        r.designation,
+        r.type,
+        r.unite,
+        r.commentaire,
+      ])
+    ),
+    triChamp,
+    triSens
   );
 
   const supprimerCompteur = async (compteur) => {
@@ -462,6 +531,8 @@ function CompteursModbusTab() {
                       setCompteurSelectionneId(c.id);
                       setRechercheRegistre("");
                       setNbAffiches(50);
+                      setTriChamp(null);
+                      setTriSens("asc");
                     }}
                   >
                     {c.nom}
@@ -554,12 +625,16 @@ function CompteursModbusTab() {
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>Adresse</th>
-                          <th>Désignation</th>
-                          <th>Type</th>
-                          <th>Unité</th>
-                          <th>Accès</th>
-                          <th>Commentaire</th>
+                          {COLONNES_TRIABLES_REGISTRE.map((c) => (
+                            <EnteteTriable
+                              key={c.champ}
+                              champ={c.champ}
+                              label={c.label}
+                              triChamp={triChamp}
+                              triSens={triSens}
+                              onTrier={trier}
+                            />
+                          ))}
                           <th></th>
                         </tr>
                       </thead>
