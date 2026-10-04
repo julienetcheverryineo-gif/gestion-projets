@@ -31,6 +31,21 @@ function formatAcces(v) {
   return ACCES_REGISTRE.find((a) => a.value === v)?.label ?? v;
 }
 
+// Découpe une recherche en plusieurs termes séparés par un espace ou un
+// point-virgule (ex. "puissance;tension" ou "puissance tension"), pour
+// filtrer sur plusieurs mots à la fois : une ligne correspond si au moins
+// un des termes est trouvé dans l'un des champs fournis.
+function correspondARecherche(recherche, champs) {
+  const termes = recherche
+    .trim()
+    .toLowerCase()
+    .split(/[\s;]+/)
+    .filter(Boolean);
+  if (termes.length === 0) return true;
+  const valeurs = champs.map((c) => String(c ?? "").toLowerCase());
+  return termes.some((t) => valeurs.some((v) => v.includes(t)));
+}
+
 function CompteurFormModal({ compteur, onClose }) {
   const [nom, setNom] = useState(compteur?.nom ?? "");
   const [commentaire, setCommentaire] = useState(compteur?.commentaire ?? "");
@@ -350,10 +365,9 @@ function CompteursModbusTab() {
   const compteurSelectionne =
     compteurs.find((c) => c.id === compteurSelectionneId) ?? compteurs[0] ?? null;
 
-  const termesProduit = rechercheProduit.trim().toLowerCase();
-  const compteursFiltres = termesProduit
-    ? compteurs.filter((c) => (c.nom || "").toLowerCase().includes(termesProduit))
-    : compteurs;
+  const compteursFiltres = compteurs.filter((c) =>
+    correspondARecherche(rechercheProduit, [c.nom])
+  );
 
   const [rechercheRegistre, setRechercheRegistre] = useState("");
   const [nbAffiches, setNbAffiches] = useState(50);
@@ -364,14 +378,15 @@ function CompteursModbusTab() {
         .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
     : [];
 
-  const termesRegistre = rechercheRegistre.trim().toLowerCase();
-  const registresFiltres = termesRegistre
-    ? registres.filter((r) =>
-        [r.adresse, r.designation, r.type, r.unite, r.commentaire].some((champ) =>
-          String(champ ?? "").toLowerCase().includes(termesRegistre)
-        )
-      )
-    : registres;
+  const registresFiltres = registres.filter((r) =>
+    correspondARecherche(rechercheRegistre, [
+      r.adresse,
+      r.designation,
+      r.type,
+      r.unite,
+      r.commentaire,
+    ])
+  );
 
   const supprimerCompteur = async (compteur) => {
     if (
@@ -521,7 +536,7 @@ function CompteursModbusTab() {
             ) : (
               <>
                 <input
-                  placeholder="Rechercher un registre (adresse, désignation, unité, commentaire…)"
+                  placeholder="Rechercher (ex. puissance tension, ou puissance;tension)"
                   value={rechercheRegistre}
                   onChange={(e) => {
                     setNbAffiches(50);
