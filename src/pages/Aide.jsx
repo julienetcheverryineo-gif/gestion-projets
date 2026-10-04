@@ -224,17 +224,24 @@ function ImportCollerModal({ compteurId, nbExistants, onClose }) {
     setEnCours(true);
     setErreur("");
     try {
-      const batch = writeBatch(db);
-      lignes.forEach((l, i) => {
-        const ref = doc(collection(db, "modbusRegistres"));
-        batch.set(ref, {
-          ...l,
-          compteurId,
-          ordre: nbExistants + i,
-          creeLe: serverTimestamp(),
+      // Un writeBatch Firestore est limité à 500 écritures : pour les
+      // tables les plus volumineuses (ex. Countis ECI2/ECI3, ~900
+      // registres), on découpe en plusieurs lots séquentiels.
+      const TAILLE_LOT = 450;
+      for (let depart = 0; depart < lignes.length; depart += TAILLE_LOT) {
+        const lot = lignes.slice(depart, depart + TAILLE_LOT);
+        const batch = writeBatch(db);
+        lot.forEach((l, i) => {
+          const ref = doc(collection(db, "modbusRegistres"));
+          batch.set(ref, {
+            ...l,
+            compteurId,
+            ordre: nbExistants + depart + i,
+            creeLe: serverTimestamp(),
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
+      }
       onClose();
     } catch (err) {
       setErreur("Erreur pendant l'import : " + err.message);
