@@ -19,7 +19,7 @@ import { useCollection } from "../lib/firestoreHooks";
 // jour par l'équipe elle-même plutôt que figées dans le code — on
 // commence avec les tables d'échange Modbus des compteurs Socomec,
 // d'autres onglets viendront s'ajouter au même endroit.
-const ONGLETS = [{ cle: "modbus-socomec", label: "⚡ Compteurs Socomec (Modbus)" }];
+const ONGLETS = [{ cle: "modbus-socomec", label: "📋 Table échange modbus" }];
 
 const TYPES_REGISTRE = ["uint16", "int16", "uint32", "int32", "float32", "bool", "string", "autre"];
 const ACCES_REGISTRE = [
@@ -53,7 +53,7 @@ function CompteurFormModal({ compteur, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{compteur ? "Modifier le compteur" : "Nouveau compteur"}</h2>
+        <h2>{compteur ? "Modifier le produit" : "Nouveau produit"}</h2>
         <form onSubmit={handleSubmit} className="form">
           <label>
             Modèle
@@ -345,9 +345,18 @@ function CompteursModbusTab() {
   const [registreEnEdition, setRegistreEnEdition] = useState(null);
   const [afficherImport, setAfficherImport] = useState(false);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
+  const [rechercheProduit, setRechercheProduit] = useState("");
 
   const compteurSelectionne =
     compteurs.find((c) => c.id === compteurSelectionneId) ?? compteurs[0] ?? null;
+
+  const termesProduit = rechercheProduit.trim().toLowerCase();
+  const compteursFiltres = termesProduit
+    ? compteurs.filter((c) => (c.nom || "").toLowerCase().includes(termesProduit))
+    : compteurs;
+
+  const [rechercheRegistre, setRechercheRegistre] = useState("");
+  const [nbAffiches, setNbAffiches] = useState(50);
 
   const registres = compteurSelectionne
     ? registresBruts
@@ -355,10 +364,19 @@ function CompteursModbusTab() {
         .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
     : [];
 
+  const termesRegistre = rechercheRegistre.trim().toLowerCase();
+  const registresFiltres = termesRegistre
+    ? registres.filter((r) =>
+        [r.adresse, r.designation, r.type, r.unite, r.commentaire].some((champ) =>
+          String(champ ?? "").toLowerCase().includes(termesRegistre)
+        )
+      )
+    : registres;
+
   const supprimerCompteur = async (compteur) => {
     if (
       !confirm(
-        "Supprimer le compteur « " + compteur.nom + " » ? Tous ses registres seront aussi supprimés."
+        "Supprimer le produit « " + compteur.nom + " » ? Tous ses registres seront aussi supprimés."
       )
     )
       return;
@@ -387,7 +405,7 @@ function CompteursModbusTab() {
     <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 20 }}>
       <div className="panel" style={{ padding: 16, alignSelf: "start" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <h3 style={{ margin: 0 }}>Compteurs</h3>
+          <h3 style={{ margin: 0 }}>Produits</h3>
           <button
             className="btn-ghost"
             onClick={() => {
@@ -400,34 +418,52 @@ function CompteursModbusTab() {
         </div>
         {compteurs.length === 0 ? (
           <p className="empty-state-description" style={{ margin: 0 }}>
-            Aucun compteur pour l'instant. Ajoutez-en un pour commencer à renseigner sa table
+            Aucun produit pour l'instant. Ajoutez-en un pour commencer à renseigner sa table
             Modbus.
           </p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {compteurs.map((c) => (
-              <button
-                key={c.id}
-                className={
-                  "btn-ghost" +
-                  (compteurSelectionne?.id === c.id ? " btn-espace-actif" : "")
-                }
-                style={{ justifyContent: "flex-start", textAlign: "left" }}
-                onClick={() => setCompteurSelectionneId(c.id)}
-              >
-                {c.nom}
-              </button>
-            ))}
-          </div>
+          <>
+            <input
+              placeholder="Rechercher un produit…"
+              value={rechercheProduit}
+              onChange={(e) => setRechercheProduit(e.target.value)}
+              style={{ width: "100%", marginBottom: 8 }}
+            />
+            {compteursFiltres.length === 0 ? (
+              <p className="empty-state-description" style={{ margin: 0 }}>
+                Aucun produit ne correspond.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {compteursFiltres.map((c) => (
+                  <button
+                    key={c.id}
+                    className={
+                      "btn-ghost" +
+                      (compteurSelectionne?.id === c.id ? " btn-espace-actif" : "")
+                    }
+                    style={{ justifyContent: "flex-start", textAlign: "left" }}
+                    onClick={() => {
+                      setCompteurSelectionneId(c.id);
+                      setRechercheRegistre("");
+                      setNbAffiches(50);
+                    }}
+                  >
+                    {c.nom}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       <div>
         {!compteurSelectionne ? (
           <div className="empty-state">
-            <p className="empty-state-title">Aucun compteur sélectionné</p>
+            <p className="empty-state-title">Aucun produit sélectionné</p>
             <p className="empty-state-description">
-              Choisissez un compteur dans la liste, ou ajoutez-en un nouveau.
+              Choisissez un produit dans la liste, ou ajoutez-en un nouveau.
             </p>
           </div>
         ) : (
@@ -458,7 +494,7 @@ function CompteursModbusTab() {
                 >
                   {suppressionEnCours === compteurSelectionne.id
                     ? "Suppression…"
-                    : "Supprimer le compteur"}
+                    : "Supprimer le produit"}
                 </button>
               </div>
             </div>
@@ -480,52 +516,79 @@ function CompteursModbusTab() {
 
             {registres.length === 0 ? (
               <p className="empty-state-description">
-                Aucun registre renseigné pour ce compteur pour l'instant.
+                Aucun registre renseigné pour ce produit pour l'instant.
               </p>
             ) : (
-              <div className="data-table-wrapper">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Adresse</th>
-                      <th>Désignation</th>
-                      <th>Type</th>
-                      <th>Unité</th>
-                      <th>Accès</th>
-                      <th>Commentaire</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {registres.map((r) => (
-                      <tr key={r.id}>
-                        <td data-label="Adresse">{r.adresse}</td>
-                        <td data-label="Désignation">{r.designation}</td>
-                        <td data-label="Type">{r.type}</td>
-                        <td data-label="Unité">{r.unite || "—"}</td>
-                        <td data-label="Accès">{formatAcces(r.acces)}</td>
-                        <td data-label="Commentaire">{r.commentaire || "—"}</td>
-                        <td>
-                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <button
-                              className="btn-ghost"
-                              onClick={() => {
-                                setRegistreEnEdition(r);
-                                setAfficherFormRegistre(true);
-                              }}
-                            >
-                              Modifier
-                            </button>
-                            <button className="btn-ghost btn-danger" onClick={() => supprimerRegistre(r)}>
-                              Supprimer
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <input
+                  placeholder="Rechercher un registre (adresse, désignation, unité, commentaire…)"
+                  value={rechercheRegistre}
+                  onChange={(e) => {
+                    setNbAffiches(50);
+                    setRechercheRegistre(e.target.value);
+                  }}
+                  style={{ width: "100%", marginBottom: 10 }}
+                />
+                <p className="page-subtitle" style={{ marginBottom: 8 }}>
+                  {registresFiltres.length} registre(s)
+                </p>
+                {registresFiltres.length === 0 ? (
+                  <p className="empty-state-description">Aucun registre ne correspond.</p>
+                ) : (
+                  <div className="data-table-wrapper">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Adresse</th>
+                          <th>Désignation</th>
+                          <th>Type</th>
+                          <th>Unité</th>
+                          <th>Accès</th>
+                          <th>Commentaire</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registresFiltres.slice(0, nbAffiches).map((r) => (
+                          <tr key={r.id}>
+                            <td data-label="Adresse">{r.adresse}</td>
+                            <td data-label="Désignation">{r.designation}</td>
+                            <td data-label="Type">{r.type}</td>
+                            <td data-label="Unité">{r.unite || "—"}</td>
+                            <td data-label="Accès">{formatAcces(r.acces)}</td>
+                            <td data-label="Commentaire">{r.commentaire || "—"}</td>
+                            <td>
+                              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                <button
+                                  className="btn-ghost"
+                                  onClick={() => {
+                                    setRegistreEnEdition(r);
+                                    setAfficherFormRegistre(true);
+                                  }}
+                                >
+                                  Modifier
+                                </button>
+                                <button className="btn-ghost btn-danger" onClick={() => supprimerRegistre(r)}>
+                                  Supprimer
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {registresFiltres.length > nbAffiches && (
+                  <button
+                    className="btn-ghost"
+                    style={{ marginTop: 12 }}
+                    onClick={() => setNbAffiches((n) => n + 50)}
+                  >
+                    Afficher plus ({registresFiltres.length - nbAffiches} restante(s))
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
