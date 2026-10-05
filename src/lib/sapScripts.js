@@ -17,7 +17,8 @@ export const PARAMS_SAP_DEFAUT = {
   organisationAchats: "I001", // Societe.SapOrganisationAchatsCode (INEO)
   varianteListeFo: "ZINEO", // variante de sélection ME2J
   miseEnFormeFo: "/GOAT_FO", // mise en forme ALV ME2J
-  varianteAlvMo: "ZCAT3_EXPORT_TXT", // mise en forme ALV ZCAT3
+  varianteAlvMo: "ZCAT3_EXPORT_TXT", // mise en forme ALV ZCAT3 (ou la vôtre, ex. IAQ2_GUEST)
+  ligneVarianteMo: "50", // ligne de la liste des mises en forme où GOAT lit la variante personnelle ("" = ignorer)
   popupProjet: false, // utilisateurs "fenêtre projet" ME2J
   profilProjet: "aaa",
   dossierFo: "C:\\temp-goat\\sap-fo\\",
@@ -323,7 +324,7 @@ export function genererScriptZcat3(params, otp, debut, fin) {
   L.push("Const TABLE_SEL = \"wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE\"");
   L.push("Const LISTE_ALV = \"wnd[0]/usr/cntlO_CONTAINER/shellcont/shell/shellcont[1]/shell\"");
   L.push("");
-  L.push("Dim nb, i, ligneFocus, cellule, shell, v, nomVar, cible");
+  L.push("Dim nb, i, ligneFocus, cellule, shell, v, t, nomVar, cible, ligneHist");
   L.push("PreparerDossier DOSSIER, CHEMIN");
   L.push("ConnecterSap");
   L.push("");
@@ -361,25 +362,51 @@ export function genererScriptZcat3(params, otp, debut, fin) {
   L.push("' Execution");
   L.push("session.findById(\"wnd[0]/tbar[1]/btn[8]\").press");
   L.push("");
-  if (String(params.varianteAlvMo || "").trim()) {
-    L.push("' Chargement de la mise en forme " + String(params.varianteAlvMo).trim().replace(/"/g, ""));
+  const ligneHist = Number.parseInt(params.ligneVarianteMo, 10);
+  const nomVariante = String(params.varianteAlvMo || "").trim();
+  if (nomVariante || ligneHist >= 0) {
+    const SHELL_VAR =
+      "wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell";
+    L.push("' Chargement de la mise en forme ALV (logique de GOAT) :");
+    L.push("' 1) nom lu sur la ligne de la liste ou se trouve la mise en forme personnelle (ex. IAQ2_GUEST),");
+    L.push("' 2) sinon nom configure, 3) sinon, clic direct sur cette ligne.");
     L.push("session.findById(LISTE_ALV).pressToolbarContextButton \"&MB_VARIANT\"");
     L.push("session.findById(LISTE_ALV).selectContextMenuItem \"&LOAD\"");
-    L.push("If Not Existe(\"wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell\") Then Fin \"Impossible d'acceder a la liste des mises en forme SAP.\", 48");
-    L.push("Set shell = session.findById(\"wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell\")");
-    L.push("nomVar = LCase(" + chaineVbs(params.varianteAlvMo.trim()) + ")");
-    L.push("cible = -1");
-    L.push("For i = 0 To shell.RowCount - 1");
-    L.push("  v = \"\"");
+    L.push("If Not Existe(\"" + SHELL_VAR + "\") Then Fin \"Impossible d'acceder a la liste des mises en forme SAP.\", 48");
+    L.push("Set shell = session.findById(\"" + SHELL_VAR + "\")");
+    L.push("ligneHist = " + (ligneHist >= 0 ? ligneHist : -1));
+    L.push("nomVar = \"\"");
+    L.push("If ligneHist >= 0 Then");
     L.push("  On Error Resume Next");
-    L.push("  v = LCase(Trim(shell.GetCellValue(i, \"TEXT\"))) & \"|\" & LCase(Trim(shell.GetCellValue(i, \"VARIANT\")))");
+    L.push("  nomVar = Trim(shell.GetCellValue(ligneHist, \"TEXT\"))");
+    L.push("  If nomVar = \"\" Then nomVar = Trim(shell.GetCellValue(ligneHist, \"VARIANT\"))");
     L.push("  On Error GoTo 0");
-    L.push("  If Split(v & \"|\", \"|\")(0) = nomVar Or Split(v & \"|\", \"|\")(1) = nomVar Then");
-    L.push("    cible = i");
-    L.push("    Exit For");
+    L.push("End If");
+    L.push("If nomVar = \"\" Then nomVar = " + chaineVbs(nomVariante));
+    L.push("nomVar = LCase(Trim(nomVar))");
+    L.push("cible = -1");
+    L.push("If nomVar <> \"\" Then");
+    L.push("  For i = 0 To shell.RowCount - 1");
+    L.push("    t = \"\" : v = \"\"");
+    L.push("    On Error Resume Next");
+    L.push("    t = LCase(Trim(shell.GetCellValue(i, \"TEXT\")))");
+    L.push("    v = LCase(Trim(shell.GetCellValue(i, \"VARIANT\")))");
+    L.push("    On Error GoTo 0");
+    L.push("    If t = nomVar Or v = nomVar Then cible = i : Exit For");
+    L.push("  Next");
+    L.push("  If cible < 0 Then");
+    L.push("    For i = 0 To shell.RowCount - 1");
+    L.push("      t = \"\" : v = \"\"");
+    L.push("      On Error Resume Next");
+    L.push("      t = LCase(Trim(shell.GetCellValue(i, \"TEXT\")))");
+    L.push("      v = LCase(Trim(shell.GetCellValue(i, \"VARIANT\")))");
+    L.push("      On Error GoTo 0");
+    L.push("      If InStr(t, nomVar) > 0 Or InStr(v, nomVar) > 0 Then cible = i : Exit For");
+    L.push("    Next");
     L.push("  End If");
-    L.push("Next");
-    L.push("If cible < 0 Then Fin \"La mise en forme SAP " + String(params.varianteAlvMo).trim().replace(/"/g, "") + " est introuvable.\", 48");
+    L.push("End If");
+    L.push("If cible < 0 Then cible = ligneHist");
+    L.push("If cible < 0 Then Fin \"Mise en forme SAP introuvable (renseignez son nom dans les parametres, ex. IAQ2_GUEST).\", 48");
     L.push("shell.firstVisibleRow = cible");
     L.push("shell.setCurrentCell cible, \"TEXT\"");
     L.push("shell.selectedRows = CStr(cible)");

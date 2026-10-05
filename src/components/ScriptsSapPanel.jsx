@@ -171,7 +171,8 @@ export default function ScriptsSapPanel() {
             {champ("Organisation d'achats", "organisationAchats", "ME2J — I001 (INEO), G001 (AXIMA), B001 (BYES)")}
             {champ("Variante de sélection ME2J", "varianteListeFo")}
             {champ("Mise en forme ALV ME2J", "miseEnFormeFo", "Laisser vide pour ne pas en charger")}
-            {champ("Mise en forme ALV ZCAT3", "varianteAlvMo", "Laisser vide pour ne pas en charger")}
+            {champ("Mise en forme ALV ZCAT3", "varianteAlvMo", "Nom de votre mise en forme (ex. IAQ2_GUEST)")}
+            {champ("Ligne de la mise en forme ZCAT3", "ligneVarianteMo", "Ligne (à partir de 0) lue en priorité dans la liste, 50 comme GOAT ; vide = ignorer")}
             {champ("Dossier d'export achats", "dossierFo")}
             {champ("Fichier d'export achats", "fichierFo")}
             {champ("Dossier d'export heures", "dossierMo")}
