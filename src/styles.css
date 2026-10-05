@@ -3709,3 +3709,20 @@ textarea:focus {
   background: var(--panel-muted, rgba(127, 127, 127, 0.08));
   padding: 8px 12px;
 }
+.recap-affectation-sap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.recap-affectation-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.recap-affectation-ligne select {
+  min-width: 260px;
+  max-width: 100%;
+}

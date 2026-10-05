@@ -23,7 +23,16 @@ const QDV_PAR_CODE_SAP = new Map(
 // Type de FO du budget (Code SAP sans correspondance, ou type absent du
 // devis) est regroupé dans `horsBudget`, pour que le total reste égal au
 // total réellement acheté dans SAP.
-export function rapprocherAchats(parType, achatsSap) {
+//
+// `affectations` (par chantier, voir affectationsSapFo sur le document
+// chantier) permet de corriger ce rapprochement à la main, Code SAP par
+// Code SAP : { "DIVE": "<Type de FO>" } force ce Code SAP sur ce type, et
+// { "DIVE": AFFECTATION_HORS_BUDGET } le laisse volontairement hors budget.
+// Une affectation vers un type qui n'est plus dans le budget est ignorée
+// (retour au rapprochement automatique).
+export const AFFECTATION_HORS_BUDGET = "__hors";
+
+export function rapprocherAchats(parType, achatsSap, affectations = {}) {
   const codes = parType.map((t) => codeTypeFo(t.cle));
   const parCle = new Map(parType.map((t) => [t.cle, { reel: 0, lignes: [] }]));
   const horsBudget = { reel: 0, lignes: [] };
@@ -35,8 +44,17 @@ export function rapprocherAchats(parType, achatsSap) {
   };
 
   achatsSap.forEach((a) => {
-    const codeQdv = QDV_PAR_CODE_SAP.get((a.grOr || "").trim().toUpperCase());
-    const cle = codeQdv ? cleDuType(codeQdv) : null;
+    const codeSap = (a.grOr || "").trim().toUpperCase();
+    const manuel = affectations[codeSap];
+    let cle;
+    if (manuel === AFFECTATION_HORS_BUDGET) {
+      cle = null;
+    } else if (manuel && parCle.has(manuel)) {
+      cle = manuel;
+    } else {
+      const codeQdv = QDV_PAR_CODE_SAP.get(codeSap);
+      cle = codeQdv ? cleDuType(codeQdv) : null;
+    }
     const cible = cle !== null ? parCle.get(cle) : horsBudget;
     cible.reel += Number(a.valNette) || 0;
     cible.lignes.push(a);

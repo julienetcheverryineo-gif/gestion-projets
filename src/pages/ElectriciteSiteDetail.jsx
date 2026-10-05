@@ -19,7 +19,7 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 import { exporterGoat } from "../lib/exportGoat";
 import { otpDepuisCompte } from "../lib/parseSapExports";
-import { rapprocherAchats, totaliserHeures } from "../lib/bilanSap";
+import { AFFECTATION_HORS_BUDGET, rapprocherAchats, totaliserHeures } from "../lib/bilanSap";
 
 // Largeurs des 2 colonnes d'identification figées (gel de volets, comme
 // dans Excel) : n°, Désignation restent visibles quand on défile vers
@@ -248,9 +248,53 @@ function TableauRecap({
   const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
   const nbColonnes = 6 + (aSap ? 2 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
+  // Codes SAP présents dans une liste de lignes, avec leur total, pour
+  // pouvoir les réaffecter à un autre Type de FO (la réaffectation vaut
+  // pour toutes les lignes de ce Code SAP, dans tout le chantier).
+  const codesDesLignes = (lignes) => {
+    const parCode = new Map();
+    lignes.forEach((a) => {
+      const code = (a.grOr || "").trim().toUpperCase() || "(sans code)";
+      if (!parCode.has(code)) parCode.set(code, { code, nb: 0, total: 0 });
+      const g = parCode.get(code);
+      g.nb += 1;
+      g.total += Number(a.valNette) || 0;
+    });
+    return [...parCode.values()];
+  };
   const detailSapFo = (lignes) => (
     <tr className="recap-detail-sap">
       <td colSpan={nbColonnes}>
+        <div className="recap-affectation-sap">
+          <div className="simple-list-meta" style={{ marginBottom: 6 }}>
+            Affecter un Code SAP à un Type de FO (vaut pour toutes ses lignes) :
+          </div>
+          {codesDesLignes(lignes).map((g) => {
+            const manuel = sap?.affectations?.[g.code];
+            return (
+              <label key={g.code} className="recap-affectation-ligne">
+                <span>
+                  <strong>{g.code}</strong> — {g.nb} ligne(s), {formatNombre(g.total)} €
+                </span>
+                <select
+                  value={manuel && (manuel === AFFECTATION_HORS_BUDGET || sapFo.parCle.has(manuel)) ? manuel : ""}
+                  disabled={!sap?.onAffecter}
+                  onChange={(e) => sap.onAffecter(g.code, e.target.value)}
+                >
+                  <option value="">Automatique (correspondance Code SAP)</option>
+                  {recap.parType
+                    .filter((t) => t.cle)
+                    .map((t) => (
+                      <option key={t.cle} value={t.cle}>
+                        {t.libelle}
+                      </option>
+                    ))}
+                  <option value={AFFECTATION_HORS_BUDGET}>Hors budget</option>
+                </select>
+              </label>
+            );
+          })}
+        </div>
         <table className="data-table">
           <thead>
             <tr>
@@ -1385,12 +1429,28 @@ export default function ElectriciteSiteDetail() {
         }))
       : [];
 
+  // Affectations manuelles Code SAP -> Type de FO de ce chantier (voir
+  // rapprocherAchats) ; une valeur vide retire l'affectation et le Code SAP
+  // retombe sur la correspondance automatique.
+  const affectationsSap = chantier?.affectationsSapFo || {};
+  const affecterCodeSap = async (codeSap, valeur) => {
+    const maj = { ...affectationsSap };
+    if (valeur) maj[codeSap] = valeur;
+    else delete maj[codeSap];
+    await updateDoc(doc(db, "sites", chantierId), { affectationsSapFo: maj });
+  };
+
   // Réel SAP rapproché du bilan (synthèse tous devis seulement) : n'a de
   // sens que si des lignes SAP existent pour l'OTP de ce chantier.
   const sapRecap = (() => {
     if (!recapSynthese) return null;
     if (recapActif === "fo" && achatsSap.length > 0) {
-      return { type: "fo", achats: rapprocherAchats(recapSynthese.parType, achatsSap) };
+      return {
+        type: "fo",
+        achats: rapprocherAchats(recapSynthese.parType, achatsSap, affectationsSap),
+        affectations: affectationsSap,
+        onAffecter: peutGerer ? affecterCodeSap : null,
+      };
     }
     if (recapActif === "mo" && heuresSap.length > 0) {
       return { type: "mo", heures: totaliserHeures(heuresSap) };
