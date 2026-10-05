@@ -47,7 +47,7 @@ const SAP_PAR_CODE_QDV = new Map(
 // extrait ici le code et le libellé bruts. Plus robuste que formatTypeFo
 // (réservé à l'affichage), qui ne reconnaît que les codes numériques : ici
 // les codes alphabétiques (CHIF, DV, STOR...) doivent aussi être lus.
-function codeTypeFo(typeFo) {
+export function codeTypeFo(typeFo) {
   if (!typeFo) return "";
   const m = typeFo.match(/^(.*?)\s*\[/);
   return (m ? m[1] : typeFo).trim();

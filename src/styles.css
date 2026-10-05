@@ -3695,3 +3695,17 @@ textarea:focus {
   border-color: var(--border);
   background: var(--panel);
 }
+
+/* Bilan FO/MO Électricité : colonnes "réel SAP" et détail déplié */
+.recap-sap-toggle {
+  padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.recap-reste-negatif {
+  color: var(--danger);
+  font-weight: 600;
+}
+.recap-detail-sap > td {
+  background: var(--panel-muted, rgba(127, 127, 127, 0.08));
+  padding: 8px 12px;
+}

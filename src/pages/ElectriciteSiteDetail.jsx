@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   addDoc,
@@ -19,6 +19,7 @@ import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteM
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 import { exporterGoat } from "../lib/exportGoat";
 import { otpDepuisCompte } from "../lib/parseSapExports";
+import { rapprocherAchats, totaliserHeures } from "../lib/bilanSap";
 
 // Largeurs des 2 colonnes d'identification figées (gel de volets, comme
 // dans Excel) : n°, Désignation restent visibles quand on défile vers
@@ -225,7 +226,55 @@ function TableauRecap({
   devisId,
   ordreTypes,
   onModifierOrdre,
+  sap,
 }) {
+  // Lignes SAP dépliées (clé d'un Type de FO, ou "__hors" / "__mo").
+  const [ouverts, setOuverts] = useState(new Set());
+  const basculer = (cle) =>
+    setOuverts((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(cle)) suivant.delete(cle);
+      else suivant.add(cle);
+      return suivant;
+    });
+
+  // Colonnes "réel SAP" (synthèse tous devis uniquement : SAP ne connaît
+  // pas les devis). FO : achats par Type de FO via le Code SAP ; MO :
+  // heures pointées, au niveau chantier seulement (SAP n'a pas de Type de
+  // FO sur les pointages).
+  const sapFo = sap?.type === "fo" ? sap.achats : null;
+  const sapMo = sap?.type === "mo" ? sap.heures : null;
+  const aSap = Boolean(sapFo || sapMo);
+  const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
+  const nbColonnes = 6 + (aSap ? 2 : 0);
+  const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
+  const detailSapFo = (lignes) => (
+    <tr className="recap-detail-sap">
+      <td colSpan={nbColonnes}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              {COLONNES_SAP_FO.map((c) => (
+                <th key={c.champ}>{c.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((a, i) => (
+              <tr key={a.id || i}>
+                {COLONNES_SAP_FO.map((c) => (
+                  <td key={c.champ} data-label={c.label}>
+                    {formatValeurSap(a[c.champ], c.numerique)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
       <div className="panel-header">
@@ -257,11 +306,14 @@ function TableauRecap({
                 <th className="col-num">Réalisé (avancement)</th>
                 <th className="col-avancement">% avancement</th>
                 <th className="col-num">Restant</th>
+                {aSap && <th className="col-num">{libelleReel}</th>}
+                {aSap && <th className="col-num">Reste budget</th>}
               </tr>
             </thead>
             <tbody>
               {recap.parType.map((l, index) => (
-                <tr key={l.libelle}>
+                <Fragment key={l.libelle}>
+                <tr>
                   <td className="col-ordre" data-label="N°">
                     {onModifierOrdre ? (
                       <input
@@ -305,8 +357,72 @@ function TableauRecap({
                   <td className="col-num" data-label="Restant">
                     {formatNombre(l.restant)} {uniteValeur}
                   </td>
+                  {sapFo && (() => {
+                    const g = sapFo.parCle.get(l.cle);
+                    const reste = l.budget - g.reel;
+                    return (
+                      <>
+                        <td className="col-num" data-label={libelleReel}>
+                          {g.lignes.length > 0 ? (
+                            <button
+                              type="button"
+                              className="btn-ghost recap-sap-toggle"
+                              title="Afficher les lignes d'achat SAP de ce type"
+                              onClick={() => basculer(l.cle)}
+                            >
+                              {ouverts.has(l.cle) ? "▾" : "▸"} {formatNombre(g.reel)} € ({g.lignes.length})
+                            </button>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className={"col-num " + classeReste(reste)} data-label="Reste budget">
+                          {formatNombre(reste)} €
+                        </td>
+                      </>
+                    );
+                  })()}
+                  {sapMo && (
+                    <>
+                      <td className="col-num" data-label={libelleReel}>—</td>
+                      <td className="col-num" data-label="Reste budget">—</td>
+                    </>
+                  )}
                 </tr>
+                {sapFo && ouverts.has(l.cle) && detailSapFo(sapFo.parCle.get(l.cle).lignes)}
+                </Fragment>
               ))}
+              {sapFo && sapFo.horsBudget.lignes.length > 0 && (
+                <>
+                  <tr>
+                    <td className="col-ordre" data-label="N°"></td>
+                    <td
+                      className="col-type"
+                      data-label="Type de FO"
+                      style={{ fontFamily: "var(--font-ui)", fontStyle: "italic" }}
+                      title="Achats SAP dont le Code SAP ne correspond à aucun Type de FO du budget"
+                    >
+                      Achats SAP hors budget
+                    </td>
+                    <td className="col-num" data-label={libelleValeur}>—</td>
+                    <td className="col-num" data-label="Réalisé">—</td>
+                    <td className="col-avancement" data-label="% avancement"></td>
+                    <td className="col-num" data-label="Restant">—</td>
+                    <td className="col-num" data-label={libelleReel}>
+                      <button
+                        type="button"
+                        className="btn-ghost recap-sap-toggle"
+                        onClick={() => basculer("__hors")}
+                      >
+                        {ouverts.has("__hors") ? "▾" : "▸"} {formatNombre(sapFo.horsBudget.reel)} € (
+                        {sapFo.horsBudget.lignes.length})
+                      </button>
+                    </td>
+                    <td className="col-num" data-label="Reste budget">—</td>
+                  </tr>
+                  {ouverts.has("__hors") && detailSapFo(sapFo.horsBudget.lignes)}
+                </>
+              )}
               <tr className="table-recap-total">
                 <td className="col-ordre" data-label="N°"></td>
                 <td className="col-type" data-label="Type de FO">
@@ -324,7 +440,57 @@ function TableauRecap({
                 <td className="col-num" data-label="Restant">
                   {formatNombre(recap.total.restant)} {uniteValeur}
                 </td>
+                {aSap && (
+                  <>
+                    <td className="col-num" data-label={libelleReel}>
+                      {sapMo ? (
+                        <button
+                          type="button"
+                          className="btn-ghost recap-sap-toggle"
+                          title="Afficher les heures par personne"
+                          onClick={() => basculer("__mo")}
+                        >
+                          {ouverts.has("__mo") ? "▾" : "▸"} {formatNombre(sapMo.totalReel)} h
+                        </button>
+                      ) : (
+                        formatNombre(sapFo.totalReel) + " €"
+                      )}
+                    </td>
+                    <td
+                      className={
+                        "col-num " + classeReste(recap.total.budget - (sapMo ?? sapFo).totalReel)
+                      }
+                      data-label="Reste budget"
+                    >
+                      {formatNombre(recap.total.budget - (sapMo ?? sapFo).totalReel)} {uniteValeur}
+                    </td>
+                  </>
+                )}
               </tr>
+              {sapMo && ouverts.has("__mo") && (
+                <tr className="recap-detail-sap">
+                  <td colSpan={nbColonnes}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Personne</th>
+                          <th>Jours pointés</th>
+                          <th>Heures</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sapMo.personnes.map((p) => (
+                          <tr key={p.nom}>
+                            <td data-label="Personne">{p.nom}</td>
+                            <td data-label="Jours pointés">{p.nbJours}</td>
+                            <td data-label="Heures">{formatNombre(p.heures)} h</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -1219,6 +1385,19 @@ export default function ElectriciteSiteDetail() {
         }))
       : [];
 
+  // Réel SAP rapproché du bilan (synthèse tous devis seulement) : n'a de
+  // sens que si des lignes SAP existent pour l'OTP de ce chantier.
+  const sapRecap = (() => {
+    if (!recapSynthese) return null;
+    if (recapActif === "fo" && achatsSap.length > 0) {
+      return { type: "fo", achats: rapprocherAchats(recapSynthese.parType, achatsSap) };
+    }
+    if (recapActif === "mo" && heuresSap.length > 0) {
+      return { type: "mo", heures: totaliserHeures(heuresSap) };
+    }
+    return null;
+  })();
+
   // Modifie l'ordre d'affichage personnalisé d'un type (FO ou MO, selon
   // le bilan actif) pour ce chantier — une valeur vide retire la
   // personnalisation et le type retombe sur son numéro de code.
@@ -1479,6 +1658,7 @@ export default function ElectriciteSiteDetail() {
                 portee="chantier"
                 ordreTypes={ordreTypesChantier}
                 onModifierOrdre={peutGerer ? modifierOrdreType : null}
+                sap={sapRecap}
               />
               {recapParDevis.map(({ devis: d, recap }) => (
                 <TableauRecap
