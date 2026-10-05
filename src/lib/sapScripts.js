@@ -244,6 +244,14 @@ Sub AttendreConnexion()
     u = session.Info.User
     On Error GoTo 0
     If u <> "" Then Exit Sub
+    ' Pas connecte apres 6 s (pas d'authentification unique) : on remet la
+    ' fenetre de connexion au premier plan pour saisir les identifiants.
+    If i = 24 And CONNEXION_OUVERTE And Not AFFICHER_SAP Then
+      On Error Resume Next
+      session.findById("wnd[0]").restore
+      Err.Clear
+      On Error GoTo 0
+    End If
     If i = 1 Then Progression "En attente de la connexion a SAP (saisissez vos identifiants dans la fenetre SAP si besoin)"
     WScript.Sleep 250
   Next
@@ -306,6 +314,12 @@ Sub ConnecterSap()
   Next
   If SapCon.Children.Count = 0 Then Fin "Aucune session SAP active.", 48
   Set session = SapCon.Children(0)
+  If CONNEXION_OUVERTE And Not AFFICHER_SAP Then
+    On Error Resume Next
+    session.findById("wnd[0]").iconify
+    Err.Clear
+    On Error GoTo 0
+  End If
   AttendreConnexion
   Progression "Extraction SAP en cours..."
   OuvrirSessionDediee
