@@ -445,10 +445,15 @@ export default function ElectriciteImportSap() {
       </header>
 
       <div className="page-sections" style={{ display: "grid", gap: 20 }}>
-        <ScriptsSapPanel />
-        <BlocImport type="fo" config={TYPES.fo} />
-        <BlocImport type="mo" config={TYPES.mo} />
-        <HistoriqueImports />
+        <ScriptsSapPanel
+          importManuel={
+            <>
+              <BlocImport type="fo" config={TYPES.fo} />
+              <BlocImport type="mo" config={TYPES.mo} />
+            </>
+          }
+          historique={<HistoriqueImports />}
+        />
         <VueConsultation />
       </div>
     </div>

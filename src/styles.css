@@ -3743,3 +3743,120 @@ textarea:focus {
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
+
+/* Import SAP : panneau de paramètres à onglets (installation, réglages,
+   import par fichier, historique). */
+.sap-reglages {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.sap-onglets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.sap-onglet {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.9rem;
+}
+.sap-onglet:hover {
+  background: var(--accent-dim);
+}
+.sap-onglet.actif {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.sap-section {
+  display: grid;
+  gap: 24px;
+}
+.sap-intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.sap-etapes {
+  list-style: none;
+  counter-reset: etape;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.sap-etapes li {
+  counter-increment: etape;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.sap-etapes li::before {
+  content: counter(etape);
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--text);
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+.sap-etapes li > div {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+.sap-etapes li span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.sap-groupe {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.sap-groupe h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.sap-champs {
+  display: grid;
+  gap: 14px 18px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.sap-champ {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.sap-champ small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.sap-case {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.9rem;
+}
+.sap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

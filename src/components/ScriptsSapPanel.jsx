@@ -51,7 +51,14 @@ function telecharger(nom, contenu) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function ScriptsSapPanel() {
+const ONGLETS = [
+  ["installation", "Installation"],
+  ["reglages", "Réglages SAP"],
+  ["import", "Import par fichier"],
+  ["historique", "Imports réalisés"],
+];
+
+export default function ScriptsSapPanel({ importManuel = null, historique = null }) {
   const { documents: chantiers } = useCollection("sites");
   const [params, setParams] = useState(lireParams);
   const [otp, setOtp] = useState([]);
@@ -61,6 +68,7 @@ export default function ScriptsSapPanel() {
   const [fin, setFin] = useState(isoAujourdhui());
   const [erreurs, setErreurs] = useState([]);
   const [ouvert, setOuvert] = useState(false);
+  const [onglet, setOnglet] = useState("installation");
   const refMenu = useRef(null);
   const [dossier, setDossier] = useState(null);
   const [etat, setEtat] = useState(null); // { phase, type, message }
@@ -255,10 +263,10 @@ export default function ScriptsSapPanel() {
   const enCours = etat && (etat.phase === "attente" || etat.phase === "import");
 
   const champ = (label, nom, aide) => (
-    <label className="form-field" style={{ display: "grid", gap: 4 }}>
+    <label className="sap-champ">
       <span>{label}</span>
       <input value={params[nom] ?? ""} onChange={(e) => maj(nom, e.target.value)} />
-      {aide && <small className="page-subtitle">{aide}</small>}
+      {aide && <small>{aide}</small>}
     </label>
   );
 
@@ -333,7 +341,7 @@ export default function ScriptsSapPanel() {
           ▶ Heures (ZCAT3)
         </button>
         <button type="button" className="btn" onClick={() => setOuvert((o) => !o)}>
-          {ouvert ? "Masquer" : "Paramètres SAP"}
+          {ouvert ? "Fermer les paramètres" : "⚙ Paramètres SAP"}
         </button>
       </div>
 
@@ -372,86 +380,136 @@ export default function ScriptsSapPanel() {
       )}
 
       {ouvert && (
-        <div className="sap-installation" style={{ marginTop: 12, display: "grid", gap: 8 }}>
-          <strong>Installation sur ce poste (une seule fois)</strong>
-          <ol style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>
-            <li>
+        <div className="sap-reglages">
+          <div className="sap-onglets" role="tablist">
+            {ONGLETS.map(([cle, libelle]) => (
               <button
+                key={cle}
                 type="button"
-                className="btn"
-                onClick={() => telecharger("installer-pilotage-sap.vbs", genererInstallateur())}
+                role="tab"
+                aria-selected={onglet === cle}
+                className={"sap-onglet" + (onglet === cle ? " actif" : "")}
+                onClick={() => setOnglet(cle)}
               >
-                ⬇ Télécharger l'installateur
-              </button>{" "}
-              puis double-clic dessus (sans droits administrateur).
-            </li>
-            <li>
-              <button type="button" className="btn" onClick={choisirDossierExport}>
-                📁 {dossier ? "Changer le dossier d'export" : "Choisir le dossier d'export"}
-              </button>{" "}
-              {dossier ? `Dossier choisi : ${dossier.name}. ` : ""}Dans la fenêtre, tapez{" "}
-              <code>{DOSSIER_EXPORT_LOCAL}</code> dans la barre d'adresse (Chrome ou Edge).
-            </li>
-            <li>
-              Au premier lancement, le navigateur demande d'autoriser le lien « Pilotage SAP » : cochez
-              « toujours autoriser ».
-            </li>
-          </ol>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <span className="page-subtitle">Secours, sans installation :</span>
-            <button type="button" className="btn" onClick={() => telechargerManuel("fo")}>
-              ⬇ Script achats
-            </button>
-            <button type="button" className="btn" onClick={() => telechargerManuel("mo")}>
-              ⬇ Script heures
-            </button>
-            <span className="page-subtitle">(à lancer par double-clic ; le fichier .txt s'importe ensuite ci-dessous)</span>
+                {libelle}
+              </button>
+            ))}
           </div>
-        </div>
-      )}
 
-      {ouvert && (
-        <div
-          style={{
-            display: "grid",
-            gap: 12,
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            marginTop: 12,
-          }}
-        >
-          {champ("Code société SAP", "societeSap", "ZCAT3 — propre à l'agence (ex. 2726 pour IAQ1 à IAQX)")}
-          {champ("Organisation d'achats", "organisationAchats", "ME2J — I001 (INEO), G001 (AXIMA), B001 (BYES)")}
-          {champ("Variante de sélection ME2J", "varianteListeFo")}
-          {champ("Mise en forme ALV ME2J", "miseEnFormeFo", "Laisser vide pour ne pas en charger")}
-          {champ("Mise en forme ALV ZCAT3", "varianteAlvMo", "Nom de votre mise en forme (ex. IAQ2_GUEST)")}
-          {champ("Ligne de la mise en forme ZCAT3", "ligneVarianteMo", "Ligne (à partir de 0) lue en priorité dans la liste, 50 comme GOAT ; vide = ignorer")}
-          {champ("Dossier d'export achats", "dossierFo")}
-          {champ("Fichier d'export achats", "fichierFo")}
-          {champ("Dossier d'export heures", "dossierMo")}
-          {champ("Fichier d'export heures", "fichierMo")}
-          <label style={{ display: "grid", gap: 4 }}>
-            <span>
-              <input
-                type="checkbox"
-                checked={Boolean(params.afficherSap)}
-                onChange={(e) => maj("afficherSap", e.target.checked)}
-              />{" "}
-              Afficher la fenêtre SAP pendant l'extraction (dépannage)
-            </span>
-          </label>
-          <label style={{ display: "grid", gap: 4 }}>
-            <span>
-              <input
-                type="checkbox"
-                checked={Boolean(params.popupProjet)}
-                onChange={(e) => maj("popupProjet", e.target.checked)}
-              />{" "}
-              Popup « profil projet » ME2J
-            </span>
-            {params.popupProjet && (
-              <input value={params.profilProjet} onChange={(e) => maj("profilProjet", e.target.value)} />
-            )}
-          </label>
+          {onglet === "installation" && (
+            <div className="sap-section">
+              <p className="sap-intro">
+                À faire une seule fois sur chaque poste. Ensuite, un clic sur « Achats » ou « Heures » suffit.
+              </p>
+              <ol className="sap-etapes">
+                <li>
+                  <div>
+                    <strong>Installer le gestionnaire</strong>
+                    <span>Télécharger puis double-cliquer sur le fichier (sans droits administrateur).</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => telecharger("installer-pilotage-sap.vbs", genererInstallateur())}
+                  >
+                    ⬇ Installateur
+                  </button>
+                </li>
+                <li>
+                  <div>
+                    <strong>Choisir le dossier d'export</strong>
+                    <span>
+                      Dans la fenêtre, saisir <code>{DOSSIER_EXPORT_LOCAL}</code> dans la barre d'adresse
+                      (Chrome ou Edge).
+                      {dossier ? ` Dossier actuel : ${dossier.name}.` : ""}
+                    </span>
+                  </div>
+                  <button type="button" className="btn" onClick={choisirDossierExport}>
+                    📁 {dossier ? "Changer" : "Choisir"}
+                  </button>
+                </li>
+                <li>
+                  <div>
+                    <strong>Autoriser le lien</strong>
+                    <span>
+                      Au premier lancement, le navigateur demande d'ouvrir « Pilotage SAP » : cocher « toujours
+                      autoriser ».
+                    </span>
+                  </div>
+                </li>
+              </ol>
+
+              <div className="sap-groupe">
+                <h3>Secours sans installation</h3>
+                <p className="sap-intro">
+                  Télécharge un script à lancer par double-clic ; le fichier .txt s'importe ensuite depuis
+                  l'onglet « Import par fichier ».
+                </p>
+                <div className="sap-champs">
+                  {champ("Dossier d'export achats", "dossierFo")}
+                  {champ("Fichier d'export achats", "fichierFo")}
+                  {champ("Dossier d'export heures", "dossierMo")}
+                  {champ("Fichier d'export heures", "fichierMo")}
+                </div>
+                <div className="sap-actions">
+                  <button type="button" className="btn" onClick={() => telechargerManuel("fo")}>
+                    ⬇ Script achats
+                  </button>
+                  <button type="button" className="btn" onClick={() => telechargerManuel("mo")}>
+                    ⬇ Script heures
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {onglet === "reglages" && (
+            <div className="sap-section">
+              <div className="sap-groupe">
+                <h3>Achats (ME2J)</h3>
+                <div className="sap-champs">
+                  {champ("Organisation d'achats", "organisationAchats", "I001 (INEO), G001 (AXIMA), B001 (BYES)")}
+                  {champ("Variante de sélection", "varianteListeFo")}
+                  {champ("Mise en forme ALV", "miseEnFormeFo", "Laisser vide pour ne pas en charger")}
+                </div>
+                <label className="sap-case">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(params.popupProjet)}
+                    onChange={(e) => maj("popupProjet", e.target.checked)}
+                  />
+                  <span>Popup « profil projet » à l'ouverture (certains utilisateurs)</span>
+                </label>
+                {params.popupProjet && (
+                  <div className="sap-champs">{champ("Profil projet", "profilProjet")}</div>
+                )}
+              </div>
+
+              <div className="sap-groupe">
+                <h3>Heures (ZCAT3)</h3>
+                <div className="sap-champs">
+                  {champ("Code société SAP", "societeSap", "Propre à l'agence (ex. 2726 pour IAQ1 à IAQX)")}
+                  {champ("Mise en forme ALV", "varianteAlvMo", "Nom de votre mise en forme (ex. IAQ2_GUEST)")}
+                  {champ("Ligne de la mise en forme", "ligneVarianteMo", "Lue en priorité (50 comme GOAT) ; vide = ignorer")}
+                </div>
+              </div>
+
+              <div className="sap-groupe">
+                <h3>Affichage</h3>
+                <label className="sap-case">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(params.afficherSap)}
+                    onChange={(e) => maj("afficherSap", e.target.checked)}
+                  />
+                  <span>Afficher la fenêtre SAP pendant l'extraction (dépannage)</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {onglet === "import" && <div className="sap-section">{importManuel}</div>}
+          {onglet === "historique" && <div className="sap-section">{historique}</div>}
         </div>
       )}
     </div>
