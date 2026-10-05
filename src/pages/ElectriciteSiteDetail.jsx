@@ -653,6 +653,12 @@ function formatValeurSap(v, numerique, euro) {
   });
 }
 
+// Compare deux codes OTP sans tenir compte des points (selon l'export SAP,
+// « AAQ2.A0006 » peut apparaître sous la forme « AAQ2A0006 »).
+function memeOtp(a, b) {
+  return String(a || "").replace(/\./g, "") === String(b || "").replace(/\./g, "");
+}
+
 // "10.12.2025" -> timestamp, pour trier du plus récent au plus ancien
 // (les champs date de ces lignes sont des chaînes JJ.MM.AAAA, pas
 // triables telles quelles).
@@ -1262,7 +1268,7 @@ export default function ElectriciteSiteDetail() {
     () =>
       otpSap
         ? sapLignesFo
-            .filter((l) => l.otp === otpSap)
+            .filter((l) => memeOtp(l.otp, otpSap))
             .sort((a, b) => tsDateSap(b.dateDoc) - tsDateSap(a.dateDoc))
         : [],
     [sapLignesFo, otpSap]
@@ -1270,7 +1276,7 @@ export default function ElectriciteSiteDetail() {
   const heuresSap = useMemo(
     () =>
       otpSap
-        ? sapLignesMo.filter((l) => l.otp === otpSap).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
+        ? sapLignesMo.filter((l) => memeOtp(l.otp, otpSap)).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
         : [],
     [sapLignesMo, otpSap]
   );

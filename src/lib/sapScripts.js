@@ -1,16 +1,19 @@
-// Génération des scripts VBScript de pilotage de SAP GUI (extraction des
-// achats ME2J et des pointages CATS ZCAT3).
+// Pilotage de SAP GUI (extraction des achats ME2J et des pointages CATS
+// ZCAT3) par VBScript.
 //
-// Les séquences reprennent à l'identique celles de l'application Access
-// GOAT (modules modSapMe2jExtractionFournitures et
-// modSapZcat3ExtractionMainOeuvre) : mêmes transactions, mêmes identifiants
-// d'écran SAP, même ordre d'actions. Une page web ne pouvant pas piloter SAP
-// GUI (objet COM Windows), l'appli produit un fichier .vbs à lancer en local
-// (double-clic) sur le poste où SAP est ouvert ; le fichier .txt exporté est
-// ensuite importé via la page « Import SAP ».
+// Les séquences reprennent celles de l'application Access GOAT (modules
+// modSapMe2jExtractionFournitures et modSapZcat3ExtractionMainOeuvre) :
+// mêmes transactions, mêmes identifiants d'écran SAP, même ordre d'actions.
+//
+// Une page web ne pouvant pas piloter SAP GUI (objet COM Windows), le moteur
+// VBScript tourne sur le poste. Il existe sous deux formes :
+//  - un script « manuel » à télécharger et lancer par double-clic (secours) ;
+//  - un gestionnaire installé UNE fois par poste, qui répond au lien
+//    ineo-sap://… ouvert par l'appli : un clic dans l'appli lance SAP, puis
+//    l'appli lit le fichier exporté et l'importe (voir dossierExportSap.js).
 //
 // Tout le texte généré est volontairement en ASCII (pas d'accents) pour que
-// le .vbs s'exécute correctement quel que soit l'encodage du fichier.
+// les .vbs s'exécutent correctement quel que soit l'encodage du fichier.
 
 export const PARAMS_SAP_DEFAUT = {
   societeSap: "2726", // Agence.SapSocieteCode (IAQ1..IAQX)
@@ -21,11 +24,16 @@ export const PARAMS_SAP_DEFAUT = {
   ligneVarianteMo: "50", // ligne de la liste des mises en forme où GOAT lit la variante personnelle ("" = ignorer)
   popupProjet: false, // utilisateurs "fenêtre projet" ME2J
   profilProjet: "aaa",
+  // Utilisés uniquement par le script manuel : le gestionnaire installé
+  // exporte toujours dans %USERPROFILE%\PilotageSAP\exports\.
   dossierFo: "C:\\temp-goat\\sap-fo\\",
   fichierFo: "export-fo-sap.txt",
   dossierMo: "C:\\temp-goat\\sap-mo\\",
   fichierMo: "export-mo-sap.txt",
 };
+
+export const PROTOCOLE_SAP = "ineo-sap";
+export const DOSSIER_EXPORT_LOCAL = "%USERPROFILE%\\PilotageSAP\\exports";
 
 // Retire les accents et caractères non ASCII, double les guillemets : valeur
 // sûre à insérer dans une chaîne VBScript.
@@ -59,26 +67,13 @@ export function dateSap(valeur) {
   return "";
 }
 
-export function listerOtp(brut) {
-  const vus = new Set();
-  const liste = [];
-  String(brut || "")
-    .split(/[\s,;]+/)
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean)
-    .forEach((o) => {
-      if (!vus.has(o)) {
-        vus.add(o);
-        liste.push(o);
-      }
-    });
-  return liste;
-}
-
 // Validation commune ; renvoie la liste des problèmes (vide = OK).
-export function validerParametres(params, otp, { dates = false, debut, fin, fo = false, mo = false }) {
+export function validerParametres(params, otp, { dates = false, debut, fin, fo = false, mo = false, chemins = false }) {
   const erreurs = [];
-  if (otp.length === 0) erreurs.push("Aucun code affaire (OTP) renseigné.");
+  if (otp.length === 0) erreurs.push("Aucune affaire sélectionnée.");
+  if (otp.length > 60) erreurs.push("Trop d'affaires sélectionnées (60 maximum).");
+  if (otp.some((o) => !/^[A-Z0-9._-]{4,24}$/.test(o)))
+    erreurs.push("Un code affaire contient des caractères non pris en charge.");
   if (fo && !String(params.organisationAchats || "").trim())
     erreurs.push("L'organisation d'achats SAP est obligatoire (ME2J).");
   if (mo && !String(params.societeSap || "").trim())
@@ -95,349 +90,647 @@ export function validerParametres(params, otp, { dates = false, debut, fin, fo =
         erreurs.push("La date de début est postérieure à la date de fin.");
     }
   }
-  if (fo && (!avecAntiSlash(params.dossierFo) || !nettoyerNomFichier(params.fichierFo)))
-    erreurs.push("Dossier ou nom de fichier d'export FO manquant.");
-  if (mo && (!avecAntiSlash(params.dossierMo) || !nettoyerNomFichier(params.fichierMo)))
-    erreurs.push("Dossier ou nom de fichier d'export MO manquant.");
-  return erreurs;
+  const sur = /^[A-Za-z0-9_/. -]{0,40}$/;
+  [params.varianteListeFo, params.miseEnFormeFo, params.varianteAlvMo].forEach((v) => {
+    if (!sur.test(String(v || ""))) erreurs.push("Un paramètre SAP contient des caractères non pris en charge.");
+  });
+  if (!/^[A-Za-z0-9]{0,10}$/.test(String(params.societeSap || "")) ||
+      !/^[A-Za-z0-9]{0,10}$/.test(String(params.organisationAchats || "")))
+    erreurs.push("Code société ou organisation d'achats invalide.");
+  if (chemins) {
+    if (fo && (!avecAntiSlash(params.dossierFo) || !nettoyerNomFichier(params.fichierFo)))
+      erreurs.push("Dossier ou nom de fichier d'export FO manquant.");
+    if (mo && (!avecAntiSlash(params.dossierMo) || !nettoyerNomFichier(params.fichierMo)))
+      erreurs.push("Dossier ou nom de fichier d'export MO manquant.");
+  }
+  return [...new Set(erreurs)];
 }
 
-// Fonctions VBScript communes (connexion, existence d'un élément, saisie
-// multiple, attente du fichier). Reprises de modSapExtractionCommun.
-const SOCLE_VBS = [
-  "Option Explicit",
-  "",
-  "Dim SapGuiAuto, SapApp, SapCon, session, fso",
-  "Set fso = CreateObject(\"Scripting.FileSystemObject\")",
-  "",
-  "Sub Fin(message, code)",
-  "  MsgBox message, code, TITRE",
-  "  WScript.Quit",
-  "End Sub",
-  "",
-  "Function Existe(id)",
-  "  Dim o",
-  "  On Error Resume Next",
-  "  Set o = session.findById(id)",
-  "  Existe = (Err.Number = 0) And (Not o Is Nothing)",
-  "  Err.Clear",
-  "  On Error GoTo 0",
-  "End Function",
-  "",
-  "Sub ConnecterSap()",
-  "  On Error Resume Next",
-  "  Set SapGuiAuto = GetObject(\"SAPGUI\")",
-  "  If Err.Number <> 0 Or SapGuiAuto Is Nothing Then Fin \"SAP GUI n'est pas accessible. Ouvrez SAP et connectez-vous, puis relancez le script.\", 48",
-  "  Set SapApp = SapGuiAuto.GetScriptingEngine",
-  "  If Err.Number <> 0 Or SapApp Is Nothing Then Fin \"Le scripting SAP n'est pas actif (voir options SAP GUI > Accessibilite et scripting).\", 48",
-  "  If SapApp.Children.Count = 0 Then Fin \"Aucune connexion SAP n'est ouverte.\", 48",
-  "  Set SapCon = SapApp.Children(0)",
-  "  If SapCon.Children.Count = 0 Then Fin \"Aucune session SAP active.\", 48",
-  "  Set session = SapCon.Children(0)",
-  "  On Error GoTo 0",
-  "End Sub",
-  "",
-  "' Saisie des affaires dans la fenetre de selection multiple (5 lignes visibles,",
-  "' defilement par blocs de 5).",
-  "Function SaisirSelectionMultiple(champSimple, boutonMultiple, tableId, valeurs)",
-  "  Dim tbl, i, ligne, scroll, nb",
-  "  session.findById(champSimple).SetFocus",
-  "  session.findById(champSimple).caretPosition = 0",
-  "  session.findById(boutonMultiple).press",
-  "  Set tbl = session.findById(tableId)",
-  "  ligne = 0 : scroll = 0 : nb = 0",
-  "  For i = 0 To UBound(valeurs)",
-  "    If Trim(valeurs(i)) <> \"\" Then",
-  "      If ligne = 5 Then",
-  "        scroll = scroll + 5",
-  "        tbl.verticalScrollbar.Position = scroll",
-  "        ligne = 0",
-  "      End If",
-  "      session.findById(tableId & \"/ctxtRSCSEL_255-SLOW_I[1,\" & ligne & \"]\").Text = valeurs(i)",
-  "      ligne = ligne + 1",
-  "      nb = nb + 1",
-  "    End If",
-  "  Next",
-  "  SaisirSelectionMultiple = nb",
-  "End Function",
-  "",
-  "Sub PreparerDossier(dossier, chemin)",
-  "  Dim parties, i, cur",
-  "  parties = Split(dossier, \"\\\")",
-  "  cur = \"\"",
-  "  For i = 0 To UBound(parties)",
-  "    If parties(i) <> \"\" Then",
-  "      If cur = \"\" Then cur = parties(i) & \"\\\" Else cur = cur & parties(i) & \"\\\"",
-  "      If i > 0 Then If Not fso.FolderExists(cur) Then fso.CreateFolder cur",
-  "    End If",
-  "  Next",
-  "  If fso.FileExists(chemin) Then fso.DeleteFile chemin, True",
-  "End Sub",
-  "",
-  "Function AttendreFichier(chemin, secondes)",
-  "  Dim t",
-  "  t = 0",
-  "  Do While t < secondes * 4",
-  "    If fso.FileExists(chemin) Then",
-  "      AttendreFichier = True",
-  "      Exit Function",
-  "    End If",
-  "    WScript.Sleep 250",
-  "    t = t + 1",
-  "  Loop",
-  "  AttendreFichier = fso.FileExists(chemin)",
-  "End Function",
-  "",
-  "Function Valeurs()",
-  "  Valeurs = Array(OTP_LISTE)",
-  "End Function",
-];
-
-function ligneOtp(otp) {
-  return otp.map(chaineVbs).join(", ");
+// Lien ouvert par l'appli pour lancer le gestionnaire installé. Jeu de
+// caractères volontairement restreint (pas de « % » : le gestionnaire passe
+// ce lien à une ligne de commande Windows) ; l'espace devient « + ».
+export function construireUrlLancement(type, params, otp, debut, fin) {
+  const q = [];
+  const ajoute = (cle, valeur) => q.push(cle + "=" + String(valeur ?? "").replace(/ /g, "+"));
+  ajoute("t", type);
+  ajoute("o", otp.join(","));
+  if (type === "mo") {
+    ajoute("d", dateSap(debut));
+    ajoute("f", dateSap(fin));
+    ajoute("s", params.societeSap);
+    ajoute("va", params.varianteAlvMo);
+    ajoute("lh", String(params.ligneVarianteMo ?? "").trim() === "" ? "-1" : params.ligneVarianteMo);
+  } else {
+    ajoute("oa", params.organisationAchats);
+    ajoute("vl", params.varianteListeFo);
+    ajoute("mf", params.miseEnFormeFo);
+    ajoute("pp", params.popupProjet ? "1" : "0");
+    ajoute("pr", params.profilProjet);
+  }
+  return `${PROTOCOLE_SAP}://run?` + q.join("&");
 }
 
-function entete(titre, description) {
+// ---------------------------------------------------------------------------
+// Moteur VBScript (partagé entre le script manuel et le gestionnaire installé)
+// ---------------------------------------------------------------------------
+
+const DECLARATIONS = String.raw`Option Explicit
+
+Dim SapGuiAuto, SapApp, SapCon, session, fso, wsh
+Dim MODE_APPLI, TYPE_EXTRACTION, LISTE_OTP, DATE_DEB, DATE_FIN, SOCIETE, ORG_ACHATS
+Dim VAR_LISTE_FO, MISE_FORME_FO, VAR_ALV_MO, LIGNE_HIST, POPUP_PROJET, PROFIL_PROJET
+Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT
+
+Const TABLE_SEL = "wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE"
+Const LISTE_ALV = "wnd[0]/usr/cntlO_CONTAINER/shellcont/shell/shellcont[1]/shell"
+Const SHELL_VAR = "wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell"
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set wsh = CreateObject("WScript.Shell")
+`;
+
+const MOTEUR = String.raw`
+Sub InitChemins()
+  CHEMIN = DOSSIER & FICHIER
+  CHEMIN_STATUT = DOSSIER & "statut-" & TYPE_EXTRACTION & ".txt"
+End Sub
+
+Sub EcrireStatut(etat, message)
+  Dim f
+  On Error Resume Next
+  Set f = fso.CreateTextFile(CHEMIN_STATUT, True, False)
+  f.WriteLine etat
+  f.WriteLine Replace(Replace(message, vbCr, " "), vbLf, " ")
+  f.Close
+  On Error GoTo 0
+End Sub
+
+Sub Fin(message, code)
+  If MODE_APPLI Then
+    If code = 64 Then
+      EcrireStatut "OK", message
+      WScript.Quit 0
+    Else
+      EcrireStatut "ERREUR", message
+      WScript.Quit 1
+    End If
+  Else
+    MsgBox message, code, "Extraction SAP"
+    WScript.Quit
+  End If
+End Sub
+
+Function Existe(id)
+  Dim o
+  Set o = Nothing
+  On Error Resume Next
+  Set o = session.findById(id)
+  Existe = (Err.Number = 0)
+  Err.Clear
+  On Error GoTo 0
+  If Existe Then
+    If o Is Nothing Then Existe = False
+  End If
+End Function
+
+Sub ConnecterSap()
+  Dim erreur
+  Set SapGuiAuto = Nothing
+  On Error Resume Next
+  Set SapGuiAuto = GetObject("SAPGUI")
+  erreur = Err.Number
+  Err.Clear
+  On Error GoTo 0
+  If erreur <> 0 Then Fin "SAP GUI n'est pas accessible. Ouvrez SAP et connectez-vous, puis relancez.", 48
+  If SapGuiAuto Is Nothing Then Fin "SAP GUI n'est pas accessible. Ouvrez SAP et connectez-vous, puis relancez.", 48
+  Set SapApp = Nothing
+  On Error Resume Next
+  Set SapApp = SapGuiAuto.GetScriptingEngine
+  erreur = Err.Number
+  Err.Clear
+  On Error GoTo 0
+  If erreur <> 0 Then Fin "Le scripting SAP n'est pas actif (options SAP GUI > Accessibilite et scripting).", 48
+  If SapApp Is Nothing Then Fin "Le scripting SAP n'est pas actif (options SAP GUI > Accessibilite et scripting).", 48
+  If SapApp.Children.Count = 0 Then Fin "Aucune connexion SAP n'est ouverte.", 48
+  Set SapCon = SapApp.Children(0)
+  If SapCon.Children.Count = 0 Then Fin "Aucune session SAP active.", 48
+  Set session = SapCon.Children(0)
+End Sub
+
+' Saisie des affaires dans la fenetre de selection multiple (5 lignes
+' visibles, defilement par blocs de 5).
+Function SaisirSelectionMultiple(champSimple, boutonMultiple)
+  Dim tbl, i, ligne, scroll, nb
+  session.findById(champSimple).SetFocus
+  session.findById(champSimple).caretPosition = 0
+  session.findById(boutonMultiple).press
+  Set tbl = session.findById(TABLE_SEL)
+  ligne = 0 : scroll = 0 : nb = 0
+  For i = 0 To UBound(LISTE_OTP)
+    If Trim(LISTE_OTP(i)) <> "" Then
+      If ligne = 5 Then
+        scroll = scroll + 5
+        tbl.verticalScrollbar.Position = scroll
+        ligne = 0
+      End If
+      session.findById(TABLE_SEL & "/ctxtRSCSEL_255-SLOW_I[1," & ligne & "]").Text = LISTE_OTP(i)
+      ligne = ligne + 1
+      nb = nb + 1
+    End If
+  Next
+  SaisirSelectionMultiple = nb
+End Function
+
+Sub PreparerDossier()
+  Dim parties, i, cur
+  parties = Split(DOSSIER, "\")
+  cur = ""
+  For i = 0 To UBound(parties)
+    If parties(i) <> "" Then
+      If cur = "" Then
+        cur = parties(i) & "\"
+      Else
+        cur = cur & parties(i) & "\"
+        If Not fso.FolderExists(cur) Then fso.CreateFolder cur
+      End If
+    End If
+  Next
+  If fso.FileExists(CHEMIN) Then fso.DeleteFile CHEMIN, True
+End Sub
+
+Function AttendreFichier(secondes)
+  Dim t
+  t = 0
+  Do While t < secondes * 4
+    If fso.FileExists(CHEMIN) Then
+      AttendreFichier = True
+      Exit Function
+    End If
+    WScript.Sleep 250
+    t = t + 1
+  Loop
+  AttendreFichier = fso.FileExists(CHEMIN)
+End Function
+
+Sub Terminer(libelle, ongletImport)
+  If AttendreFichier(20) Then
+    WScript.Sleep 800
+    Fin "Extraction " & libelle & " terminee. Fichier : " & CHEMIN & ongletImport, 64
+  Else
+    Fin "Extraction terminee, mais le fichier est introuvable : " & CHEMIN, 48
+  End If
+End Sub
+
+Sub ExtraireFo()
+  Dim nb, i, trouve, shell, v
+  session.findById("wnd[0]").Maximize
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "ME2J"
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+
+  If POPUP_PROJET Then
+    If Existe("wnd[1]/usr/ctxtTCNT-PROF_DB") Then
+      session.findById("wnd[1]/usr/ctxtTCNT-PROF_DB").Text = PROFIL_PROJET
+      session.findById("wnd[1]/usr/ctxtTCNT-PROF_DB").caretPosition = Len(PROFIL_PROJET)
+      session.findById("wnd[1]").sendVKey 4
+      If Existe("wnd[2]/tbar[0]/btn[0]") Then session.findById("wnd[2]/tbar[0]/btn[0]").press
+      If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+    End If
+  End If
+
+  nb = SaisirSelectionMultiple("wnd[0]/usr/ctxtCN_PSPNR-LOW", "wnd[0]/usr/btn%_CN_PSPNR_%_APP_%-VALU_PUSH")
+  If nb = 0 Then
+    If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
+    Fin "Aucune affaire exploitable.", 48
+  End If
+  session.findById("wnd[1]/tbar[0]/btn[8]").press
+
+  session.findById("wnd[0]/usr/ctxtS_EKORG-LOW").Text = ORG_ACHATS
+  session.findById("wnd[0]/usr/ctxtLISTU").Text = VAR_LISTE_FO
+  session.findById("wnd[0]/usr/ctxtLISTU").SetFocus
+  session.findById("wnd[0]/usr/ctxtLISTU").caretPosition = Len(session.findById("wnd[0]/usr/ctxtLISTU").Text)
+  session.findById("wnd[0]/tbar[1]/btn[8]").press
+
+  If MISE_FORME_FO <> "" Then
+    session.findById("wnd[0]/tbar[1]/btn[33]").press
+    Set shell = session.findById(SHELL_VAR)
+    trouve = False
+    For i = 0 To shell.RowCount - 1
+      v = ""
+      On Error Resume Next
+      v = shell.GetCellValue(i, "VARIANT")
+      On Error GoTo 0
+      If UCase(v) = UCase(MISE_FORME_FO) Then
+        shell.currentCellRow = i
+        shell.clickCurrentCell
+        trouve = True
+        Exit For
+      End If
+    Next
+    If Not trouve Then Fin "La mise en forme SAP " & MISE_FORME_FO & " est introuvable.", 48
+  End If
+
+  session.findById("wnd[0]/tbar[1]/btn[45]").press
+  If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+  session.findById("wnd[1]/usr/ctxtDY_PATH").Text = DOSSIER
+  session.findById("wnd[1]/usr/ctxtDY_FILENAME").Text = FICHIER
+  session.findById("wnd[1]/usr/ctxtDY_FILENAME").caretPosition = Len(FICHIER)
+  session.findById("wnd[1]/tbar[0]/btn[0]").press
+
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  session.findById("wnd[0]/tbar[0]/btn[12]").press
+  Terminer "ME2J", ""
+End Sub
+
+' Mise en forme ALV de ZCAT3 (logique de GOAT) : nom lu sur la ligne
+' LIGNE_HIST de la liste (mise en forme personnelle, ex. IAQ2_GUEST), sinon
+' nom configure, sinon clic direct sur cette ligne.
+Sub ChargerMiseEnFormeMo()
+  Dim shell, i, t, v, nomVar, cible
+  If VAR_ALV_MO = "" And LIGNE_HIST < 0 Then Exit Sub
+  session.findById(LISTE_ALV).pressToolbarContextButton "&MB_VARIANT"
+  session.findById(LISTE_ALV).selectContextMenuItem "&LOAD"
+  If Not Existe(SHELL_VAR) Then Fin "Impossible d'acceder a la liste des mises en forme SAP.", 48
+  Set shell = session.findById(SHELL_VAR)
+  nomVar = ""
+  If LIGNE_HIST >= 0 Then
+    On Error Resume Next
+    nomVar = Trim(shell.GetCellValue(LIGNE_HIST, "TEXT"))
+    If nomVar = "" Then nomVar = Trim(shell.GetCellValue(LIGNE_HIST, "VARIANT"))
+    On Error GoTo 0
+  End If
+  If nomVar = "" Then nomVar = VAR_ALV_MO
+  nomVar = LCase(Trim(nomVar))
+  cible = -1
+  If nomVar <> "" Then
+    For i = 0 To shell.RowCount - 1
+      t = "" : v = ""
+      On Error Resume Next
+      t = LCase(Trim(shell.GetCellValue(i, "TEXT")))
+      v = LCase(Trim(shell.GetCellValue(i, "VARIANT")))
+      On Error GoTo 0
+      If t = nomVar Or v = nomVar Then
+        cible = i
+        Exit For
+      End If
+    Next
+    If cible < 0 Then
+      For i = 0 To shell.RowCount - 1
+        t = "" : v = ""
+        On Error Resume Next
+        t = LCase(Trim(shell.GetCellValue(i, "TEXT")))
+        v = LCase(Trim(shell.GetCellValue(i, "VARIANT")))
+        On Error GoTo 0
+        If InStr(t, nomVar) > 0 Or InStr(v, nomVar) > 0 Then
+          cible = i
+          Exit For
+        End If
+      Next
+    End If
+  End If
+  If cible < 0 Then cible = LIGNE_HIST
+  If cible < 0 Then Fin "Mise en forme SAP introuvable (renseignez son nom dans les parametres, ex. IAQ2_GUEST).", 48
+  shell.firstVisibleRow = cible
+  shell.setCurrentCell cible, "TEXT"
+  shell.selectedRows = CStr(cible)
+  shell.clickCurrentCell
+End Sub
+
+Sub ExtraireMo()
+  Dim nb, ligneFocus, cellule
+  session.findById("wnd[0]").Maximize
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "ZCAT3"
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+  session.findById("wnd[0]/usr/ctxtPNPBEGDA").Text = DATE_DEB
+  session.findById("wnd[0]/usr/ctxtPNPENDDA").Text = DATE_FIN
+  session.findById("wnd[0]/usr/ctxtPNPBUKRS-LOW").Text = SOCIETE
+
+  nb = SaisirSelectionMultiple("wnd[0]/usr/ctxtS_RPROJ-LOW", "wnd[0]/usr/btn%_S_RPROJ_%_APP_%-VALU_PUSH")
+  If nb = 0 Then
+    If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
+    Fin "Aucune affaire exploitable.", 48
+  End If
+  If nb <= 1 Then
+    ligneFocus = 0
+  ElseIf nb = 2 Then
+    ligneFocus = 1
+  Else
+    ligneFocus = 2
+  End If
+  cellule = TABLE_SEL & "/ctxtRSCSEL_255-SLOW_I[1," & ligneFocus & "]"
+  session.findById(cellule).SetFocus
+  session.findById(cellule).caretPosition = Len(session.findById(cellule).Text)
+  session.findById("wnd[1]/tbar[0]/btn[6]").press
+  If Existe("wnd[2]/tbar[0]/btn[12]") Then session.findById("wnd[2]/tbar[0]/btn[12]").press
+  If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+  session.findById("wnd[1]/tbar[0]/btn[8]").press
+  session.findById("wnd[0]/usr/btn%_S_RPROJ_%_APP_%-VALU_PUSH").press
+  session.findById("wnd[1]/tbar[0]/btn[8]").press
+
+  session.findById("wnd[0]/tbar[1]/btn[8]").press
+  ChargerMiseEnFormeMo
+
+  session.findById(LISTE_ALV).pressToolbarContextButton "&MB_EXPORT"
+  session.findById(LISTE_ALV).selectContextMenuItem "&PC"
+  session.findById("wnd[1]/tbar[0]/btn[0]").press
+  If Existe("wnd[1]/usr/ctxtDY_PATH") Then
+    session.findById("wnd[1]/usr/ctxtDY_PATH").SetFocus
+    session.findById("wnd[1]/usr/ctxtDY_PATH").caretPosition = 0
+    session.findById("wnd[1]").sendVKey 4
+  End If
+  session.findById("wnd[2]/usr/ctxtDY_PATH").Text = DOSSIER
+  session.findById("wnd[2]/usr/ctxtDY_FILENAME").Text = FICHIER
+  session.findById("wnd[2]/usr/ctxtDY_FILENAME").caretPosition = Len(FICHIER)
+  session.findById("wnd[2]/tbar[0]/btn[11]").press
+  If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  session.findById("wnd[0]").sendVKey 0
+  Terminer "ZCAT3", ""
+End Sub
+
+Sub Lancer()
+  InitChemins
+  PreparerDossier
+  ConnecterSap
+  If TYPE_EXTRACTION = "fo" Then
+    ExtraireFo
+  Else
+    ExtraireMo
+  End If
+End Sub
+`;
+
+// ---------------------------------------------------------------------------
+// Script manuel (téléchargé, valeurs figées)
+// ---------------------------------------------------------------------------
+
+function enteteManuel(titre, otp, suite) {
   return [
     "' ============================================================",
     `' ${titre}`,
-    `' ${description}`,
+    `' Affaires : ${otp.join(", ")}${suite ? " - " + suite : ""}`,
     "' Genere par l'application Pilotage de projets.",
     "' Prerequis : SAP GUI ouvert et connecte, scripting active.",
     "' Lancement : double-clic sur ce fichier.",
     "' ============================================================",
-  ];
+    "",
+  ].join("\r\n");
 }
 
-function socle(titre, otp) {
-  return SOCLE_VBS.map((l) =>
-    l.replace("OTP_LISTE", ligneOtp(otp)).replace("TITRE", chaineVbs(titre))
-  );
-}
-
-// ME2J : liste des commandes par élément d'OTP -> export texte (achats).
-// Les dates ne sont pas utilisées par la transaction (comme dans GOAT).
-export function genererScriptMe2j(params, otp) {
-  const dossier = avecAntiSlash(params.dossierFo);
-  const fichier = nettoyerNomFichier(params.fichierFo);
-  const chemin = dossier + fichier;
-  const L = [];
-  L.push(...entete("Extraction SAP ME2J (achats / fournitures)", `Affaires : ${otp.join(", ")}`));
-  L.push("");
-  L.push(...socle("Extraction ME2J", otp));
-  L.push("");
-  L.push("Const DOSSIER = " + chaineVbs(dossier));
-  L.push("Const FICHIER = " + chaineVbs(fichier));
-  L.push("Const CHEMIN = " + chaineVbs(chemin));
-  L.push("Const TABLE_SEL = \"wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE\"");
-  L.push("");
-  L.push("Dim nb, i, trouve, shell, v");
-  L.push("PreparerDossier DOSSIER, CHEMIN");
-  L.push("ConnecterSap");
-  L.push("");
-  L.push("' Ouverture de la transaction ME2J");
-  L.push("session.findById(\"wnd[0]\").Maximize");
-  L.push("session.findById(\"wnd[0]/tbar[0]/okcd\").Text = \"ME2J\"");
-  L.push("session.findById(\"wnd[0]/tbar[0]/btn[0]\").press");
-  if (params.popupProjet) {
-    L.push("");
-    L.push("' Popup projet (profil specifique a certains utilisateurs)");
-    L.push("If Existe(\"wnd[1]/usr/ctxtTCNT-PROF_DB\") Then");
-    L.push("  session.findById(\"wnd[1]/usr/ctxtTCNT-PROF_DB\").Text = " + chaineVbs(params.profilProjet));
-    L.push("  session.findById(\"wnd[1]/usr/ctxtTCNT-PROF_DB\").caretPosition = " + String(String(params.profilProjet || "").length));
-    L.push("  session.findById(\"wnd[1]\").sendVKey 4");
-    L.push("  If Existe(\"wnd[2]/tbar[0]/btn[0]\") Then session.findById(\"wnd[2]/tbar[0]/btn[0]\").press");
-    L.push("  If Existe(\"wnd[1]/tbar[0]/btn[0]\") Then session.findById(\"wnd[1]/tbar[0]/btn[0]\").press");
-    L.push("End If");
-  }
-  L.push("");
-  L.push("' Selection multiple des affaires (elements d'OTP)");
-  L.push("nb = SaisirSelectionMultiple(\"wnd[0]/usr/ctxtCN_PSPNR-LOW\", \"wnd[0]/usr/btn%_CN_PSPNR_%_APP_%-VALU_PUSH\", TABLE_SEL, Valeurs())");
-  L.push("If nb = 0 Then");
-  L.push("  If Existe(\"wnd[1]/tbar[0]/btn[12]\") Then session.findById(\"wnd[1]/tbar[0]/btn[12]\").press");
-  L.push("  Fin \"Aucune affaire exploitable.\", 48");
-  L.push("End If");
-  L.push("session.findById(\"wnd[1]/tbar[0]/btn[8]\").press");
-  L.push("");
-  L.push("' Organisation d'achats + variante de liste, puis execution");
-  L.push("session.findById(\"wnd[0]/usr/ctxtS_EKORG-LOW\").Text = " + chaineVbs(params.organisationAchats));
-  L.push("session.findById(\"wnd[0]/usr/ctxtLISTU\").Text = " + chaineVbs(params.varianteListeFo));
-  L.push("session.findById(\"wnd[0]/usr/ctxtLISTU\").SetFocus");
-  L.push("session.findById(\"wnd[0]/usr/ctxtLISTU\").caretPosition = Len(session.findById(\"wnd[0]/usr/ctxtLISTU\").Text)");
-  L.push("session.findById(\"wnd[0]/tbar[1]/btn[8]\").press");
-  L.push("");
-  if (String(params.miseEnFormeFo || "").trim()) {
-    L.push("' Mise en forme ALV " + String(params.miseEnFormeFo).trim());
-    L.push("session.findById(\"wnd[0]/tbar[1]/btn[33]\").press");
-    L.push("Set shell = session.findById(\"wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell\")");
-    L.push("trouve = False");
-    L.push("For i = 0 To shell.RowCount - 1");
-    L.push("  v = \"\"");
-    L.push("  On Error Resume Next");
-    L.push("  v = shell.GetCellValue(i, \"VARIANT\")");
-    L.push("  On Error GoTo 0");
-    L.push("  If UCase(v) = UCase(" + chaineVbs(params.miseEnFormeFo.trim()) + ") Then");
-    L.push("    shell.currentCellRow = i");
-    L.push("    shell.clickCurrentCell");
-    L.push("    trouve = True");
-    L.push("    Exit For");
-    L.push("  End If");
-    L.push("Next");
-    L.push("If Not trouve Then Fin \"La mise en forme SAP " + String(params.miseEnFormeFo).trim().replace(/"/g, "") + " est introuvable.\", 48");
-    L.push("");
-  }
-  L.push("' Export de la liste en fichier texte");
-  L.push("session.findById(\"wnd[0]/tbar[1]/btn[45]\").press");
-  L.push("If Existe(\"wnd[1]/tbar[0]/btn[0]\") Then session.findById(\"wnd[1]/tbar[0]/btn[0]\").press");
-  L.push("session.findById(\"wnd[1]/usr/ctxtDY_PATH\").Text = DOSSIER");
-  L.push("session.findById(\"wnd[1]/usr/ctxtDY_FILENAME\").Text = FICHIER");
-  L.push("session.findById(\"wnd[1]/usr/ctxtDY_FILENAME\").caretPosition = Len(FICHIER)");
-  L.push("session.findById(\"wnd[1]/tbar[0]/btn[0]\").press");
-  L.push("");
-  L.push("' Retour a l'ecran principal");
-  L.push("session.findById(\"wnd[0]/tbar[0]/btn[3]\").press");
-  L.push("session.findById(\"wnd[0]/tbar[0]/btn[12]\").press");
-  L.push("");
-  L.push("If AttendreFichier(CHEMIN, 15) Then");
-  L.push("  Fin \"Extraction ME2J terminee.\" & vbCrLf & \"Fichier genere : \" & CHEMIN & vbCrLf & vbCrLf & \"Importez-le dans l'application (Import SAP > Achats).\", 64");
-  L.push("Else");
-  L.push("  Fin \"Extraction terminee, mais le fichier est introuvable :\" & vbCrLf & CHEMIN, 48");
-  L.push("End If");
-  return L.join("\r\n") + "\r\n";
-}
-
-// ZCAT3 : pointages CATS sur la période -> export texte (main d'oeuvre).
-export function genererScriptZcat3(params, otp, debut, fin) {
-  const dossier = avecAntiSlash(params.dossierMo);
-  const fichier = nettoyerNomFichier(params.fichierMo);
-  const chemin = dossier + fichier;
-  const d = dateSap(debut);
-  const f = dateSap(fin);
-  const L = [];
-  L.push(...entete("Extraction SAP ZCAT3 (pointages / main d'oeuvre)", `Affaires : ${otp.join(", ")} - du ${d} au ${f}`));
-  L.push("");
-  L.push(...socle("Extraction ZCAT3", otp));
-  L.push("");
-  L.push("Const DOSSIER = " + chaineVbs(dossier));
-  L.push("Const FICHIER = " + chaineVbs(fichier));
-  L.push("Const CHEMIN = " + chaineVbs(chemin));
-  L.push("Const TABLE_SEL = \"wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE\"");
-  L.push("Const LISTE_ALV = \"wnd[0]/usr/cntlO_CONTAINER/shellcont/shell/shellcont[1]/shell\"");
-  L.push("");
-  L.push("Dim nb, i, ligneFocus, cellule, shell, v, t, nomVar, cible, ligneHist");
-  L.push("PreparerDossier DOSSIER, CHEMIN");
-  L.push("ConnecterSap");
-  L.push("");
-  L.push("' Ouverture de la transaction ZCAT3 et criteres (dates + societe)");
-  L.push("session.findById(\"wnd[0]\").Maximize");
-  L.push("session.findById(\"wnd[0]/tbar[0]/okcd\").Text = \"ZCAT3\"");
-  L.push("session.findById(\"wnd[0]/tbar[0]/btn[0]\").press");
-  L.push("session.findById(\"wnd[0]/usr/ctxtPNPBEGDA\").Text = " + chaineVbs(d));
-  L.push("session.findById(\"wnd[0]/usr/ctxtPNPENDDA\").Text = " + chaineVbs(f));
-  L.push("session.findById(\"wnd[0]/usr/ctxtPNPBUKRS-LOW\").Text = " + chaineVbs(params.societeSap));
-  L.push("");
-  L.push("' Selection multiple des affaires");
-  L.push("nb = SaisirSelectionMultiple(\"wnd[0]/usr/ctxtS_RPROJ-LOW\", \"wnd[0]/usr/btn%_S_RPROJ_%_APP_%-VALU_PUSH\", TABLE_SEL, Valeurs())");
-  L.push("If nb = 0 Then");
-  L.push("  If Existe(\"wnd[1]/tbar[0]/btn[12]\") Then session.findById(\"wnd[1]/tbar[0]/btn[12]\").press");
-  L.push("  Fin \"Aucune affaire exploitable.\", 48");
-  L.push("End If");
-  L.push("If nb <= 1 Then");
-  L.push("  ligneFocus = 0");
-  L.push("ElseIf nb = 2 Then");
-  L.push("  ligneFocus = 1");
-  L.push("Else");
-  L.push("  ligneFocus = 2");
-  L.push("End If");
-  L.push("cellule = TABLE_SEL & \"/ctxtRSCSEL_255-SLOW_I[1,\" & ligneFocus & \"]\"");
-  L.push("session.findById(cellule).SetFocus");
-  L.push("session.findById(cellule).caretPosition = Len(session.findById(cellule).Text)");
-  L.push("session.findById(\"wnd[1]/tbar[0]/btn[6]\").press");
-  L.push("If Existe(\"wnd[2]/tbar[0]/btn[12]\") Then session.findById(\"wnd[2]/tbar[0]/btn[12]\").press");
-  L.push("If Existe(\"wnd[1]/tbar[0]/btn[0]\") Then session.findById(\"wnd[1]/tbar[0]/btn[0]\").press");
-  L.push("session.findById(\"wnd[1]/tbar[0]/btn[8]\").press");
-  L.push("session.findById(\"wnd[0]/usr/btn%_S_RPROJ_%_APP_%-VALU_PUSH\").press");
-  L.push("session.findById(\"wnd[1]/tbar[0]/btn[8]\").press");
-  L.push("");
-  L.push("' Execution");
-  L.push("session.findById(\"wnd[0]/tbar[1]/btn[8]\").press");
-  L.push("");
+export function genererScriptManuel(type, params, otp, debut, fin) {
+  const fo = type === "fo";
+  const dossier = avecAntiSlash(fo ? params.dossierFo : params.dossierMo);
+  const fichier = nettoyerNomFichier(fo ? params.fichierFo : params.fichierMo);
   const ligneHist = Number.parseInt(params.ligneVarianteMo, 10);
-  const nomVariante = String(params.varianteAlvMo || "").trim();
-  if (nomVariante || ligneHist >= 0) {
-    const SHELL_VAR =
-      "wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell";
-    L.push("' Chargement de la mise en forme ALV (logique de GOAT) :");
-    L.push("' 1) nom lu sur la ligne de la liste ou se trouve la mise en forme personnelle (ex. IAQ2_GUEST),");
-    L.push("' 2) sinon nom configure, 3) sinon, clic direct sur cette ligne.");
-    L.push("session.findById(LISTE_ALV).pressToolbarContextButton \"&MB_VARIANT\"");
-    L.push("session.findById(LISTE_ALV).selectContextMenuItem \"&LOAD\"");
-    L.push("If Not Existe(\"" + SHELL_VAR + "\") Then Fin \"Impossible d'acceder a la liste des mises en forme SAP.\", 48");
-    L.push("Set shell = session.findById(\"" + SHELL_VAR + "\")");
-    L.push("ligneHist = " + (ligneHist >= 0 ? ligneHist : -1));
-    L.push("nomVar = \"\"");
-    L.push("If ligneHist >= 0 Then");
-    L.push("  On Error Resume Next");
-    L.push("  nomVar = Trim(shell.GetCellValue(ligneHist, \"TEXT\"))");
-    L.push("  If nomVar = \"\" Then nomVar = Trim(shell.GetCellValue(ligneHist, \"VARIANT\"))");
-    L.push("  On Error GoTo 0");
-    L.push("End If");
-    L.push("If nomVar = \"\" Then nomVar = " + chaineVbs(nomVariante));
-    L.push("nomVar = LCase(Trim(nomVar))");
-    L.push("cible = -1");
-    L.push("If nomVar <> \"\" Then");
-    L.push("  For i = 0 To shell.RowCount - 1");
-    L.push("    t = \"\" : v = \"\"");
-    L.push("    On Error Resume Next");
-    L.push("    t = LCase(Trim(shell.GetCellValue(i, \"TEXT\")))");
-    L.push("    v = LCase(Trim(shell.GetCellValue(i, \"VARIANT\")))");
-    L.push("    On Error GoTo 0");
-    L.push("    If t = nomVar Or v = nomVar Then cible = i : Exit For");
-    L.push("  Next");
-    L.push("  If cible < 0 Then");
-    L.push("    For i = 0 To shell.RowCount - 1");
-    L.push("      t = \"\" : v = \"\"");
-    L.push("      On Error Resume Next");
-    L.push("      t = LCase(Trim(shell.GetCellValue(i, \"TEXT\")))");
-    L.push("      v = LCase(Trim(shell.GetCellValue(i, \"VARIANT\")))");
-    L.push("      On Error GoTo 0");
-    L.push("      If InStr(t, nomVar) > 0 Or InStr(v, nomVar) > 0 Then cible = i : Exit For");
-    L.push("    Next");
-    L.push("  End If");
-    L.push("End If");
-    L.push("If cible < 0 Then cible = ligneHist");
-    L.push("If cible < 0 Then Fin \"Mise en forme SAP introuvable (renseignez son nom dans les parametres, ex. IAQ2_GUEST).\", 48");
-    L.push("shell.firstVisibleRow = cible");
-    L.push("shell.setCurrentCell cible, \"TEXT\"");
-    L.push("shell.selectedRows = CStr(cible)");
-    L.push("shell.clickCurrentCell");
-    L.push("");
-  }
-  L.push("' Export de la liste en fichier texte (menu Exporter > Fichier local)");
-  L.push("session.findById(LISTE_ALV).pressToolbarContextButton \"&MB_EXPORT\"");
-  L.push("session.findById(LISTE_ALV).selectContextMenuItem \"&PC\"");
-  L.push("session.findById(\"wnd[1]/tbar[0]/btn[0]\").press");
-  L.push("If Existe(\"wnd[1]/usr/ctxtDY_PATH\") Then");
-  L.push("  session.findById(\"wnd[1]/usr/ctxtDY_PATH\").SetFocus");
-  L.push("  session.findById(\"wnd[1]/usr/ctxtDY_PATH\").caretPosition = 0");
-  L.push("  session.findById(\"wnd[1]\").sendVKey 4");
-  L.push("End If");
-  L.push("session.findById(\"wnd[2]/usr/ctxtDY_PATH\").Text = DOSSIER");
-  L.push("session.findById(\"wnd[2]/usr/ctxtDY_FILENAME\").Text = FICHIER");
-  L.push("session.findById(\"wnd[2]/usr/ctxtDY_FILENAME\").caretPosition = Len(FICHIER)");
-  L.push("session.findById(\"wnd[2]/tbar[0]/btn[11]\").press");
-  L.push("If Existe(\"wnd[1]/tbar[0]/btn[0]\") Then session.findById(\"wnd[1]/tbar[0]/btn[0]\").press");
-  L.push("");
-  L.push("' Retour a l'ecran principal");
-  L.push("session.findById(\"wnd[0]/tbar[0]/btn[3]\").press");
-  L.push("session.findById(\"wnd[0]/tbar[0]/btn[0]\").press");
-  L.push("session.findById(\"wnd[0]/tbar[0]/btn[3]\").press");
-  L.push("session.findById(\"wnd[0]\").sendVKey 0");
-  L.push("");
-  L.push("If AttendreFichier(CHEMIN, 15) Then");
-  L.push("  Fin \"Extraction ZCAT3 terminee.\" & vbCrLf & \"Fichier genere : \" & CHEMIN & vbCrLf & vbCrLf & \"Importez-le dans l'application (Import SAP > Pointages).\", 64");
-  L.push("Else");
-  L.push("  Fin \"Extraction terminee, mais le fichier est introuvable :\" & vbCrLf & CHEMIN, 48");
-  L.push("End If");
-  return L.join("\r\n") + "\r\n";
+  const valeurs = [
+    `MODE_APPLI = False`,
+    `TYPE_EXTRACTION = ${chaineVbs(type)}`,
+    `LISTE_OTP = Array(${otp.map(chaineVbs).join(", ")})`,
+    `DATE_DEB = ${chaineVbs(dateSap(debut))}`,
+    `DATE_FIN = ${chaineVbs(dateSap(fin))}`,
+    `SOCIETE = ${chaineVbs(params.societeSap)}`,
+    `ORG_ACHATS = ${chaineVbs(params.organisationAchats)}`,
+    `VAR_LISTE_FO = ${chaineVbs(params.varianteListeFo)}`,
+    `MISE_FORME_FO = ${chaineVbs(String(params.miseEnFormeFo || "").trim())}`,
+    `VAR_ALV_MO = ${chaineVbs(String(params.varianteAlvMo || "").trim())}`,
+    `LIGNE_HIST = ${Number.isFinite(ligneHist) && ligneHist >= 0 ? ligneHist : -1}`,
+    `POPUP_PROJET = ${params.popupProjet ? "True" : "False"}`,
+    `PROFIL_PROJET = ${chaineVbs(params.profilProjet)}`,
+    `DOSSIER = ${chaineVbs(dossier)}`,
+    `FICHIER = ${chaineVbs(fichier)}`,
+    "Lancer",
+    "",
+  ].join("\r\n");
+  const titre = fo ? "Extraction SAP ME2J (achats / fournitures)" : "Extraction SAP ZCAT3 (pointages / main d'oeuvre)";
+  const corps = (DECLARATIONS + "\n" + valeurs + MOTEUR).replace(/\r?\n/g, "\r\n");
+  return enteteManuel(titre, otp, fo ? "" : `du ${dateSap(debut)} au ${dateSap(fin)}`) + corps + "\r\n";
+}
+
+// ---------------------------------------------------------------------------
+// Gestionnaire du lien ineo-sap:// (installé une fois par poste)
+// ---------------------------------------------------------------------------
+
+const GESTIONNAIRE_MAIN = String.raw`
+' Gestionnaire du lien ineo-sap://run?... ouvert par l'application.
+' Mode normal : valide le lien, puis relance ce meme script en mode moteur
+' (cscript masque) et consigne le resultat dans statut-<type>.txt.
+Dim msgMoteur
+If WScript.Arguments.Count >= 2 Then
+  If WScript.Arguments(0) = "--engine" Then
+    MODE_APPLI = True
+    msgMoteur = ChargerDepuisUrl(WScript.Arguments(1))
+    InitChemins
+    If msgMoteur <> "" Then Fin msgMoteur, 48
+    Lancer
+    WScript.Quit 0
+  End If
+End If
+If WScript.Arguments.Count = 1 Then Wrapper
+WScript.Quit 0
+`;
+
+const GESTIONNAIRE_FONCTIONS = String.raw`
+Function Valide(motif, s)
+  Dim r
+  Set r = New RegExp
+  r.Pattern = motif
+  r.IgnoreCase = False
+  Valide = r.Test(s)
+End Function
+
+' Charge et VALIDE les parametres du lien (liste blanche de caracteres) :
+' une page quelconque peut ouvrir ce lien, rien d'autre que ces valeurs
+' ne doit pouvoir atteindre SAP ou le disque.
+Function ChargerDepuisUrl(url)
+  Dim p, parts, i, kv, d, otps, j, base
+  ChargerDepuisUrl = ""
+  base = wsh.ExpandEnvironmentStrings("%USERPROFILE%") & "\PilotageSAP\exports\"
+  DOSSIER = base
+  TYPE_EXTRACTION = "fo"
+  p = InStr(url, "?")
+  If p = 0 Then
+    ChargerDepuisUrl = "Lien invalide."
+    Exit Function
+  End If
+  Set d = CreateObject("Scripting.Dictionary")
+  parts = Split(Mid(url, p + 1), "&")
+  For i = 0 To UBound(parts)
+    kv = Split(parts(i), "=", 2)
+    If UBound(kv) = 1 Then d(kv(0)) = Replace(kv(1), "+", " ")
+  Next
+  If Not d.Exists("t") Then
+    ChargerDepuisUrl = "Type d'extraction manquant."
+    Exit Function
+  End If
+  If Not Valide("^(fo|mo)$", d("t")) Then
+    ChargerDepuisUrl = "Type d'extraction invalide."
+    Exit Function
+  End If
+  TYPE_EXTRACTION = d("t")
+  If TYPE_EXTRACTION = "fo" Then FICHIER = "export-fo-sap.txt" Else FICHIER = "export-mo-sap.txt"
+  If Not d.Exists("o") Then
+    ChargerDepuisUrl = "Aucune affaire dans le lien."
+    Exit Function
+  End If
+  otps = Split(d("o"), ",")
+  If UBound(otps) > 59 Then
+    ChargerDepuisUrl = "Trop d'affaires."
+    Exit Function
+  End If
+  For j = 0 To UBound(otps)
+    If Not Valide("^[A-Z0-9._-]{4,24}$", otps(j)) Then
+      ChargerDepuisUrl = "Code affaire invalide : " & Left(otps(j), 30)
+      Exit Function
+    End If
+  Next
+  LISTE_OTP = otps
+  DATE_DEB = "" : DATE_FIN = "" : SOCIETE = "" : ORG_ACHATS = ""
+  VAR_LISTE_FO = "" : MISE_FORME_FO = "" : VAR_ALV_MO = "" : LIGNE_HIST = -1
+  POPUP_PROJET = False : PROFIL_PROJET = ""
+  If TYPE_EXTRACTION = "mo" Then
+    If Not (d.Exists("d") And d.Exists("f") And d.Exists("s")) Then
+      ChargerDepuisUrl = "Dates ou societe manquantes."
+      Exit Function
+    End If
+    If Not (Valide("^\d{2}\.\d{2}\.\d{4}$", d("d")) And Valide("^\d{2}\.\d{2}\.\d{4}$", d("f"))) Then
+      ChargerDepuisUrl = "Dates invalides."
+      Exit Function
+    End If
+    If Not Valide("^[A-Za-z0-9]{1,10}$", d("s")) Then
+      ChargerDepuisUrl = "Code societe invalide."
+      Exit Function
+    End If
+    DATE_DEB = d("d") : DATE_FIN = d("f") : SOCIETE = d("s")
+    If d.Exists("va") Then
+      If Not Valide("^[A-Za-z0-9_/. -]{0,40}$", d("va")) Then
+        ChargerDepuisUrl = "Mise en forme invalide."
+        Exit Function
+      End If
+      VAR_ALV_MO = Trim(d("va"))
+    End If
+    If d.Exists("lh") Then
+      If Not Valide("^-?[0-9]{1,3}$", d("lh")) Then
+        ChargerDepuisUrl = "Ligne de mise en forme invalide."
+        Exit Function
+      End If
+      LIGNE_HIST = CInt(d("lh"))
+    End If
+  Else
+    If Not d.Exists("oa") Then
+      ChargerDepuisUrl = "Organisation d'achats manquante."
+      Exit Function
+    End If
+    If Not Valide("^[A-Za-z0-9]{1,10}$", d("oa")) Then
+      ChargerDepuisUrl = "Organisation d'achats invalide."
+      Exit Function
+    End If
+    ORG_ACHATS = d("oa")
+    If d.Exists("vl") Then
+      If Not Valide("^[A-Za-z0-9_/. -]{0,40}$", d("vl")) Then
+        ChargerDepuisUrl = "Variante invalide."
+        Exit Function
+      End If
+      VAR_LISTE_FO = Trim(d("vl"))
+    End If
+    If d.Exists("mf") Then
+      If Not Valide("^[A-Za-z0-9_/. -]{0,40}$", d("mf")) Then
+        ChargerDepuisUrl = "Mise en forme invalide."
+        Exit Function
+      End If
+      MISE_FORME_FO = Trim(d("mf"))
+    End If
+    If d.Exists("pp") Then
+      If Not Valide("^[01]$", d("pp")) Then
+        ChargerDepuisUrl = "Parametre invalide."
+        Exit Function
+      End If
+      POPUP_PROJET = (d("pp") = "1")
+    End If
+    If d.Exists("pr") Then
+      If Not Valide("^[A-Za-z0-9_]{0,12}$", d("pr")) Then
+        ChargerDepuisUrl = "Profil projet invalide."
+        Exit Function
+      End If
+      PROFIL_PROJET = d("pr")
+    End If
+  End If
+End Function
+
+Function LirePremiereLigne(chemin)
+  Dim f
+  LirePremiereLigne = ""
+  On Error Resume Next
+  If fso.FileExists(chemin) Then
+    Set f = fso.OpenTextFile(chemin, 1)
+    LirePremiereLigne = Trim(f.ReadLine)
+    f.Close
+  End If
+  On Error GoTo 0
+End Function
+
+Sub Wrapper()
+  Dim url, msg, tmp, cmd, rc, txt, f
+  url = WScript.Arguments(0)
+  MODE_APPLI = True
+  msg = ChargerDepuisUrl(url)
+  InitChemins
+  If msg <> "" Then
+    EcrireStatut "ERREUR", msg
+    WScript.Quit 1
+  End If
+  PreparerDossier
+  EcrireStatut "EN_COURS", "Lancement"
+  tmp = wsh.ExpandEnvironmentStrings("%TEMP%") & "\pilotage-sap-" & TYPE_EXTRACTION & ".log"
+  cmd = "cmd /c ""cscript.exe //nologo """ & WScript.ScriptFullName & """ --engine """ & url & """ > """ & tmp & """ 2>&1"""
+  rc = wsh.Run(cmd, 0, True)
+  If rc <> 0 Then
+    If LirePremiereLigne(CHEMIN_STATUT) <> "ERREUR" Then
+      txt = ""
+      On Error Resume Next
+      If fso.FileExists(tmp) Then
+        Set f = fso.OpenTextFile(tmp, 1)
+        txt = Left(f.ReadAll, 300)
+        f.Close
+      End If
+      On Error GoTo 0
+      EcrireStatut "ERREUR", "Erreur pendant le pilotage de SAP. " & txt
+    End If
+  End If
+End Sub
+`;
+
+export function genererGestionnaire() {
+  return (DECLARATIONS + MOTEUR + GESTIONNAIRE_FONCTIONS + GESTIONNAIRE_MAIN).replace(/\r?\n/g, "\r\n");
+}
+
+// Installateur (à lancer une fois par poste, sans droits administrateur) :
+// écrit le gestionnaire dans %USERPROFILE%\PilotageSAP et déclare le lien
+// ineo-sap:// pour l'utilisateur courant (HKCU).
+export function genererInstallateur() {
+  const lignes = genererGestionnaire()
+    .split("\r\n")
+    .map((l) => `f.WriteLine "${l.replace(/"/g, '""')}"`);
+  return [
+    "' Installation de Pilotage SAP sur ce poste (une seule fois).",
+    "' Cree %USERPROFILE%\\PilotageSAP et declare le lien " + PROTOCOLE_SAP + ":// pour l'utilisateur courant.",
+    "Option Explicit",
+    "Dim wsh, fso, base, expo, hand, f",
+    'Set wsh = CreateObject("WScript.Shell")',
+    'Set fso = CreateObject("Scripting.FileSystemObject")',
+    'base = wsh.ExpandEnvironmentStrings("%USERPROFILE%") & "\\PilotageSAP"',
+    'expo = base & "\\exports"',
+    "If Not fso.FolderExists(base) Then fso.CreateFolder base",
+    "If Not fso.FolderExists(expo) Then fso.CreateFolder expo",
+    'hand = base & "\\pilotage-sap.vbs"',
+    "Set f = fso.CreateTextFile(hand, True, False)",
+    ...lignes,
+    "f.Close",
+    `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_SAP}\\", "URL:Pilotage SAP", "REG_SZ"`,
+    `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_SAP}\\URL Protocol", "", "REG_SZ"`,
+    `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_SAP}\\shell\\open\\command\\", "wscript.exe """ & hand & """ ""%1""", "REG_SZ"`,
+    'MsgBox "Installation terminee." & vbCrLf & vbCrLf & "Dossier d\'export a choisir dans l\'application (une seule fois) :" & vbCrLf & expo, 64, "Pilotage SAP"',
+    "",
+  ].join("\r\n");
 }
