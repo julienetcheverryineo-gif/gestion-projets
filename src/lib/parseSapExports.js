@@ -56,13 +56,16 @@ const PREFIXE_AGENCE_OTP = "AAQ5";
 // Champ "Compte" du chantier (ex. "JE605", voir SiteFormModal) -> code
 // OTP complet tel qu'il apparaît dans les lignes importées (ex.
 // "AAQ5JE605") — utilisé pour retrouver les lignes SAP d'un chantier
-// donné. Tolère que le compte ait déjà été saisi avec le préfixe.
+// donné. Tolère que le compte ait déjà été saisi avec le préfixe, et laisse
+// tel quel un compte qui porte déjà le code d'une autre agence (ex.
+// "AAQ2.A0006" : 3 lettres puis un chiffre, là où un compte normal comme
+// "JE601" a un chiffre dès le 3e caractère).
 export function otpDepuisCompte(compte) {
   const brut = (compte || "").trim().toUpperCase().replace(/\s+/g, "");
   if (!brut) return null;
-  const suffixe = brut.startsWith(PREFIXE_AGENCE_OTP) ? brut.slice(PREFIXE_AGENCE_OTP.length) : brut;
-  if (!suffixe) return null;
-  return PREFIXE_AGENCE_OTP + suffixe;
+  if (brut.startsWith(PREFIXE_AGENCE_OTP)) return brut.length > PREFIXE_AGENCE_OTP.length ? brut : null;
+  if (/^[A-Z]{3}\d/.test(brut)) return brut;
+  return PREFIXE_AGENCE_OTP + brut;
 }
 
 const CHAMPS_FO = [
