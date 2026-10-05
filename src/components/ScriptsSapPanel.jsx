@@ -219,7 +219,12 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
           fini = true;
           break;
         }
-        setEtat({ phase: "attente", type, message: `Extraction ${libelle} en cours dans SAP…` });
+        setEtat({
+          phase: "attente",
+          type,
+          message:
+            detail && detail !== "Lancement" ? detail : `Extraction ${libelle} en cours dans SAP…`,
+        });
       } else if (!reponse && Date.now() - t0 > 15000) {
         setEtat({
           phase: "attente",
@@ -465,6 +470,17 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
 
           {onglet === "reglages" && (
             <div className="sap-section">
+              <div className="sap-groupe">
+                <h3>Connexion</h3>
+                <div className="sap-champs">
+                  {champ(
+                    "Système SAP (entrée SAP Logon)",
+                    "systemeSap",
+                    "SAP est démarré et connecté à ce système si besoin (ex. PE1) ; vide = session déjà ouverte"
+                  )}
+                </div>
+              </div>
+
               <div className="sap-groupe">
                 <h3>Achats (ME2J)</h3>
                 <div className="sap-champs">
