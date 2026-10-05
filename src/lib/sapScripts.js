@@ -22,6 +22,7 @@ export const PARAMS_SAP_DEFAUT = {
   miseEnFormeFo: "/GOAT_FO", // mise en forme ALV ME2J
   varianteAlvMo: "ZCAT3_EXPORT_TXT", // mise en forme ALV ZCAT3 (ou la vôtre, ex. IAQ2_GUEST)
   ligneVarianteMo: "50", // ligne de la liste des mises en forme où GOAT lit la variante personnelle ("" = ignorer)
+  afficherSap: false, // true = fenêtre SAP visible (dépannage)
   popupProjet: false, // utilisateurs "fenêtre projet" ME2J
   profilProjet: "aaa",
   // Utilisés uniquement par le script manuel : le gestionnaire installé
@@ -114,6 +115,7 @@ export function construireUrlLancement(type, params, otp, debut, fin) {
   const ajoute = (cle, valeur) => q.push(cle + "=" + String(valeur ?? "").replace(/ /g, "+"));
   ajoute("t", type);
   ajoute("o", otp.join(","));
+  ajoute("ax", params.afficherSap ? "1" : "0");
   if (type === "mo") {
     ajoute("d", dateSap(debut));
     ajoute("f", dateSap(fin));
@@ -139,7 +141,7 @@ const DECLARATIONS = String.raw`Option Explicit
 Dim SapGuiAuto, SapApp, SapCon, session, fso, wsh
 Dim MODE_APPLI, TYPE_EXTRACTION, LISTE_OTP, DATE_DEB, DATE_FIN, SOCIETE, ORG_ACHATS
 Dim VAR_LISTE_FO, MISE_FORME_FO, VAR_ALV_MO, LIGNE_HIST, POPUP_PROJET, PROFIL_PROJET
-Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT
+Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT, AFFICHER_SAP, SESSION_CREEE
 
 Const TABLE_SEL = "wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE"
 Const LISTE_ALV = "wnd[0]/usr/cntlO_CONTAINER/shellcont/shell/shellcont[1]/shell"
@@ -147,6 +149,7 @@ Const SHELL_VAR = "wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:05
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set wsh = CreateObject("WScript.Shell")
+SESSION_CREEE = False
 `;
 
 const MOTEUR = String.raw`
@@ -166,6 +169,7 @@ Sub EcrireStatut(etat, message)
 End Sub
 
 Sub Fin(message, code)
+  FermerSessionDediee
   If MODE_APPLI Then
     If code = 64 Then
       EcrireStatut "OK", message
@@ -215,6 +219,46 @@ Sub ConnecterSap()
   Set SapCon = SapApp.Children(0)
   If SapCon.Children.Count = 0 Then Fin "Aucune session SAP active.", 48
   Set session = SapCon.Children(0)
+  OuvrirSessionDediee
+End Sub
+
+' Travaille dans une NOUVELLE session SAP, reduite dans la barre des taches :
+' la session en cours de l'utilisateur n'est ni utilisee ni deplacee, et on
+' ne voit pas les ecrans defiler. Si la creation echoue (6 sessions deja
+' ouvertes...), on retombe sur la session existante.
+Sub OuvrirSessionDediee()
+  Dim avant, i, n
+  avant = SapCon.Children.Count
+  On Error Resume Next
+  session.createSession
+  Err.Clear
+  On Error GoTo 0
+  For i = 1 To 40
+    If SapCon.Children.Count > avant Then Exit For
+    WScript.Sleep 250
+  Next
+  If SapCon.Children.Count > avant Then
+    n = SapCon.Children.Count
+    Set session = SapCon.Children(n - 1)
+    SESSION_CREEE = True
+    WScript.Sleep 1000
+  End If
+  If Not AFFICHER_SAP Then
+    On Error Resume Next
+    session.findById("wnd[0]").iconify
+    Err.Clear
+    On Error GoTo 0
+  End If
+End Sub
+
+Sub FermerSessionDediee()
+  If SESSION_CREEE Then
+    SESSION_CREEE = False
+    On Error Resume Next
+    SapCon.CloseSession session.ID
+    Err.Clear
+    On Error GoTo 0
+  End If
 End Sub
 
 ' Saisie des affaires dans la fenetre de selection multiple (5 lignes
@@ -283,7 +327,6 @@ End Sub
 
 Sub ExtraireFo()
   Dim nb, i, trouve, shell, v
-  session.findById("wnd[0]").Maximize
   session.findById("wnd[0]/tbar[0]/okcd").Text = "ME2J"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
 
@@ -397,7 +440,6 @@ End Sub
 
 Sub ExtraireMo()
   Dim nb, ligneFocus, cellule
-  session.findById("wnd[0]").Maximize
   session.findById("wnd[0]/tbar[0]/okcd").Text = "ZCAT3"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
   session.findById("wnd[0]/usr/ctxtPNPBEGDA").Text = DATE_DEB
@@ -497,6 +539,7 @@ export function genererScriptManuel(type, params, otp, debut, fin) {
     `VAR_ALV_MO = ${chaineVbs(String(params.varianteAlvMo || "").trim())}`,
     `LIGNE_HIST = ${Number.isFinite(ligneHist) && ligneHist >= 0 ? ligneHist : -1}`,
     `POPUP_PROJET = ${params.popupProjet ? "True" : "False"}`,
+    `AFFICHER_SAP = ${params.afficherSap ? "True" : "False"}`,
     `PROFIL_PROJET = ${chaineVbs(params.profilProjet)}`,
     `DOSSIER = ${chaineVbs(dossier)}`,
     `FICHIER = ${chaineVbs(fichier)}`,
@@ -588,7 +631,14 @@ Function ChargerDepuisUrl(url)
   LISTE_OTP = otps
   DATE_DEB = "" : DATE_FIN = "" : SOCIETE = "" : ORG_ACHATS = ""
   VAR_LISTE_FO = "" : MISE_FORME_FO = "" : VAR_ALV_MO = "" : LIGNE_HIST = -1
-  POPUP_PROJET = False : PROFIL_PROJET = ""
+  POPUP_PROJET = False : PROFIL_PROJET = "" : AFFICHER_SAP = False
+  If d.Exists("ax") Then
+    If Not Valide("^[01]$", d("ax")) Then
+      ChargerDepuisUrl = "Parametre invalide."
+      Exit Function
+    End If
+    AFFICHER_SAP = (d("ax") = "1")
+  End If
   If TYPE_EXTRACTION = "mo" Then
     If Not (d.Exists("d") And d.Exists("f") And d.Exists("s")) Then
       ChargerDepuisUrl = "Dates ou societe manquantes."

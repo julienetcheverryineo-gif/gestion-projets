@@ -433,6 +433,16 @@ export default function ScriptsSapPanel() {
             <span>
               <input
                 type="checkbox"
+                checked={Boolean(params.afficherSap)}
+                onChange={(e) => maj("afficherSap", e.target.checked)}
+              />{" "}
+              Afficher la fenêtre SAP pendant l'extraction (dépannage)
+            </span>
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span>
+              <input
+                type="checkbox"
                 checked={Boolean(params.popupProjet)}
                 onChange={(e) => maj("popupProjet", e.target.checked)}
               />{" "}
