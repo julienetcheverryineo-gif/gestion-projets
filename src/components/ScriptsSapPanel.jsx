@@ -25,7 +25,12 @@ const CLE_STOCKAGE = "scriptsSapParams";
 function lireParams() {
   try {
     const brut = localStorage.getItem(CLE_STOCKAGE);
-    if (brut) return { ...PARAMS_SAP_DEFAUT, ...JSON.parse(brut) };
+    if (brut) {
+      const lus = { ...PARAMS_SAP_DEFAUT, ...JSON.parse(brut) };
+      // ancienne valeur par défaut, remplacée par le nom exact de l'entrée SAP Logon
+      if (String(lus.systemeSap).trim() === "PE1") lus.systemeSap = PARAMS_SAP_DEFAUT.systemeSap;
+      return lus;
+    }
   } catch {
     /* stockage indisponible */
   }
@@ -476,7 +481,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
                   {champ(
                     "Système SAP (entrée SAP Logon)",
                     "systemeSap",
-                    "SAP est démarré et connecté à ce système si besoin (ex. PE1) ; vide = session déjà ouverte"
+                    "SAP est démarré et connecté à ce système si besoin (ex. PE1 - SAP RISE) ; vide = session déjà ouverte"
                   )}
                 </div>
               </div>

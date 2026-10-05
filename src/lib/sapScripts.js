@@ -16,7 +16,7 @@
 // les .vbs s'exécutent correctement quel que soit l'encodage du fichier.
 
 export const PARAMS_SAP_DEFAUT = {
-  systemeSap: "PE1", // entrée SAP Logon à ouvrir (démarre SAP si besoin)
+  systemeSap: "PE1 - SAP RISE", // entrée SAP Logon à ouvrir (démarre SAP si besoin)
   societeSap: "2726", // Agence.SapSocieteCode (IAQ1..IAQX)
   organisationAchats: "I001", // Societe.SapOrganisationAchatsCode (INEO)
   varianteListeFo: "ZINEO", // variante de sélection ME2J
