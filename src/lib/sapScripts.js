@@ -68,6 +68,19 @@ export function dateSap(valeur) {
   return "";
 }
 
+// Les affaires d'agences différentes (AAQ5…, AAQ2…) ne peuvent pas être
+// saisies ensemble dans SAP sans bug : on les traite en plusieurs passes,
+// une par préfixe d'agence (4 premiers caractères du code OTP).
+export function grouperParAgence(otp) {
+  const groupes = new Map();
+  otp.forEach((o) => {
+    const prefixe = o.slice(0, 4);
+    if (!groupes.has(prefixe)) groupes.set(prefixe, []);
+    groupes.get(prefixe).push(o);
+  });
+  return [...groupes.entries()].map(([prefixe, codes]) => ({ prefixe, codes }));
+}
+
 // Validation commune ; renvoie la liste des problèmes (vide = OK).
 export function validerParametres(params, otp, { dates = false, debut, fin, fo = false, mo = false, chemins = false }) {
   const erreurs = [];

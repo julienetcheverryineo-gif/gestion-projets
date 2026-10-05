@@ -8,6 +8,7 @@ import {
   construireUrlLancement,
   genererInstallateur,
   genererScriptManuel,
+  grouperParAgence,
   validerParametres,
 } from "../lib/sapScripts";
 import {
@@ -145,14 +146,20 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
   const optionsValidation = (type, chemins = false) =>
     type === "fo" ? { fo: true, chemins } : { mo: true, dates: true, debut, fin, chemins };
 
-  // Script à télécharger (secours, si le gestionnaire n'est pas installé).
+  // Script à télécharger (secours, si le gestionnaire n'est pas installé) :
+  // un script par agence (AAQ5, AAQ2…), voir grouperParAgence.
   const telechargerManuel = (type) => {
     const problemes = validerParametres(params, otp, optionsValidation(type, true));
     setErreurs(problemes);
     if (problemes.length > 0) return;
-    telecharger(
-      type === "fo" ? "extraction-sap-me2j-achats.vbs" : "extraction-sap-zcat3-heures.vbs",
-      genererScriptManuel(type, params, otp, debut, fin)
+    const groupes = grouperParAgence(otp);
+    groupes.forEach(({ prefixe, codes }) =>
+      telecharger(
+        `extraction-sap-${type === "fo" ? "me2j-achats" : "zcat3-heures"}` +
+          (groupes.length > 1 ? `-${prefixe}` : "") +
+          ".vbs",
+        genererScriptManuel(type, params, codes, debut, fin)
+      )
     );
   };
 
@@ -164,12 +171,77 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
     }
   };
 
-  // Un clic : lance SAP via le gestionnaire installé sur le poste, attend
-  // la fin de l'extraction, lit le fichier exporté et l'importe.
-  const lancer = async (type) => {
+  // Une passe = une extraction (ME2J ou ZCAT3) pour les affaires d'UNE agence :
+  // lance SAP via le gestionnaire installé sur le poste, attend la fin,
+  // lit le fichier exporté et l'importe.
+  const executerPasse = async (h, type, codes, titre) => {
+    const libelle = type === "fo" ? "achats (ME2J)" : "heures (ZCAT3)";
+    const t0 = Date.now();
+    setEtat({ phase: "attente", type, message: `${titre}Lancement de l'extraction ${libelle}…` });
+    ouvrirLien(construireUrlLancement(type, params, codes, debut, fin));
+
+    const limite = t0 + 10 * 60 * 1000;
+    let reponse = false;
+    let fini = false;
+    while (!annule.current && Date.now() < limite) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const st = await lireFichier(h, `statut-${type}.txt`);
+      if (st && st.modifieLe >= t0 - 2000) {
+        reponse = true;
+        const [code, ...reste] = st.texte.split(/\r?\n/);
+        const detail = reste.join(" ").trim();
+        if (code.trim() === "ERREUR") return { ok: false, message: detail || "L'extraction SAP a échoué." };
+        if (code.trim() === "OK") {
+          fini = true;
+          break;
+        }
+        setEtat({
+          phase: "attente",
+          type,
+          message: titre + (detail && detail !== "Lancement" ? detail : `Extraction ${libelle} en cours dans SAP…`),
+        });
+      } else if (!reponse && Date.now() - t0 > 15000) {
+        setEtat({
+          phase: "attente",
+          type,
+          message:
+            "Aucune réponse du poste. Le gestionnaire SAP est-il installé (Paramètres SAP > Installation) et le lien autorisé dans le navigateur ?",
+        });
+      }
+    }
+    if (annule.current) return { ok: false, annule: true };
+    if (!fini) return { ok: false, message: "Délai dépassé : l'extraction SAP n'a pas abouti." };
+
+    setEtat({ phase: "import", type, message: `${titre}Lecture et import du fichier exporté…` });
+    try {
+      const nomFichier = `export-${type}-sap.txt`;
+      const fichier = await lireFichier(h, nomFichier);
+      if (!fichier) throw new Error("Fichier d'export introuvable dans le dossier choisi.");
+      const res = await importerExportSap({
+        type,
+        texte: fichier.texte,
+        nomFichier,
+        otpDemandes: codes,
+        debut: type === "mo" ? dateSap(debut) : "",
+        fin: type === "mo" ? dateSap(fin) : "",
+      });
+      return {
+        ok: true,
+        resume:
+          `${type === "fo" ? "Achats" : "Heures"} : ${res.nbLignes} ligne(s)` +
+          (res.nbRemplacees > 0 ? ` (${res.nbRemplacees} remplacée(s))` : ""),
+      };
+    } catch (e) {
+      return { ok: false, message: "Import impossible : " + e.message };
+    }
+  };
+
+  // Un clic : une ou deux extractions (types = ["fo"], ["mo"] ou les deux),
+  // chacune découpée par agence (AAQ5, AAQ2…), exécutées l'une après l'autre.
+  const lancer = async (types) => {
     if (etat && (etat.phase === "attente" || etat.phase === "import")) return;
-    const problemes = validerParametres(params, otp, optionsValidation(type));
-    setErreurs(problemes);
+    const problemes = types.flatMap((t) => validerParametres(params, otp, optionsValidation(t)));
+    setErreurs([...new Set(problemes)]);
     if (problemes.length > 0) return;
     if (!dossierSupporte()) {
       setEtat({
@@ -195,74 +267,26 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
       return;
     }
 
-    const libelle = type === "fo" ? "achats (ME2J)" : "heures (ZCAT3)";
-    const t0 = Date.now();
     annule.current = false;
-    setEtat({ phase: "attente", type, message: `Lancement de l'extraction ${libelle}…` });
-    ouvrirLien(construireUrlLancement(type, params, otp, debut, fin));
-
-    const limite = t0 + 10 * 60 * 1000;
-    let reponse = false;
-    let fini = false;
-    while (!annule.current && Date.now() < limite) {
-      await new Promise((r) => setTimeout(r, 1000));
-      const st = await lireFichier(h, `statut-${type}.txt`);
-      if (st && st.modifieLe >= t0 - 2000) {
-        reponse = true;
-        const [code, ...reste] = st.texte.split(/\r?\n/);
-        const detail = reste.join(" ").trim();
-        if (code.trim() === "ERREUR") {
-          setEtat({ phase: "erreur", message: detail || "L'extraction SAP a échoué." });
-          return;
-        }
-        if (code.trim() === "OK") {
-          fini = true;
-          break;
-        }
+    const groupes = grouperParAgence(otp);
+    const passes = groupes.flatMap((g) => types.map((type) => ({ type, ...g })));
+    const resumes = [];
+    for (let i = 0; i < passes.length; i++) {
+      const { type, prefixe, codes } = passes[i];
+      const titre =
+        (passes.length > 1 ? `[${i + 1}/${passes.length}] ` : "") + (groupes.length > 1 ? `${prefixe} — ` : "");
+      const r = await executerPasse(h, type, codes, titre);
+      if (r.annule) return;
+      if (!r.ok) {
         setEtat({
-          phase: "attente",
-          type,
-          message:
-            detail && detail !== "Lancement" ? detail : `Extraction ${libelle} en cours dans SAP…`,
+          phase: "erreur",
+          message: (titre ? titre : "") + r.message + (resumes.length ? ` (déjà importé : ${resumes.join(" ; ")})` : ""),
         });
-      } else if (!reponse && Date.now() - t0 > 15000) {
-        setEtat({
-          phase: "attente",
-          type,
-          message:
-            "Aucune réponse du poste. Le gestionnaire SAP est-il installé (Paramètres SAP > Installation) et le lien autorisé dans le navigateur ?",
-        });
+        return;
       }
+      resumes.push((groupes.length > 1 ? `${prefixe} ` : "") + r.resume);
     }
-    if (annule.current) return;
-    if (!fini) {
-      setEtat({ phase: "erreur", message: "Délai dépassé : l'extraction SAP n'a pas abouti." });
-      return;
-    }
-
-    setEtat({ phase: "import", type, message: "Lecture et import du fichier exporté…" });
-    try {
-      const nomFichier = `export-${type}-sap.txt`;
-      const fichier = await lireFichier(h, nomFichier);
-      if (!fichier) throw new Error("Fichier d'export introuvable dans le dossier choisi.");
-      const res = await importerExportSap({
-        type,
-        texte: fichier.texte,
-        nomFichier,
-        otpDemandes: otp,
-        debut: type === "mo" ? dateSap(debut) : "",
-        fin: type === "mo" ? dateSap(fin) : "",
-      });
-      setEtat({
-        phase: "ok",
-        message:
-          `${res.nbLignes} ligne(s) importée(s)` +
-          (res.nbRemplacees > 0 ? ` (${res.nbRemplacees} ancienne(s) ligne(s) remplacée(s))` : "") +
-          ".",
-      });
-    } catch (e) {
-      setEtat({ phase: "erreur", message: "Import impossible : " + e.message });
-    }
+    setEtat({ phase: "ok", message: resumes.join(" ; ") + "." });
   };
 
   const enCours = etat && (etat.phase === "attente" || etat.phase === "import");
@@ -298,6 +322,18 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
                 onChange={(e) => setRecherche(e.target.value)}
                 autoFocus
               />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setOtp([...new Set([...otp, ...visibles.map((o) => o.code)])])}
+                >
+                  Tout cocher
+                </button>
+                <button type="button" className="btn" onClick={() => setOtp([])}>
+                  Tout décocher
+                </button>
+              </div>
               <div className="chantier-multiselect-liste">
                 {libres.map((code) => (
                   <label key={code} style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -339,11 +375,14 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
         <span>→</span>
         <input type="date" value={fin} onChange={(e) => setFin(e.target.value)} title="Fin (ZCAT3)" />
 
-        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer("fo")}>
+        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo"])}>
           ▶ Achats (ME2J)
         </button>
-        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer("mo")}>
+        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["mo"])}>
           ▶ Heures (ZCAT3)
+        </button>
+        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo", "mo"])}>
+          ▶ Achats + Heures
         </button>
         <button type="button" className="btn" onClick={() => setOuvert((o) => !o)}>
           {ouvert ? "Fermer les paramètres" : "⚙ Paramètres SAP"}
