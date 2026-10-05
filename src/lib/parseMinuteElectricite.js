@@ -1,6 +1,9 @@
 import * as XLSX from "xlsx";
 import { RE_CODE, trouverLigneEntete, trouverColonne } from "./parseXlsxCommun";
 
+// Désignation affichée pour une ligne de la minute qui n'en a pas.
+export const DESIGNATION_VIDE = "LIGNE SANS DESIGNATION";
+
 const LABELS = {
   numero: ["n°", "no"],
   reference: ["référence", "reference"],
@@ -83,14 +86,6 @@ export function analyserMinuteElectricite(arrayBuffer) {
     }
     if (/^totaux pour le poste/i.test(description)) continue;
 
-    const designationBrute = description || nomArticle;
-    if (!designationBrute) continue;
-    const [designation, ...reste] = designationBrute
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const detail = reste.join(" ").slice(0, 300);
-
     const reference = texte(ligne, c.reference);
     const unite = texte(ligne, c.unite);
     const quantite = nombre(ligne, c.quantite);
@@ -99,6 +94,23 @@ export function analyserMinuteElectricite(arrayBuffer) {
     const tempsUnitaire = nombre(ligne, c.tempsUnitaire);
     const coutUnitaireFo = nombre(ligne, c.coutUnitaireFo);
     const pvUnitaire = nombre(ligne, c.pvUnitaire);
+
+    // Ligne sans description : on l'importe quand même si elle porte une
+    // vraie information (unité, référence, quantité ou montant non nuls),
+    // en la marquant explicitement, pour qu'elle ne disparaisse pas
+    // silencieusement du suivi. Une ligne numérotée mais entièrement vide
+    // (simple trou de numérotation, tout à 0) reste ignorée.
+    const sansDesignation =
+      !description &&
+      !nomArticle &&
+      Boolean(reference || unite || quantite || tempsUnitaire || coutUnitaireFo || pvUnitaire);
+    if (!description && !nomArticle && !sansDesignation) continue;
+    const designationBrute = description || nomArticle || DESIGNATION_VIDE;
+    const [designation, ...reste] = designationBrute
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const detail = reste.join(" ").slice(0, 300);
 
     // Ligne purement informative (ex: "Barattage :", un sous-titre, ou le
     // titre du devis en première ligne) : repérée par l'absence d'unité
@@ -126,6 +138,7 @@ export function analyserMinuteElectricite(arrayBuffer) {
       pvUnitaire,
       pvTotal: c.pvTotal >= 0 ? nombre(ligne, c.pvTotal) : pvUnitaire * quantite,
       informative,
+      sansDesignation,
       ordre: ordre++,
     });
   }

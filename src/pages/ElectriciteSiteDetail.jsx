@@ -1373,7 +1373,7 @@ export default function ElectriciteSiteDetail() {
                 Modifier le chantier
               </button>
               <button className="btn-primary" onClick={() => setAfficherImport(true)}>
-                Importer une minute
+                Importer / mettre à jour une minute
               </button>
             </>
           )}
@@ -1782,6 +1782,8 @@ export default function ElectriciteSiteDetail() {
         <ImportMinuteElectriciteModal
           chantierId={chantierId}
           nbDevisExistants={devis.length}
+          devisExistants={devis}
+          toutesLignes={toutesLignes}
           onClose={() => setAfficherImport(false)}
         />
       )}
