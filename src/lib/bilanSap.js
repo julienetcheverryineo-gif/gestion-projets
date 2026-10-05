@@ -24,13 +24,22 @@ const QDV_PAR_CODE_SAP = new Map(
 // devis) est regroupé dans `horsBudget`, pour que le total reste égal au
 // total réellement acheté dans SAP.
 //
-// `affectations` (par chantier, voir affectationsSapFo sur le document
-// chantier) permet de corriger ce rapprochement à la main, Code SAP par
-// Code SAP : { "DIVE": "<Type de FO>" } force ce Code SAP sur ce type, et
-// { "DIVE": AFFECTATION_HORS_BUDGET } le laisse volontairement hors budget.
-// Une affectation vers un type qui n'est plus dans le budget est ignorée
-// (retour au rapprochement automatique).
+// `affectations` (par chantier, voir affectationsSapLignes sur le document
+// chantier) corrige ce rapprochement à la main, LIGNE d'achat par ligne :
+// { "<cleLigneAchat>": "<Type de FO>" } force cette ligne sur ce type, et
+// { "<cleLigneAchat>": AFFECTATION_HORS_BUDGET } la laisse volontairement
+// hors budget. Une affectation vers un type qui n'est plus dans le budget
+// est ignorée (retour au rapprochement automatique).
 export const AFFECTATION_HORS_BUDGET = "__hors";
+
+// Identifiant stable d'une ligne d'achat SAP : document d'achat + poste
+// (unique côté SAP, et identique si le même export est ré-importé, ce que
+// ne garantirait pas l'id Firestore). Caractères limités à [A-Za-z0-9_-]
+// pour servir de clé dans le document chantier.
+export function cleLigneAchat(a) {
+  const base = a.docAchat ? a.docAchat + "_" + (a.poste || "") : a.id || "";
+  return String(base).replace(/[^A-Za-z0-9_-]/g, "_");
+}
 
 export function rapprocherAchats(parType, achatsSap, affectations = {}) {
   const codes = parType.map((t) => codeTypeFo(t.cle));
@@ -44,15 +53,14 @@ export function rapprocherAchats(parType, achatsSap, affectations = {}) {
   };
 
   achatsSap.forEach((a) => {
-    const codeSap = (a.grOr || "").trim().toUpperCase();
-    const manuel = affectations[codeSap];
+    const manuel = affectations[cleLigneAchat(a)];
     let cle;
     if (manuel === AFFECTATION_HORS_BUDGET) {
       cle = null;
     } else if (manuel && parCle.has(manuel)) {
       cle = manuel;
     } else {
-      const codeQdv = QDV_PAR_CODE_SAP.get(codeSap);
+      const codeQdv = QDV_PAR_CODE_SAP.get((a.grOr || "").trim().toUpperCase());
       cle = codeQdv ? cleDuType(codeQdv) : null;
     }
     const cible = cle !== null ? parCle.get(cle) : horsBudget;
