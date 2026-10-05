@@ -14,6 +14,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import { analyserSapFo, analyserSapMo } from "../lib/parseSapExports";
+import ScriptsSapPanel from "../components/ScriptsSapPanel";
 
 // Import brut des exports texte SAP (achats "Fourniture" et pointages
 // CATS "Main d'œuvre"), tous chantiers confondus. Première étape avant
@@ -444,6 +445,7 @@ export default function ElectriciteImportSap() {
       </header>
 
       <div className="page-sections" style={{ display: "grid", gap: 20 }}>
+        <ScriptsSapPanel />
         <BlocImport type="fo" config={TYPES.fo} />
         <BlocImport type="mo" config={TYPES.mo} />
         <HistoriqueImports />
