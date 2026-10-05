@@ -239,7 +239,7 @@ const CONSULTATION = {
       { champ: "nomFournisseur", label: "Fournisseur" },
       { champ: "designation", label: "Désignation" },
       { champ: "quantite", label: "Qté", numerique: true },
-      { champ: "valNette", label: "Val. nette €", numerique: true },
+      { champ: "valNette", label: "Val. nette €", numerique: true, euro: true },
     ],
     champsRecherche: ["otp", "designation", "grOr", "nomFournisseur", "reference", "docAchat"],
     champValeur: "valNette",
@@ -263,11 +263,14 @@ const CONSULTATION = {
   },
 };
 
-function formatValeur(v, numerique) {
+function formatValeur(v, numerique, euro) {
   if (v === null || v === undefined || v === "") return "";
   if (!numerique) return String(v);
   const n = Number(v) || 0;
-  return n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+  return n.toLocaleString("fr-FR", {
+    minimumFractionDigits: euro ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
 }
 
 // Recherche/filtre/affichage progressif pour un onglet (Fourniture ou
@@ -336,7 +339,7 @@ function TableauConsultation({ config }) {
           <p className="page-subtitle" style={{ marginBottom: 8 }}>
             {filtrees.length} ligne(s) — {config.labelTotal} :{" "}
             <strong>
-              {formatValeur(total, true)}
+              {formatValeur(total, true, config.suffixeTotal === " €")}
               {config.suffixeTotal}
             </strong>
           </p>
@@ -355,7 +358,7 @@ function TableauConsultation({ config }) {
                   <tr key={l.id}>
                     {config.colonnes.map((c) => (
                       <td key={c.champ} data-label={c.label}>
-                        {formatValeur(l[c.champ], c.numerique)}
+                        {formatValeur(l[c.champ], c.numerique, c.euro)}
                       </td>
                     ))}
                   </tr>

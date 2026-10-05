@@ -3709,3 +3709,37 @@ textarea:focus {
   background: var(--panel-muted, rgba(127, 127, 127, 0.08));
   padding: 8px 12px;
 }
+
+/* Indicateur Réel SAP / Budget : barre avec le % écrit dedans */
+.reel-budget-barre {
+  position: relative;
+  height: 22px;
+  min-width: 110px;
+  border-radius: 999px;
+  background: var(--panel-muted, rgba(127, 127, 127, 0.18));
+  overflow: hidden;
+}
+.reel-budget-barre-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+}
+.reel-budget-barre-fill.ok {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.reel-budget-barre-fill.alerte {
+  background: color-mix(in srgb, #e0a030 65%, transparent);
+}
+.reel-budget-barre-fill.depasse {
+  background: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.reel-budget-barre-label {
+  position: relative;
+  display: block;
+  text-align: center;
+  line-height: 22px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}

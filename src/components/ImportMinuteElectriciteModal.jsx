@@ -348,7 +348,7 @@ export default function ImportMinuteElectriciteModal({
                         <td data-label="Unité">{ligne.unite || ""}</td>
                         <td data-label="Qté">{ligne.estPoste ? "" : ligne.quantite || ""}</td>
                         <td data-label="Coût total FO">
-                          {ligne.estPoste ? "" : ligne.coutTotalFo ? ligne.coutTotalFo + " €" : ""}
+                          {ligne.estPoste ? "" : ligne.coutTotalFo ? ligne.coutTotalFo.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €" : ""}
                         </td>
                         <td data-label="Temps total">
                           {ligne.estPoste

@@ -97,6 +97,16 @@ function formatNombre(n) {
   });
 }
 
+// Montants en euros : toujours 2 chiffres après la virgule.
+function formatEuro(n) {
+  return (n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Valeur + unité du récap : 2 décimales pour les €, 1 pour les heures.
+function formatMontant(n, unite) {
+  return unite === "€" ? formatEuro(n) + " €" : formatNombre(n) + " " + unite;
+}
+
 function classeAvancement(pct) {
   if (!pct) return "elec-avancement-nul";
   if (pct >= 100) return "elec-avancement-fait";
@@ -251,7 +261,7 @@ function TableauRecap({
   const sapMo = sap?.type === "mo" ? sap.heures : null;
   const aSap = Boolean(sapFo || sapMo);
   const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
-  const nbColonnes = 6 + (aSap ? 2 : 0);
+  const nbColonnes = 6 + (aSap ? 3 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
   // Détail des lignes d'achat SAP d'un type (ou hors budget) : chaque ligne
   // peut être réaffectée à un autre Type de FO du budget, ou laissée hors
@@ -281,7 +291,7 @@ function TableauRecap({
                 <tr key={a.id || i}>
                   {COLONNES_SAP_FO.map((c) => (
                     <td key={c.champ} data-label={c.label}>
-                      {formatValeurSap(a[c.champ], c.numerique)}
+                      {formatValeurSap(a[c.champ], c.numerique, c.euro)}
                     </td>
                   ))}
                   <td data-label="Affecter à">
@@ -343,6 +353,7 @@ function TableauRecap({
                 <th className="col-num">Restant</th>
                 {aSap && <th className="col-num">{libelleReel}</th>}
                 {aSap && <th className="col-num">Reste budget</th>}
+                {aSap && <th className="col-avancement">Réel / Budget</th>}
               </tr>
             </thead>
             <tbody>
@@ -374,10 +385,10 @@ function TableauRecap({
                     {l.libelle}
                   </td>
                   <td className="col-num" data-label={libelleValeur}>
-                    {formatNombre(l.budget)} {uniteValeur}
+                    {formatMontant(l.budget, uniteValeur)}
                   </td>
                   <td className="col-num" data-label="Réalisé">
-                    {formatNombre(l.realise)} {uniteValeur}
+                    {formatMontant(l.realise, uniteValeur)}
                   </td>
                   <td className="col-avancement" data-label="% avancement">
                     {modifiable ? (
@@ -390,7 +401,7 @@ function TableauRecap({
                     )}
                   </td>
                   <td className="col-num" data-label="Restant">
-                    {formatNombre(l.restant)} {uniteValeur}
+                    {formatMontant(l.restant, uniteValeur)}
                   </td>
                   {sapFo && (() => {
                     const g = sapFo.parCle.get(l.cle);
@@ -405,14 +416,17 @@ function TableauRecap({
                               title="Afficher les lignes d'achat SAP de ce type"
                               onClick={() => basculer(l.cle)}
                             >
-                              {ouverts.has(l.cle) ? "▾" : "▸"} {formatNombre(g.reel)} € ({g.lignes.length})
+                              {ouverts.has(l.cle) ? "▾" : "▸"} {formatEuro(g.reel)} € ({g.lignes.length})
                             </button>
                           ) : (
                             "—"
                           )}
                         </td>
                         <td className={"col-num " + classeReste(reste)} data-label="Reste budget">
-                          {formatNombre(reste)} €
+                          {formatEuro(reste)} €
+                        </td>
+                        <td className="col-avancement" data-label="Réel / Budget">
+                          <BarreReelBudget reel={g.reel} budget={l.budget} />
                         </td>
                       </>
                     );
@@ -421,6 +435,7 @@ function TableauRecap({
                     <>
                       <td className="col-num" data-label={libelleReel}>—</td>
                       <td className="col-num" data-label="Reste budget">—</td>
+                      <td className="col-avancement" data-label="Réel / Budget"></td>
                     </>
                   )}
                 </tr>
@@ -449,11 +464,12 @@ function TableauRecap({
                         className="btn-ghost recap-sap-toggle"
                         onClick={() => basculer("__hors")}
                       >
-                        {ouverts.has("__hors") ? "▾" : "▸"} {formatNombre(sapFo.horsBudget.reel)} € (
+                        {ouverts.has("__hors") ? "▾" : "▸"} {formatEuro(sapFo.horsBudget.reel)} € (
                         {sapFo.horsBudget.lignes.length})
                       </button>
                     </td>
                     <td className="col-num" data-label="Reste budget">—</td>
+                    <td className="col-avancement" data-label="Réel / Budget"></td>
                   </tr>
                   {ouverts.has("__hors") && detailSapFo(sapFo.horsBudget.lignes)}
                 </>
@@ -464,16 +480,16 @@ function TableauRecap({
                   TOTAL
                 </td>
                 <td className="col-num" data-label={libelleValeur}>
-                  {formatNombre(recap.total.budget)} {uniteValeur}
+                  {formatMontant(recap.total.budget, uniteValeur)}
                 </td>
                 <td className="col-num" data-label="Réalisé">
-                  {formatNombre(recap.total.realise)} {uniteValeur}
+                  {formatMontant(recap.total.realise, uniteValeur)}
                 </td>
                 <td className="col-avancement" data-label="% avancement">
                   <LigneAvancementBarre pct={recap.total.pctAvancement} />
                 </td>
                 <td className="col-num" data-label="Restant">
-                  {formatNombre(recap.total.restant)} {uniteValeur}
+                  {formatMontant(recap.total.restant, uniteValeur)}
                 </td>
                 {aSap && (
                   <>
@@ -488,7 +504,7 @@ function TableauRecap({
                           {ouverts.has("__mo") ? "▾" : "▸"} {formatNombre(sapMo.totalReel)} h
                         </button>
                       ) : (
-                        formatNombre(sapFo.totalReel) + " €"
+                        formatEuro(sapFo.totalReel) + " €"
                       )}
                     </td>
                     <td
@@ -497,7 +513,13 @@ function TableauRecap({
                       }
                       data-label="Reste budget"
                     >
-                      {formatNombre(recap.total.budget - (sapMo ?? sapFo).totalReel)} {uniteValeur}
+                      {formatMontant(recap.total.budget - (sapMo ?? sapFo).totalReel, uniteValeur)}
+                    </td>
+                    <td className="col-avancement" data-label="Réel / Budget">
+                      <BarreReelBudget
+                        reel={(sapMo ?? sapFo).totalReel}
+                        budget={recap.total.budget}
+                      />
                     </td>
                   </>
                 )}
@@ -613,7 +635,7 @@ const COLONNES_SAP_FO = [
   { champ: "nomFournisseur", label: "Fournisseur" },
   { champ: "designation", label: "Désignation" },
   { champ: "quantite", label: "Qté", numerique: true },
-  { champ: "valNette", label: "Val. nette €", numerique: true },
+  { champ: "valNette", label: "Val. nette €", numerique: true, euro: true },
 ];
 const COLONNES_SAP_MO = [
   { champ: "date", label: "Date" },
@@ -622,10 +644,13 @@ const COLONNES_SAP_MO = [
   { champ: "heures", label: "Heures", numerique: true },
 ];
 
-function formatValeurSap(v, numerique) {
+function formatValeurSap(v, numerique, euro) {
   if (v === null || v === undefined || v === "") return "";
   if (!numerique) return String(v);
-  return (Number(v) || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+  return (Number(v) || 0).toLocaleString("fr-FR", {
+    minimumFractionDigits: euro ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
 }
 
 // "10.12.2025" -> timestamp, pour trier du plus récent au plus ancien
@@ -676,7 +701,7 @@ function PanneauSap({ otp, achats, heures }) {
           <p className="page-subtitle" style={{ marginBottom: 8 }}>
             {lignes.length} ligne(s) — {onglet === "fo" ? "Val. nette totale" : "Heures totales"} :{" "}
             <strong>
-              {formatValeurSap(total, true)}
+              {formatValeurSap(total, true, onglet === "fo")}
               {onglet === "fo" ? " €" : " h"}
             </strong>
           </p>
@@ -694,7 +719,7 @@ function PanneauSap({ otp, achats, heures }) {
                   <tr key={l.id}>
                     {colonnes.map((c) => (
                       <td key={c.champ} data-label={c.label}>
-                        {formatValeurSap(l[c.champ], c.numerique)}
+                        {formatValeurSap(l[c.champ], c.numerique, c.euro)}
                       </td>
                     ))}
                   </tr>
@@ -704,6 +729,27 @@ function PanneauSap({ otp, achats, heures }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// Indicateur Réel SAP / Budget : barre remplie à hauteur du % consommé
+// (plafonnée à 100 %), avec le % écrit dedans — orange à partir de 90 %,
+// rouge en cas de dépassement (le % affiché peut alors dépasser 100).
+function BarreReelBudget({ reel, budget }) {
+  if (!(budget > 0)) return <span className="simple-list-meta">—</span>;
+  const pct = (reel / budget) * 100;
+  const niveau = pct > 100 ? "depasse" : pct >= 90 ? "alerte" : "ok";
+  return (
+    <div
+      className="reel-budget-barre"
+      title={formatNombre(reel) + " / " + formatNombre(budget)}
+    >
+      <div
+        className={"reel-budget-barre-fill " + niveau}
+        style={{ width: Math.max(0, Math.min(100, pct)) + "%" }}
+      />
+      <span className="reel-budget-barre-label">{formatNombre(pct)} %</span>
     </div>
   );
 }
@@ -857,7 +903,7 @@ function LigneDevisRow({
           </div>
         )}
       </td>
-      <td className="elec-col-materiel">{formatNombre(l.coutUnitaireFo)} €</td>
+      <td className="elec-col-materiel">{formatEuro(l.coutUnitaireFo)} €</td>
       <td className="elec-col-materiel elec-type-code">
         <select
           className="elec-type-select"
@@ -878,9 +924,9 @@ function LigneDevisRow({
           ))}
         </select>
       </td>
-      <td className="elec-col-materiel">{formatNombre(coutTotalFoAffiche)} €</td>
+      <td className="elec-col-materiel">{formatEuro(coutTotalFoAffiche)} €</td>
       <td className="elec-col-materiel">
-        {coutTotalFoAffiche ? formatNombre((coutTotalFoAffiche * pctFo) / 100) + " €" : "—"}
+        {coutTotalFoAffiche ? formatEuro((coutTotalFoAffiche * pctFo) / 100) + " €" : "—"}
       </td>
       <td className="elec-col-mo elec-col-saisie">
         {l.informative ? (
@@ -1011,9 +1057,9 @@ function GroupeEnteteRow({
       </td>
       <td className="elec-col-materiel">—</td>
       <td className="elec-col-materiel elec-type-code">—</td>
-      <td className="elec-col-materiel">{formatNombre(sommeCoutTotalFo)} €</td>
+      <td className="elec-col-materiel">{formatEuro(sommeCoutTotalFo)} €</td>
       <td className="elec-col-materiel">
-        {sommeCoutTotalFo ? formatNombre((sommeCoutTotalFo * pctFo) / 100) + " €" : "—"}
+        {sommeCoutTotalFo ? formatEuro((sommeCoutTotalFo * pctFo) / 100) + " €" : "—"}
       </td>
       <td className="elec-col-mo elec-col-saisie">
         <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
@@ -1761,7 +1807,7 @@ export default function ElectriciteSiteDetail() {
                       />
                     </div>
                     <div className="simple-list-meta" style={{ marginTop: 4 }}>
-                      {formatNombre(synthese.realiseMateriel)} € / {formatNombre(synthese.budgetMateriel)} €
+                      {formatEuro(synthese.realiseMateriel)} € / {formatEuro(synthese.budgetMateriel)} €
                     </div>
                   </div>
                   <div>
