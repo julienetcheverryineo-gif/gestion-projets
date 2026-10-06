@@ -9,7 +9,12 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { analyserMinuteElectricite, DESIGNATION_VIDE } from "../lib/parseMinuteElectricite";
-import { calculerMiseAJour, champsDocumentLigne } from "../lib/majMinuteElectricite";
+import {
+  calculerMiseAJour,
+  champsDocumentLigne,
+  groupesDuFichier,
+  trouverDevisCorrespondant,
+} from "../lib/majMinuteElectricite";
 
 // Import d'une minute de devis pour un chantier Électricité : contrairement
 // à l'Automatisme (qui regroupe les lignes en équipements), on garde ici
@@ -51,7 +56,7 @@ export default function ImportMinuteElectriciteModal({
       setSequence(resultat);
       // Même nom de fichier qu'un devis déjà importé : on propose d'emblée
       // la mise à jour de ce devis plutôt que d'en créer un doublon.
-      const memeFichier = devisExistants.find((d) => d.nomFichier === fichier.name);
+      const memeFichier = trouverDevisCorrespondant(fichier.name, devisExistants);
       setMode(memeFichier ? "maj" : "nouveau");
       setDevisCibleId(memeFichier?.id ?? devisExistants[0]?.id ?? "");
       setSupprimerAbsentes(false);
@@ -104,16 +109,33 @@ export default function ImportMinuteElectriciteModal({
         ordre: nbDevisExistants,
         creeLe: serverTimestamp(),
       });
-      await ecrireParLots(
-        sequence.map((ligne) => (batch) => {
-          batch.set(doc(collection(db, "elecLignes")), {
+      const refs = sequence.map(() => doc(collection(db, "elecLignes")));
+      const groupes = groupesDuFichier(sequence).map((g) => ({
+        ...g,
+        ref: doc(collection(db, "elecGroupes")),
+      }));
+      const groupeDe = new Map();
+      groupes.forEach((g) => g.membres.forEach((i) => groupeDe.set(i, g.ref.id)));
+      await ecrireParLots([
+        ...groupes.map((g) => (batch) => {
+          batch.set(g.ref, {
+            chantierId,
+            devisId: devisRef.id,
+            nom: g.nom,
+            ligneRepresentativeId: refs[g.tete].id,
+            creeLe: serverTimestamp(),
+          });
+        }),
+        ...sequence.map((ligne, i) => (batch) => {
+          batch.set(refs[i], {
             ...champsDocumentLigne(ligne),
+            ...(groupeDe.has(i) ? { groupeId: groupeDe.get(i) } : {}),
             devisId: devisRef.id,
             chantierId,
             creeLe: serverTimestamp(),
           });
-        })
-      );
+        }),
+      ]);
       onClose();
     } catch (err) {
       setErreur("Erreur pendant l'import : " + err.message);
@@ -130,10 +152,44 @@ export default function ImportMinuteElectriciteModal({
     if (!diff || !devisCible) return;
     setEnImport(true);
     try {
+      // Regroupements du fichier : on ne crée un groupe que si aucune de ses
+      // lignes déjà présentes n'est déjà groupée (le groupement fait dans
+      // l'appli n'est jamais modifié).
+      const refAjout = new Map(diff.ajouts.map((l) => [l, doc(collection(db, "elecLignes"))]));
+      const idDe = (i) => diff.idsFichier[i] ?? refAjout.get(sequence[i])?.id ?? null;
+      const dejaGroupe = new Set(
+        toutesLignes.filter((l) => l.devisId === devisCible.id && l.groupeId).map((l) => l.id)
+      );
+      const groupeAjout = new Map();
+      const groupeExistante = [];
+      const creationsGroupes = [];
+      groupesDuFichier(sequence).forEach((g) => {
+        const ids = g.membres.map(idDe);
+        if (ids.some((id) => id == null || dejaGroupe.has(id))) return;
+        const ref = doc(collection(db, "elecGroupes"));
+        creationsGroupes.push((batch) =>
+          batch.set(ref, {
+            chantierId,
+            devisId: devisCible.id,
+            nom: g.nom,
+            ligneRepresentativeId: idDe(g.tete),
+            creeLe: serverTimestamp(),
+          })
+        );
+        g.membres.forEach((i) => {
+          if (refAjout.has(sequence[i])) groupeAjout.set(sequence[i], ref.id);
+          else groupeExistante.push({ id: idDe(i), groupeId: ref.id });
+        });
+      });
       const operations = [
+        ...creationsGroupes,
+        ...groupeExistante.map((m) => (batch) => {
+          batch.update(doc(db, "elecLignes", m.id), { groupeId: m.groupeId });
+        }),
         ...diff.ajouts.map((ligne) => (batch) => {
-          batch.set(doc(collection(db, "elecLignes")), {
+          batch.set(refAjout.get(ligne), {
             ...champsDocumentLigne(ligne),
+            ...(groupeAjout.has(ligne) ? { groupeId: groupeAjout.get(ligne) } : {}),
             devisId: devisCible.id,
             chantierId,
             creeLe: serverTimestamp(),

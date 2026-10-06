@@ -847,9 +847,7 @@ function LigneDevisRow({
       <td className="elec-td-figee elec-col-etroite" style={{ left: 0, width: LARGEUR_NUMERO }}>
         {modeSelection && peutGerer ? (
           <input type="checkbox" checked={selectionnee} onChange={onBasculerSelection} />
-        ) : (
-          l.code || ""
-        )}
+        ) : null}
       </td>
       <td
         className="elec-td-figee elec-th-figee-bord"
@@ -857,7 +855,7 @@ function LigneDevisRow({
         title={titreDesignation}
       >
         <div className="elec-designation-cellule">
-          <span style={imbriquee ? { paddingLeft: 20 } : undefined}>{l.designation}</span>
+          <span className="elec-designation-texte" style={imbriquee ? { paddingLeft: 20 } : undefined}>{l.designation}</span>
           {entete && (
             <span className="elec-groupe-actions">
               {entete.ouvert && peutGerer && (
@@ -1909,7 +1907,6 @@ export default function ElectriciteSiteDetail() {
                         className="elec-th-figee elec-col-etroite"
                         style={{ left: 0, width: LARGEUR_NUMERO }}
                       >
-                        N°
                       </th>
                       <th
                         className="elec-th-figee elec-th-figee-bord"

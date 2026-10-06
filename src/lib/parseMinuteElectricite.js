@@ -31,11 +31,45 @@ const LABELS = {
 // équipements régulés), on garde ici la structure telle quelle : c'est
 // cette même structure, ligne par ligne, que le suivi d'exécution du
 // service Électricité renseigne avec un % d'avancement par ligne.
+// Niveau de gris (0-255) de la couleur de fond d'une cellule, ou null si la
+// cellule n'a pas de fond gris (blanc, couleur, absent). Sert à repérer les
+// regroupements de la minute : une ligne gris foncé suivie de lignes gris
+// plus clair.
+function niveauGris(cellule) {
+  const rgb = cellule?.s?.patternType === "solid" ? cellule.s.fgColor?.rgb : null;
+  if (!rgb || !/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(rgb)) return null;
+  const hex = rgb.slice(-6);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  if (Math.max(r, g, b) - Math.min(r, g, b) > 4) return null;
+  return r >= 0xf4 ? null : r;
+}
+
+// Repère les regroupements : une ligne d'article gris foncé suivie
+// immédiatement de lignes gris plus clair forme un groupe (la ligne foncée
+// en est la tête). Marque chaque ligne concernée avec groupeCle (n° du
+// groupe dans le fichier) et groupeTete (true pour la ligne foncée).
+function reperGroupes(sequence) {
+  let cle = 0;
+  for (let i = 0; i < sequence.length; i++) {
+    const tete = sequence[i];
+    if (tete.estPoste || tete.gris == null) continue;
+    let j = i + 1;
+    while (j < sequence.length && !sequence[j].estPoste && sequence[j].gris != null && sequence[j].gris > tete.gris) j++;
+    if (j > i + 1) {
+      cle += 1;
+      tete.groupeCle = cle;
+      tete.groupeTete = true;
+      for (let k = i + 1; k < j; k++) sequence[k].groupeCle = cle;
+      i = j - 1;
+    }
+  }
+  sequence.forEach((l) => delete l.gris);
+}
+
 export function analyserMinuteElectricite(arrayBuffer) {
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellStyles: true });
   const feuille = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(feuille, { header: 1, defval: "" });
-
   const iEntete = trouverLigneEntete(rows, LABELS.numero);
   if (iEntete === -1) {
     throw new Error(
@@ -59,6 +93,16 @@ export function analyserMinuteElectricite(arrayBuffer) {
     tempsTotalHeures: col(LABELS.tempsTotalHeures),
     pvUnitaire: col(LABELS.pvUnitaire),
     pvTotal: col(LABELS.pvTotal),
+  };
+
+  const ligneDepart = XLSX.utils.decode_range(feuille["!ref"] || "A1").s.r;
+  const grisDeLigne = (i) => {
+    for (const idx of [c.description, c.numero, c.nomArticle]) {
+      if (idx == null || idx < 0) continue;
+      const g = niveauGris(feuille[XLSX.utils.encode_cell({ r: ligneDepart + i, c: idx })]);
+      if (g != null) return g;
+    }
+    return null;
   };
 
   const texte = (ligne, idx) => (idx >= 0 ? String(ligne[idx] ?? "").trim() : "");
@@ -139,6 +183,7 @@ export function analyserMinuteElectricite(arrayBuffer) {
       pvTotal: c.pvTotal >= 0 ? nombre(ligne, c.pvTotal) : pvUnitaire * quantite,
       informative,
       sansDesignation,
+      gris: grisDeLigne(i),
       ordre: ordre++,
     });
   }
@@ -149,5 +194,6 @@ export function analyserMinuteElectricite(arrayBuffer) {
     );
   }
 
+  reperGroupes(sequence);
   return sequence;
 }

@@ -159,5 +159,41 @@ export function calculerMiseAJour(sequence, lignesExistantes) {
 
   const absentes = existantes.filter((_, j) => !utilisees.has(j));
 
-  return { ajouts, modifications, repositionnees, absentes, inchangees };
+  const idsFichier = apparie.map((j) => (j >= 0 ? existantes[j].id : null));
+  return { ajouts, modifications, repositionnees, absentes, inchangees, idsFichier };
+}
+
+// Regroupements détectés dans le fichier (lignes gris foncé suivies de lignes
+// gris clair) : [{ nom, tete, membres }] avec des indices dans la séquence.
+export function groupesDuFichier(sequence) {
+  const parCle = new Map();
+  sequence.forEach((l, i) => {
+    if (!l.groupeCle) return;
+    if (!parCle.has(l.groupeCle)) parCle.set(l.groupeCle, { nom: "", tete: -1, membres: [] });
+    const g = parCle.get(l.groupeCle);
+    g.membres.push(i);
+    if (l.groupeTete) {
+      g.tete = i;
+      g.nom = l.designation || "Groupe";
+    }
+  });
+  return [...parCle.values()].filter((g) => g.tete >= 0);
+}
+
+// Devis existant qui correspond au fichier : même nom de fichier, même nom
+// normalisé, ou même code affaire (ex. CF502-015) — sinon null.
+export function trouverDevisCorrespondant(nomFichier, devisExistants) {
+  const sansExt = (t) => normaliser(String(t || "").replace(/\.[^.]+$/, ""));
+  const code = (t) => (String(t || "").match(/[A-Za-z]{2}\d{3}-\d{3}/) || [""])[0].toUpperCase();
+  const exact = devisExistants.find((d) => d.nomFichier === nomFichier);
+  if (exact) return exact;
+  const nom = sansExt(nomFichier);
+  const memeNom = devisExistants.find((d) => sansExt(d.nomFichier) === nom || normaliser(d.nom) === nom);
+  if (memeNom) return memeNom;
+  const c = code(nomFichier);
+  if (c) {
+    const memeCode = devisExistants.filter((d) => code(d.nomFichier) === c || code(d.nom) === c);
+    if (memeCode.length >= 1) return memeCode[0];
+  }
+  return null;
 }
