@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-route
 import { useAuth } from "../contexts/AuthContext";
 import { ecouterNotificationsPremierPlan } from "../lib/push";
 import NotificationsBell from "./NotificationsBell";
+import ImportSapAuto from "./ImportSapAuto";
 import logoIneo from "../assets/logo-ineo.png";
 
 const NAV_ITEMS_AUTOMATISME = [
@@ -345,6 +346,7 @@ export default function Layout() {
         </div>
         <Outlet />
       </main>
+      <ImportSapAuto />
     </div>
   );
 }

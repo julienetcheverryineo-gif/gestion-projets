@@ -16,6 +16,7 @@
 // les .vbs s'exécutent correctement quel que soit l'encodage du fichier.
 
 export const PARAMS_SAP_DEFAUT = {
+  systemeSap: "PE1 - SAP RISE", // entrée SAP Logon ouverte seulement si aucune connexion SAP n'est ouverte
   societeSap: "2726", // Agence.SapSocieteCode (IAQ1..IAQX)
   organisationAchats: "I001", // Societe.SapOrganisationAchatsCode (INEO)
   varianteListeFo: "ZINEO", // variante de sélection ME2J
@@ -105,7 +106,7 @@ export function validerParametres(params, otp, { dates = false, debut, fin, fo =
     }
   }
   const sur = /^[A-Za-z0-9_/. -]{0,40}$/;
-  [params.varianteListeFo, params.miseEnFormeFo, params.varianteAlvMo].forEach((v) => {
+  [params.varianteListeFo, params.miseEnFormeFo, params.varianteAlvMo, params.systemeSap].forEach((v) => {
     if (!sur.test(String(v || ""))) erreurs.push("Un paramètre SAP contient des caractères non pris en charge.");
   });
   if (!/^[A-Za-z0-9]{0,10}$/.test(String(params.societeSap || "")) ||
@@ -129,6 +130,7 @@ export function construireUrlLancement(type, params, otp, debut, fin) {
   ajoute("t", type);
   ajoute("o", otp.join(","));
   ajoute("ax", params.afficherSap ? "1" : "0");
+  ajoute("sy", String(params.systemeSap || "").trim());
   if (type === "mo") {
     ajoute("d", dateSap(debut));
     ajoute("f", dateSap(fin));
@@ -154,7 +156,7 @@ const DECLARATIONS = String.raw`Option Explicit
 Dim SapGuiAuto, SapApp, SapCon, session, fso, wsh
 Dim MODE_APPLI, TYPE_EXTRACTION, LISTE_OTP, DATE_DEB, DATE_FIN, SOCIETE, ORG_ACHATS
 Dim VAR_LISTE_FO, MISE_FORME_FO, VAR_ALV_MO, LIGNE_HIST, POPUP_PROJET, PROFIL_PROJET
-Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT, AFFICHER_SAP, SESSION_CREEE
+Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT, AFFICHER_SAP, SESSION_CREEE, SYSTEME_SAP, CONNEXION_OUVERTE
 
 Const TABLE_SEL = "wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE"
 Const LISTE_ALV = "wnd[0]/usr/cntlO_CONTAINER/shellcont/shell/shellcont[1]/shell"
@@ -210,7 +212,7 @@ Function Existe(id)
   End If
 End Function
 
-Sub ConnecterSap()
+Function SapPret()
   Dim erreur
   Set SapGuiAuto = Nothing
   On Error Resume Next
@@ -218,8 +220,79 @@ Sub ConnecterSap()
   erreur = Err.Number
   Err.Clear
   On Error GoTo 0
-  If erreur <> 0 Then Fin "SAP GUI n'est pas accessible. Ouvrez SAP et connectez-vous, puis relancez.", 48
-  If SapGuiAuto Is Nothing Then Fin "SAP GUI n'est pas accessible. Ouvrez SAP et connectez-vous, puis relancez.", 48
+  SapPret = (erreur = 0) And (Not SapGuiAuto Is Nothing)
+End Function
+
+' Demarre SAP Logon (chemin lu dans le registre, sinon emplacements usuels).
+Sub LancerSapLogon()
+  Dim c, chemins, i
+  c = ""
+  On Error Resume Next
+  c = Replace(wsh.RegRead("HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\saplogon.exe\"), """", "")
+  Err.Clear
+  On Error GoTo 0
+  If c <> "" Then
+    If Not fso.FileExists(c) Then c = ""
+  End If
+  If c = "" Then
+    chemins = Array(wsh.ExpandEnvironmentStrings("%ProgramFiles(x86)%") & "\SAP\FrontEnd\SAPgui\saplogon.exe", wsh.ExpandEnvironmentStrings("%ProgramFiles%") & "\SAP\FrontEnd\SAPgui\saplogon.exe")
+    For i = 0 To UBound(chemins)
+      If fso.FileExists(chemins(i)) Then c = chemins(i)
+    Next
+  End If
+  If c = "" Then Fin "SAP Logon est introuvable sur ce poste : lancez SAP manuellement puis relancez.", 48
+  wsh.Run """" & c & """", 1, False
+End Sub
+
+Sub Progression(message)
+  If MODE_APPLI Then EcrireStatut "EN_COURS", message
+End Sub
+
+' Si la session est sur l'ecran de connexion (utilisateur vide), attend la
+' fin de la connexion : automatique en authentification unique, sinon saisie
+' des identifiants (2 minutes). Si l'etat de connexion est illisible, on ne
+' bloque pas.
+Sub AttendreConnexion()
+  Dim i, u, lisible
+  For i = 1 To 480
+    u = ""
+    lisible = False
+    On Error Resume Next
+    u = session.Info.User
+    If Err.Number = 0 Then lisible = True
+    Err.Clear
+    On Error GoTo 0
+    If lisible = False Or u <> "" Then Exit Sub
+    If i = 24 And CONNEXION_OUVERTE And Not AFFICHER_SAP Then
+      On Error Resume Next
+      session.findById("wnd[0]").restore
+      Err.Clear
+      On Error GoTo 0
+    End If
+    If i = 1 Then Progression "En attente de la connexion a SAP (saisissez vos identifiants dans la fenetre SAP si besoin)"
+    WScript.Sleep 250
+  Next
+  Fin "Connexion a SAP non effectuee (delai de 2 minutes depasse).", 48
+End Sub
+
+' Connexion a SAP : reutilise TOUJOURS une connexion deja ouverte (la
+' premiere), et ne demarre SAP / n'ouvre l'entree SYSTEME_SAP de SAP Logon
+' que s'il n'y en a aucune.
+Sub ConnecterSap()
+  Dim i, erreur
+  CONNEXION_OUVERTE = False
+
+  If Not SapPret() Then
+    Progression "Demarrage de SAP..."
+    LancerSapLogon
+    For i = 1 To 120
+      WScript.Sleep 250
+      If SapPret() Then Exit For
+    Next
+    If Not SapPret() Then Fin "SAP GUI n'a pas demarre. Lancez SAP manuellement puis relancez.", 48
+    WScript.Sleep 2000
+  End If
+
   Set SapApp = Nothing
   On Error Resume Next
   Set SapApp = SapGuiAuto.GetScriptingEngine
@@ -228,10 +301,37 @@ Sub ConnecterSap()
   On Error GoTo 0
   If erreur <> 0 Then Fin "Le scripting SAP n'est pas actif (options SAP GUI > Accessibilite et scripting).", 48
   If SapApp Is Nothing Then Fin "Le scripting SAP n'est pas actif (options SAP GUI > Accessibilite et scripting).", 48
-  If SapApp.Children.Count = 0 Then Fin "Aucune connexion SAP n'est ouverte.", 48
-  Set SapCon = SapApp.Children(0)
+
+  If SapApp.Children.Count = 0 Then
+    If SYSTEME_SAP = "" Then Fin "Aucune connexion SAP n'est ouverte.", 48
+    Progression "Ouverture de la connexion SAP " & SYSTEME_SAP & "..."
+    Set SapCon = Nothing
+    On Error Resume Next
+    Set SapCon = SapApp.OpenConnection(SYSTEME_SAP, True)
+    erreur = Err.Number
+    Err.Clear
+    On Error GoTo 0
+    If erreur <> 0 Then Fin "Impossible d'ouvrir la connexion SAP " & SYSTEME_SAP & " (nom exact de l'entree dans SAP Logon).", 48
+    If SapCon Is Nothing Then Fin "Impossible d'ouvrir la connexion SAP " & SYSTEME_SAP & " (nom exact de l'entree dans SAP Logon).", 48
+    CONNEXION_OUVERTE = True
+  Else
+    Set SapCon = SapApp.Children(0)
+  End If
+
+  For i = 1 To 40
+    If SapCon.Children.Count > 0 Then Exit For
+    WScript.Sleep 250
+  Next
   If SapCon.Children.Count = 0 Then Fin "Aucune session SAP active.", 48
   Set session = SapCon.Children(0)
+  If CONNEXION_OUVERTE And Not AFFICHER_SAP Then
+    On Error Resume Next
+    session.findById("wnd[0]").iconify
+    Err.Clear
+    On Error GoTo 0
+  End If
+  AttendreConnexion
+  Progression "Extraction SAP en cours..."
   OuvrirSessionDediee
 End Sub
 
@@ -259,6 +359,8 @@ Sub OuvrirSessionDediee()
   If Not AFFICHER_SAP Then
     On Error Resume Next
     session.findById("wnd[0]").iconify
+    Err.Clear
+    If CONNEXION_OUVERTE And SESSION_CREEE Then SapCon.Children(0).findById("wnd[0]").iconify
     Err.Clear
     On Error GoTo 0
   End If
@@ -543,6 +645,7 @@ export function genererScriptManuel(type, params, otp, debut, fin) {
     `MODE_APPLI = False`,
     `TYPE_EXTRACTION = ${chaineVbs(type)}`,
     `LISTE_OTP = Array(${otp.map(chaineVbs).join(", ")})`,
+    `SYSTEME_SAP = ${chaineVbs(String(params.systemeSap || "").trim())}`,
     `DATE_DEB = ${chaineVbs(dateSap(debut))}`,
     `DATE_FIN = ${chaineVbs(dateSap(fin))}`,
     `SOCIETE = ${chaineVbs(params.societeSap)}`,
@@ -644,7 +747,14 @@ Function ChargerDepuisUrl(url)
   LISTE_OTP = otps
   DATE_DEB = "" : DATE_FIN = "" : SOCIETE = "" : ORG_ACHATS = ""
   VAR_LISTE_FO = "" : MISE_FORME_FO = "" : VAR_ALV_MO = "" : LIGNE_HIST = -1
-  POPUP_PROJET = False : PROFIL_PROJET = "" : AFFICHER_SAP = False
+  POPUP_PROJET = False : PROFIL_PROJET = "" : AFFICHER_SAP = False : SYSTEME_SAP = ""
+  If d.Exists("sy") Then
+    If Not Valide("^[A-Za-z0-9_ .-]{0,40}$", d("sy")) Then
+      ChargerDepuisUrl = "Systeme SAP invalide."
+      Exit Function
+    End If
+    SYSTEME_SAP = Trim(d("sy"))
+  End If
   If d.Exists("ax") Then
     If Not Valide("^[01]$", d("ax")) Then
       ChargerDepuisUrl = "Parametre invalide."

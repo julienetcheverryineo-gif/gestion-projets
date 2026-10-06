@@ -3,41 +3,21 @@ import { useCollection } from "../lib/firestoreHooks";
 import { otpDepuisCompte } from "../lib/parseSapExports";
 import {
   DOSSIER_EXPORT_LOCAL,
-  dateSap,
-  PARAMS_SAP_DEFAUT,
-  construireUrlLancement,
   genererInstallateur,
   genererScriptManuel,
   grouperParAgence,
   validerParametres,
 } from "../lib/sapScripts";
+import { autoriser, choisirDossier, dossierSupporte, lireDossierMemorise } from "../lib/dossierExportSap";
 import {
-  autoriser,
-  choisirDossier,
-  dossierSupporte,
-  lireDossierMemorise,
-  lireFichier,
-  ouvrirLien,
-} from "../lib/dossierExportSap";
-import { importerExportSap } from "../lib/importSapAuto";
-
-const CLE_STOCKAGE = "scriptsSapParams";
-
-function lireParams() {
-  try {
-    const brut = localStorage.getItem(CLE_STOCKAGE);
-    if (brut) return { ...PARAMS_SAP_DEFAUT, ...JSON.parse(brut) };
-  } catch {
-    /* stockage indisponible */
-  }
-  return { ...PARAMS_SAP_DEFAUT };
-}
-
-function isoAujourdhui(decalageAnnees = 0) {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() + decalageAnnees);
-  return d.toISOString().slice(0, 10);
-}
+  autoActif,
+  definirAutoActif,
+  executerExtraction,
+  isoAujourdhui,
+  lireParamsSap,
+  optionsValidation,
+  sauverParamsSap,
+} from "../lib/extractionSap";
 
 function telecharger(nom, contenu) {
   // .vbs encodé en ASCII : pas de BOM, saut de ligne CRLF déjà inclus.
@@ -61,7 +41,7 @@ const ONGLETS = [
 
 export default function ScriptsSapPanel({ importManuel = null, historique = null }) {
   const { documents: chantiers } = useCollection("sites");
-  const [params, setParams] = useState(lireParams);
+  const [params, setParams] = useState(lireParamsSap);
   const [otp, setOtp] = useState([]);
   const [menuOuvert, setMenuOuvert] = useState(false);
   const [recherche, setRecherche] = useState("");
@@ -70,6 +50,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
   const [erreurs, setErreurs] = useState([]);
   const [ouvert, setOuvert] = useState(false);
   const [onglet, setOnglet] = useState("installation");
+  const [autoConnexion, setAutoConnexion] = useState(autoActif);
   const refMenu = useRef(null);
   const [dossier, setDossier] = useState(null);
   const [etat, setEtat] = useState(null); // { phase, type, message }
@@ -112,11 +93,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
   const maj = (champ, valeur) => {
     setParams((p) => {
       const suivant = { ...p, [champ]: valeur };
-      try {
-        localStorage.setItem(CLE_STOCKAGE, JSON.stringify(suivant));
-      } catch {
-        /* ignoré */
-      }
+      sauverParamsSap(suivant);
       return suivant;
     });
   };
@@ -143,13 +120,10 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
         ? otp.join(", ")
         : `${otp.length} affaires sélectionnées`;
 
-  const optionsValidation = (type, chemins = false) =>
-    type === "fo" ? { fo: true, chemins } : { mo: true, dates: true, debut, fin, chemins };
-
   // Script à télécharger (secours, si le gestionnaire n'est pas installé) :
   // un script par agence (AAQ5, AAQ2…), voir grouperParAgence.
   const telechargerManuel = (type) => {
-    const problemes = validerParametres(params, otp, optionsValidation(type, true));
+    const problemes = validerParametres(params, otp, optionsValidation(type, debut, fin, true));
     setErreurs(problemes);
     if (problemes.length > 0) return;
     const groupes = grouperParAgence(otp);
@@ -171,76 +145,11 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
     }
   };
 
-  // Une passe = une extraction (ME2J ou ZCAT3) pour les affaires d'UNE agence :
-  // lance SAP via le gestionnaire installé sur le poste, attend la fin,
-  // lit le fichier exporté et l'importe.
-  const executerPasse = async (h, type, codes, titre) => {
-    const libelle = type === "fo" ? "achats (ME2J)" : "heures (ZCAT3)";
-    const t0 = Date.now();
-    setEtat({ phase: "attente", type, message: `${titre}Lancement de l'extraction ${libelle}…` });
-    ouvrirLien(construireUrlLancement(type, params, codes, debut, fin));
-
-    const limite = t0 + 10 * 60 * 1000;
-    let reponse = false;
-    let fini = false;
-    while (!annule.current && Date.now() < limite) {
-      await new Promise((r) => setTimeout(r, 1000));
-      const st = await lireFichier(h, `statut-${type}.txt`);
-      if (st && st.modifieLe >= t0 - 2000) {
-        reponse = true;
-        const [code, ...reste] = st.texte.split(/\r?\n/);
-        const detail = reste.join(" ").trim();
-        if (code.trim() === "ERREUR") return { ok: false, message: detail || "L'extraction SAP a échoué." };
-        if (code.trim() === "OK") {
-          fini = true;
-          break;
-        }
-        setEtat({
-          phase: "attente",
-          type,
-          message: titre + (detail && detail !== "Lancement" ? detail : `Extraction ${libelle} en cours dans SAP…`),
-        });
-      } else if (!reponse && Date.now() - t0 > 15000) {
-        setEtat({
-          phase: "attente",
-          type,
-          message:
-            "Aucune réponse du poste. Le gestionnaire SAP est-il installé (Paramètres SAP > Installation) et le lien autorisé dans le navigateur ?",
-        });
-      }
-    }
-    if (annule.current) return { ok: false, annule: true };
-    if (!fini) return { ok: false, message: "Délai dépassé : l'extraction SAP n'a pas abouti." };
-
-    setEtat({ phase: "import", type, message: `${titre}Lecture et import du fichier exporté…` });
-    try {
-      const nomFichier = `export-${type}-sap.txt`;
-      const fichier = await lireFichier(h, nomFichier);
-      if (!fichier) throw new Error("Fichier d'export introuvable dans le dossier choisi.");
-      const res = await importerExportSap({
-        type,
-        texte: fichier.texte,
-        nomFichier,
-        otpDemandes: codes,
-        debut: type === "mo" ? dateSap(debut) : "",
-        fin: type === "mo" ? dateSap(fin) : "",
-      });
-      return {
-        ok: true,
-        resume:
-          `${type === "fo" ? "Achats" : "Heures"} : ${res.nbLignes} ligne(s)` +
-          (res.nbRemplacees > 0 ? ` (${res.nbRemplacees} remplacée(s))` : ""),
-      };
-    } catch (e) {
-      return { ok: false, message: "Import impossible : " + e.message };
-    }
-  };
-
   // Un clic : une ou deux extractions (types = ["fo"], ["mo"] ou les deux),
-  // chacune découpée par agence (AAQ5, AAQ2…), exécutées l'une après l'autre.
+  // découpées par agence, importées au fil de l'eau (voir extractionSap.js).
   const lancer = async (types) => {
     if (etat && (etat.phase === "attente" || etat.phase === "import")) return;
-    const problemes = types.flatMap((t) => validerParametres(params, otp, optionsValidation(t)));
+    const problemes = types.flatMap((t) => validerParametres(params, otp, optionsValidation(t, debut, fin)));
     setErreurs([...new Set(problemes)]);
     if (problemes.length > 0) return;
     if (!dossierSupporte()) {
@@ -268,25 +177,16 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
     }
 
     annule.current = false;
-    const groupes = grouperParAgence(otp);
-    const passes = groupes.flatMap((g) => types.map((type) => ({ type, ...g })));
-    const resumes = [];
-    for (let i = 0; i < passes.length; i++) {
-      const { type, prefixe, codes } = passes[i];
-      const titre =
-        (passes.length > 1 ? `[${i + 1}/${passes.length}] ` : "") + (groupes.length > 1 ? `${prefixe} — ` : "");
-      const r = await executerPasse(h, type, codes, titre);
-      if (r.annule) return;
-      if (!r.ok) {
-        setEtat({
-          phase: "erreur",
-          message: (titre ? titre : "") + r.message + (resumes.length ? ` (déjà importé : ${resumes.join(" ; ")})` : ""),
-        });
-        return;
-      }
-      resumes.push((groupes.length > 1 ? `${prefixe} ` : "") + r.resume);
-    }
-    setEtat({ phase: "ok", message: resumes.join(" ; ") + "." });
+    await executerExtraction({
+      handle: h,
+      types,
+      otp,
+      debut,
+      fin,
+      params,
+      onEtat: setEtat,
+      estAnnule: () => annule.current,
+    });
   };
 
   const enCours = etat && (etat.phase === "attente" || etat.phase === "import");
@@ -510,6 +410,17 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
           {onglet === "reglages" && (
             <div className="sap-section">
               <div className="sap-groupe">
+                <h3>Connexion</h3>
+                <div className="sap-champs">
+                  {champ(
+                    "Système SAP (entrée SAP Logon)",
+                    "systemeSap",
+                    "Utilisé seulement si SAP n'est pas déjà connecté : SAP est alors démarré et connecté à ce système"
+                  )}
+                </div>
+              </div>
+
+              <div className="sap-groupe">
                 <h3>Achats (ME2J)</h3>
                 <div className="sap-champs">
                   {champ("Organisation d'achats", "organisationAchats", "I001 (INEO), G001 (AXIMA), B001 (BYES)")}
@@ -536,6 +447,24 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
                   {champ("Mise en forme ALV", "varianteAlvMo", "Nom de votre mise en forme (ex. IAQ2_GUEST)")}
                   {champ("Ligne de la mise en forme", "ligneVarianteMo", "Lue en priorité (50 comme GOAT) ; vide = ignorer")}
                 </div>
+              </div>
+
+              <div className="sap-groupe">
+                <h3>Import automatique</h3>
+                <label className="sap-case">
+                  <input
+                    type="checkbox"
+                    checked={autoConnexion}
+                    onChange={(e) => {
+                      setAutoConnexion(e.target.checked);
+                      definirAutoActif(e.target.checked);
+                    }}
+                  />
+                  <span>
+                    Lancer l'import SAP (achats + heures, tous les chantiers) à la connexion — au plus une fois
+                    toutes les 4 h sur ce poste
+                  </span>
+                </label>
               </div>
 
               <div className="sap-groupe">

@@ -1,0 +1,149 @@
+import {
+  PARAMS_SAP_DEFAUT,
+  construireUrlLancement,
+  dateSap,
+  grouperParAgence,
+  validerParametres,
+} from "./sapScripts";
+import { lireFichier, ouvrirLien } from "./dossierExportSap";
+import { importerExportSap } from "./importSapAuto";
+
+const CLE_PARAMS = "scriptsSapParams";
+
+export function lireParamsSap() {
+  try {
+    const brut = localStorage.getItem(CLE_PARAMS);
+    if (brut) return { ...PARAMS_SAP_DEFAUT, ...JSON.parse(brut) };
+  } catch {
+    /* stockage indisponible */
+  }
+  return { ...PARAMS_SAP_DEFAUT };
+}
+
+export function sauverParamsSap(params) {
+  try {
+    localStorage.setItem(CLE_PARAMS, JSON.stringify(params));
+  } catch {
+    /* ignoré */
+  }
+}
+
+export function isoAujourdhui(decalageAnnees = 0) {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + decalageAnnees);
+  return d.toISOString().slice(0, 10);
+}
+
+export function optionsValidation(type, debut, fin, chemins = false) {
+  return type === "fo" ? { fo: true, chemins } : { mo: true, dates: true, debut, fin, chemins };
+}
+
+// Une passe = une extraction (ME2J ou ZCAT3) pour les affaires d'UNE agence :
+// lance SAP via le gestionnaire installé sur le poste, attend la fin, lit le
+// fichier exporté et l'importe.
+async function executerPasse({ handle, type, codes, titre, params, debut, fin, onEtat, estAnnule }) {
+  const libelle = type === "fo" ? "achats (ME2J)" : "heures (ZCAT3)";
+  const t0 = Date.now();
+  onEtat({ phase: "attente", type, message: `${titre}Lancement de l'extraction ${libelle}…` });
+  ouvrirLien(construireUrlLancement(type, params, codes, debut, fin));
+
+  const limite = t0 + 10 * 60 * 1000;
+  let reponse = false;
+  let fini = false;
+  while (!estAnnule() && Date.now() < limite) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const st = await lireFichier(handle, `statut-${type}.txt`);
+    if (st && st.modifieLe >= t0 - 2000) {
+      reponse = true;
+      const [code, ...reste] = st.texte.split(/\r?\n/);
+      const detail = reste.join(" ").trim();
+      if (code.trim() === "ERREUR") return { ok: false, message: detail || "L'extraction SAP a échoué." };
+      if (code.trim() === "OK") {
+        fini = true;
+        break;
+      }
+      onEtat({
+        phase: "attente",
+        type,
+        message: titre + (detail && detail !== "Lancement" ? detail : `Extraction ${libelle} en cours dans SAP…`),
+      });
+    } else if (!reponse && Date.now() - t0 > 15000) {
+      onEtat({
+        phase: "attente",
+        type,
+        message:
+          "Aucune réponse du poste. Le gestionnaire SAP est-il installé (Paramètres SAP > Installation) et le lien autorisé dans le navigateur ?",
+      });
+    }
+  }
+  if (estAnnule()) return { ok: false, annule: true };
+  if (!fini) return { ok: false, message: "Délai dépassé : l'extraction SAP n'a pas abouti." };
+
+  onEtat({ phase: "import", type, message: `${titre}Lecture et import du fichier exporté…` });
+  try {
+    const nomFichier = `export-${type}-sap.txt`;
+    const fichier = await lireFichier(handle, nomFichier);
+    if (!fichier) throw new Error("Fichier d'export introuvable dans le dossier choisi.");
+    const res = await importerExportSap({
+      type,
+      texte: fichier.texte,
+      nomFichier,
+      otpDemandes: codes,
+      debut: type === "mo" ? dateSap(debut) : "",
+      fin: type === "mo" ? dateSap(fin) : "",
+    });
+    return {
+      ok: true,
+      resume:
+        `${type === "fo" ? "Achats" : "Heures"} : ${res.nbLignes} ligne(s)` +
+        (res.nbRemplacees > 0 ? ` (${res.nbRemplacees} remplacée(s))` : ""),
+    };
+  } catch (e) {
+    return { ok: false, message: "Import impossible : " + e.message };
+  }
+}
+
+// Une ou deux extractions (types = ["fo"], ["mo"] ou les deux), chacune
+// découpée par agence (AAQ5, AAQ2… ne se saisissent pas ensemble dans SAP),
+// exécutées l'une après l'autre. Appelle onEtat({phase, message}) au fil de
+// l'eau ; phase finale : "ok" ou "erreur" (rien si annulé).
+export async function executerExtraction({ handle, types, otp, debut, fin, params, onEtat, estAnnule }) {
+  const groupes = grouperParAgence(otp);
+  const passes = groupes.flatMap((g) => types.map((type) => ({ type, ...g })));
+  const resumes = [];
+  for (let i = 0; i < passes.length; i++) {
+    const { type, prefixe, codes } = passes[i];
+    const titre =
+      (passes.length > 1 ? `[${i + 1}/${passes.length}] ` : "") + (groupes.length > 1 ? `${prefixe} — ` : "");
+    const r = await executerPasse({ handle, type, codes, titre, params, debut, fin, onEtat, estAnnule });
+    if (r.annule) return { ok: false, annule: true };
+    if (!r.ok) {
+      const message = titre + r.message + (resumes.length ? ` (déjà importé : ${resumes.join(" ; ")})` : "");
+      onEtat({ phase: "erreur", message });
+      return { ok: false, message };
+    }
+    resumes.push((groupes.length > 1 ? `${prefixe} ` : "") + r.resume);
+  }
+  const message = resumes.join(" ; ") + ".";
+  onEtat({ phase: "ok", message });
+  return { ok: true, message };
+}
+
+export { validerParametres };
+
+// Déclenchement automatique de l'import SAP à la connexion (par poste).
+const CLE_AUTO = "sapAutoConnexion";
+export const autoActif = () => {
+  try {
+    return localStorage.getItem(CLE_AUTO) !== "0";
+  } catch {
+    return true;
+  }
+};
+export const definirAutoActif = (actif) => {
+  try {
+    localStorage.setItem(CLE_AUTO, actif ? "1" : "0");
+  } catch {
+    /* ignoré */
+  }
+};
