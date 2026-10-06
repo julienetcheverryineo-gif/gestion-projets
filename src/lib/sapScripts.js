@@ -630,35 +630,61 @@ End Sub
 
 ' ---- Test d'ecriture : transaction ZCA_TACHES (saisie SANS enregistrement) ----
 Sub Collecter(obj, prof, sortie)
-  Dim i, n, t, ch, id, tx, enf
-  If prof > 12 Then Exit Sub
+  Dim i, n, t, ch, id, tx, enf, coll, msg
+  If prof > 14 Then Exit Sub
   If sortie.Count > 3000 Then Exit Sub
   On Error Resume Next
-  t = "" : ch = False : id = "" : tx = ""
+  t = "" : ch = "" : id = "" : tx = "" : msg = ""
   t = obj.Type
   ch = obj.Changeable
   id = obj.Id
   tx = obj.Text
   Err.Clear
-  sortie.Add sortie.Count, String(prof * 2, " ") & id & " | " & t & " | chg=" & ch & " | " & Replace(Replace(tx, vbCr, " "), vbLf, " ")
-  If (t = "GuiTextField" Or t = "GuiCTextField") And ch = True Then CHAMPS_SAISIE.Add CHAMPS_SAISIE.Count, id
-  n = 0
-  n = obj.Children.Count
-  If Err.Number <> 0 Then n = 0
+  n = -1
+  Set coll = Nothing
+  Set coll = obj.Children
+  If Err.Number <> 0 Then msg = msg & " [Children: " & Err.Description & "]"
   Err.Clear
+  n = coll.Count
+  If Err.Number <> 0 Then
+    msg = msg & " [Count: " & Err.Description & "]"
+    Err.Clear
+    n = coll.Length
+    If Err.Number <> 0 Then
+      msg = msg & " [Length: " & Err.Description & "]"
+      n = 0
+    End If
+  End If
+  Err.Clear
+  sortie.Add sortie.Count, String(prof * 2, " ") & id & " | " & t & " | chg=" & ch & " | n=" & n & " | " & Replace(Replace(tx, vbCr, " "), vbLf, " ") & msg
+  If (t = "GuiTextField" Or t = "GuiCTextField") And ch = True Then CHAMPS_SAISIE.Add CHAMPS_SAISIE.Count, id
   For i = 0 To n - 1
     Set enf = Nothing
-    Set enf = obj.Children(i)
-    If Err.Number = 0 Then Collecter enf, prof + 1, sortie
+    Set enf = coll.Item(CLng(i))
+    If Err.Number <> 0 Then
+      Err.Clear
+      Set enf = coll.ElementAt(CLng(i))
+    End If
+    If Err.Number = 0 Then
+      Collecter enf, prof + 1, sortie
+    Else
+      sortie.Add sortie.Count, String(prof * 2 + 2, " ") & "(enfant " & i & " illisible : " & Err.Description & ")"
+    End If
     Err.Clear
   Next
 End Sub
 
 Function ScannerEcran(nomFichier)
-  Dim sortie, k, f
+  Dim sortie, k, f, info
   Set sortie = CreateObject("Scripting.Dictionary")
   Set CHAMPS_SAISIE = CreateObject("Scripting.Dictionary")
-  Collecter session.findById("wnd[0]/usr"), 0, sortie
+  info = ""
+  On Error Resume Next
+  info = "Transaction=" & session.Info.Transaction & " | Programme=" & session.Info.Program & " | Ecran=" & session.Info.ScreenNumber & " | Titre=" & session.findById("wnd[0]").Text & " | Barre=" & session.findById("wnd[0]/sbar").Text
+  Err.Clear
+  On Error GoTo 0
+  sortie.Add 0, info
+  Collecter session.findById("wnd[0]"), 0, sortie
   On Error Resume Next
   Set f = fso.CreateTextFile(DOSSIER & nomFichier, True, False)
   For Each k In sortie.Keys
@@ -674,7 +700,7 @@ Sub EcrireTaches()
   EcrireStatut "EN_COURS", "Ouverture de ZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/okcd").Text = "/nZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
-  WScript.Sleep 800
+  WScript.Sleep 2000
   n = ScannerEcran("zca-taches-ecran-1.txt")
   If n = 0 Then Fin "ZCA_TACHES : aucun champ saisissable trouve (voir zca-taches-ecran-1.txt).", 48
   idCompte = CHAMPS_SAISIE(0)
