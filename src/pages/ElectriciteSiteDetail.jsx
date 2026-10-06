@@ -16,8 +16,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
 import { libelleTypeActivite, estActiviteIgnoree } from "../lib/typesActiviteSap";
+import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
+import { codeTypeFo } from "../lib/exportGoat";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 import { exporterGoat } from "../lib/exportGoat";
 import { otpDepuisCompte } from "../lib/parseSapExports";
@@ -1407,6 +1409,7 @@ export default function ElectriciteSiteDetail() {
   const [lignesSelectionnees, setLignesSelectionnees] = useState(new Set());
   const [afficherGroupeModal, setAfficherGroupeModal] = useState(false);
   const [afficherTaches, setAfficherTaches] = useState(false);
+  const [afficherEnvoiSap, setAfficherEnvoiSap] = useState(false);
   const tachesFo = chantier?.tachesFo || LISTE_TYPES_FO;
   const [groupesOuverts, setGroupesOuverts] = useState(new Set());
   const groupesDuDevis = devisOuvert
@@ -1538,6 +1541,19 @@ export default function ElectriciteSiteDetail() {
   const lignesChantier = toutesLignes.filter(
     (l) => l.chantierId === chantierId && !l.estPoste
   );
+  // Tâches (types de FO) réellement utilisées dans les devis du chantier :
+  // code + libellé, pour l'envoi vers SAP.
+  const tachesUtilisees = (() => {
+    const parCode = new Map();
+    lignesChantier.forEach((l) => {
+      const code = codeTypeFo(l.typeFo);
+      if (!code || parCode.has(code)) return;
+      const connue = tachesFo.find((t) => t.code === code);
+      const m = String(l.typeFo).match(/\[([^\]]*)\]/);
+      parCode.set(code, { code, libelle: (connue?.label || (m ? m[1] : "") || code).trim() });
+    });
+    return [...parCode.values()].sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
+  })();
   const champRecap = recapActif === "mo" ? "tempsTotalHeures" : "coutTotalFo";
   const champAvancementRecap = recapActif === "mo" ? "avancementMo" : "avancementFo";
   const uniteRecap = recapActif === "mo" ? "h" : "€";
@@ -1974,6 +1990,15 @@ export default function ElectriciteSiteDetail() {
                   <button type="button" className="btn-ghost" onClick={() => setAfficherTaches(true)}>
                     ⚙ Types de FO / tâches
                   </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={!otpSap}
+                    title={otpSap ? "Créer ces tâches dans SAP (ZCA_TACHES)" : "Renseignez d'abord le compte du chantier"}
+                    onClick={() => setAfficherEnvoiSap(true)}
+                  >
+                    📤 Tâches vers SAP
+                  </button>
                   {modeSelection && (
                     <>
                       <span className="simple-list-meta">
@@ -2188,6 +2213,14 @@ export default function ElectriciteSiteDetail() {
           devisExistants={devis}
           toutesLignes={toutesLignes}
           onClose={() => setAfficherImport(false)}
+        />
+      )}
+
+      {afficherEnvoiSap && (
+        <EnvoyerTachesSapModal
+          compte={otpSap}
+          taches={tachesUtilisees}
+          onClose={() => setAfficherEnvoiSap(false)}
         />
       )}
 

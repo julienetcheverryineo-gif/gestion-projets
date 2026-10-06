@@ -51,7 +51,7 @@ async function ecrireMemoire(handle) {
 export const lireDossierMemorise = () => lireMemoire();
 
 export async function choisirDossier() {
-  const handle = await window.showDirectoryPicker({ id: "pilotage-sap-exports", mode: "read" });
+  const handle = await window.showDirectoryPicker({ id: "pilotage-sap-exports", mode: "readwrite" });
   await ecrireMemoire(handle);
   return handle;
 }

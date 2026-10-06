@@ -2,6 +2,7 @@ import {
   PARAMS_SAP_DEFAUT,
   construireUrlLancement,
   construireUrlTaches,
+  construireUrlLotTaches,
   dateSap,
   grouperParAgence,
   validerParametres,
@@ -166,6 +167,49 @@ export async function executerTestTaches({ handle, params, compte, code, libelle
       if (c.trim() === "OK") return onEtat({ phase: "ok", message: detail });
       if (c.trim() === "ERREUR") return onEtat({ phase: "erreur", message: detail || "Échec du test." });
       onEtat({ phase: "attente", type: "taches", message: "Test ZCA_TACHES : " + (detail || "en cours…") });
+    }
+  }
+  if (!estAnnule()) onEtat({ phase: "erreur", message: "Délai dépassé (gestionnaire SAP installé et à jour ?)." });
+}
+
+// Envoi d'un lot de tâches vers ZCA_TACHES : l'appli écrit le lot dans le
+// dossier d'export (UTF-16, pour garder les accents), lance le gestionnaire
+// SAP puis attend son compte rendu. Doit être appelée depuis un clic (la
+// permission d'écriture sur le dossier est demandée au navigateur).
+export async function envoyerTachesSap({ handle, params, compte, taches, onEtat, estAnnule }) {
+  try {
+    if ((await handle.requestPermission({ mode: "readwrite" })) !== "granted") {
+      return onEtat({ phase: "erreur", message: "Écriture dans le dossier d'export refusée." });
+    }
+    const texte =
+      compte + "\r\n" + taches.map((t) => t.code + "\t" + String(t.libelle).replace(/[\t\r\n]+/g, " ")).join("\r\n") + "\r\n";
+    const octets = new Uint8Array(2 + texte.length * 2);
+    octets[0] = 0xff;
+    octets[1] = 0xfe;
+    for (let i = 0; i < texte.length; i++) {
+      const c = texte.charCodeAt(i);
+      octets[2 + i * 2] = c & 0xff;
+      octets[3 + i * 2] = c >> 8;
+    }
+    const fh = await handle.getFileHandle("taches-entree.txt", { create: true });
+    const w = await fh.createWritable();
+    await w.write(octets);
+    await w.close();
+  } catch (e) {
+    return onEtat({ phase: "erreur", message: "Préparation impossible : " + e.message });
+  }
+  const t0 = Date.now();
+  onEtat({ phase: "attente", type: "taches", message: "Envoi vers SAP : lancement…" });
+  ouvrirLien(construireUrlLotTaches(params));
+  while (!estAnnule() && Date.now() < t0 + 8 * 60 * 1000) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const st = await lireFichier(handle, "statut-taches.txt");
+    if (st && st.modifieLe >= t0 - 2000) {
+      const [c, ...reste] = st.texte.split(/\r?\n/);
+      const detail = reste.join(" ").trim();
+      if (c.trim() === "OK") return onEtat({ phase: "ok", message: detail });
+      if (c.trim() === "ERREUR") return onEtat({ phase: "erreur", message: detail || "Échec de l'envoi." });
+      onEtat({ phase: "attente", type: "taches", message: "Envoi vers SAP : " + (detail || "en cours…") });
     }
   }
   if (!estAnnule()) onEtat({ phase: "erreur", message: "Délai dépassé (gestionnaire SAP installé et à jour ?)." });

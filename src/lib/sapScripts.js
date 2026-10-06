@@ -121,6 +121,12 @@ export function validerParametres(params, otp, { dates = false, debut, fin, fo =
   return [...new Set(erreurs)];
 }
 
+// Lien de l'envoi d'un lot de tâches (le lot est dans taches-entree.txt).
+export function construireUrlLotTaches(params) {
+  const sy = String(params.systemeSap || "").trim().replace(/ /g, "+");
+  return `${PROTOCOLE_SAP}://run?t=taches&m=lot&sy=${sy}`;
+}
+
 // Lien du test d'écriture ZCA_TACHES (saisie d'une ligne, sans enregistrer).
 export function construireUrlTaches(params, compte, code, libelle) {
   const e = (v) => String(v ?? "").replace(/ /g, "+");
@@ -162,7 +168,7 @@ const DECLARATIONS = String.raw`Option Explicit
 Dim SapGuiAuto, SapApp, SapCon, session, fso, wsh
 Dim MODE_APPLI, TYPE_EXTRACTION, LISTE_OTP, DATE_DEB, DATE_FIN, SOCIETE, ORG_ACHATS
 Dim VAR_LISTE_FO, MISE_FORME_FO, VAR_ALV_MO, LIGNE_HIST, POPUP_PROJET, PROFIL_PROJET
-Dim CODE_TACHE, LIB_TACHE, CHAMPS_SAISIE
+Dim CODE_TACHE, LIB_TACHE, CHAMPS_SAISIE, LOT_CODES, LOT_LIBS
 Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT, AFFICHER_SAP, SESSION_CREEE, SYSTEME_SAP, CONNEXION_OUVERTE
 
 Const TABLE_SEL = "wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE"
@@ -755,7 +761,8 @@ Function BoutonGrille(g, motif)
 End Function
 
 Sub EcrireTaches()
-  Dim n, g, idChamp, bouton, nl, ligne, i, nc, col, cibles, k, barre, msgFenetre
+  Dim n, g, idChamp, bouton, nl, ligne, i, j, nc, col, cibles, barre, msgFenetre
+  Dim colCode, colLib, existants, aEnvoyer, cree, deja, code, lib, nbAvant
   EcrireStatut "EN_COURS", "Ouverture de ZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/okcd").Text = "/nZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
@@ -774,39 +781,73 @@ Sub EcrireTaches()
   n = ScannerEcran("zca-taches-ecran-2.txt")
   If Not Existe(GRILLE_TACHES) Then Fin "ZCA_TACHES : la grille des taches n'est pas affichee (voir zca-taches-ecran-2.txt).", 48
   Set g = session.findById(GRILLE_TACHES)
-  nl = g.RowCount
+  nbAvant = g.RowCount
 
-  ' 1) ajouter une ligne a la grille
   bouton = BoutonGrille(g, "APPEND")
   If bouton = "" Then bouton = BoutonGrille(g, "INSERT_ROW")
   If bouton = "" Then bouton = BoutonGrille(g, "Ajouter|Cr.er|Nouvelle|Ins.rer")
-  If bouton = "" Then Fin "ZCA_TACHES : aucun bouton d'ajout de ligne trouve dans la grille (voir zca-taches-ecran-2.txt, lignes GRILLE bouton).", 48
+  If bouton = "" Then Fin "ZCA_TACHES : aucun bouton d'ajout de ligne trouve dans la grille (voir zca-taches-ecran-2.txt).", 48
+
+  ' Une premiere ligne vide sert a reperer les colonnes de saisie (code, libelle).
   g.pressToolbarButton bouton
   WScript.Sleep 1200
-  If Existe("wnd[1]") Then Fin "ZCA_TACHES : une fenetre s'est ouverte apres l'ajout de ligne (voir zca-taches-ecran-3.txt).", 48
+  If Existe("wnd[1]") Then Fin "ZCA_TACHES : une fenetre s'est ouverte apres l'ajout de ligne.", 48
   Set g = session.findById(GRILLE_TACHES)
-  If g.RowCount > nl Then
+  If g.RowCount > nbAvant Then
     ligne = g.RowCount - 1
   Else
     ligne = g.CurrentCellRow
   End If
-  n = ScannerEcran("zca-taches-ecran-3.txt")
-
-  ' 2) code puis libelle dans les deux premieres colonnes modifiables de la ligne
   Set cibles = CreateObject("Scripting.Dictionary")
   nc = g.ColumnOrder.Count
   For i = 0 To nc - 1
     col = g.ColumnOrder.Item(CLng(i))
     If g.GetCellChangeable(ligne, col) Then cibles.Add cibles.Count, col
   Next
-  If cibles.Count < 2 Then Fin "ZCA_TACHES : moins de 2 colonnes modifiables sur la nouvelle ligne (voir zca-taches-ecran-3.txt).", 48
-  g.ModifyCell ligne, cibles(0), CODE_TACHE
-  g.ModifyCell ligne, cibles(1), LIB_TACHE
-  g.SetCurrentCell ligne, cibles(1)
-  g.PressEnter
-  WScript.Sleep 800
+  If cibles.Count < 2 Then Fin "ZCA_TACHES : moins de 2 colonnes modifiables sur la nouvelle ligne.", 48
+  colCode = cibles(0)
+  colLib = cibles(1)
 
-  ' 3) enregistrer
+  ' Taches deja presentes dans SAP pour ce compte : on ne les recree pas.
+  Set existants = CreateObject("Scripting.Dictionary")
+  For j = 0 To nbAvant - 1
+    existants(UCase(Trim(g.GetCellValue(j, colCode)))) = True
+  Next
+  Set aEnvoyer = CreateObject("Scripting.Dictionary")
+  deja = 0
+  For i = 0 To LOT_CODES.Count - 1
+    code = LOT_CODES(i)
+    If existants.Exists(UCase(code)) Then
+      deja = deja + 1
+    Else
+      existants(UCase(code)) = True
+      aEnvoyer.Add aEnvoyer.Count, i
+    End If
+  Next
+  If aEnvoyer.Count = 0 Then
+    SESSION_CREEE = False
+    Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & " - rien a creer, les " & deja & " tache(s) existent deja. Une ligne vide non enregistree reste dans la fenetre SAP : fermez-la sans enregistrer.", 64
+  End If
+
+  cree = 0
+  For j = 0 To aEnvoyer.Count - 1
+    i = aEnvoyer(j)
+    If j > 0 Then
+      g.pressToolbarButton bouton
+      WScript.Sleep 700
+      Set g = session.findById(GRILLE_TACHES)
+      ligne = g.RowCount - 1
+    End If
+    g.ModifyCell ligne, colCode, LOT_CODES(i)
+    g.ModifyCell ligne, colLib, LOT_LIBS(i)
+    g.SetCurrentCell ligne, colLib
+    g.PressEnter
+    WScript.Sleep 500
+    cree = cree + 1
+    EcrireStatut "EN_COURS", "Saisie " & cree & "/" & aEnvoyer.Count
+  Next
+  n = ScannerEcran("zca-taches-ecran-3.txt")
+
   session.findById("wnd[0]").sendVKey 11
   WScript.Sleep 1800
   msgFenetre = ""
@@ -823,8 +864,16 @@ Sub EcrireTaches()
   Err.Clear
   On Error GoTo 0
   SESSION_CREEE = False
-  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", ligne '" & CODE_TACHE & "' / '" & LIB_TACHE & "' saisie (colonnes " & cibles(0) & " / " & cibles(1) & ") puis Ctrl+S. Message SAP : " & barre & msgFenetre, 64
+  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", " & cree & " tache(s) saisie(s) et enregistree(s)" & IIf2(deja > 0, ", " & deja & " deja presente(s)", "") & ". Message SAP : " & barre & msgFenetre, 64
 End Sub
+
+Function IIf2(c, a, b)
+  If c Then
+    IIf2 = a
+  Else
+    IIf2 = b
+  End If
+End Function
 
 Sub Lancer()
   InitChemins
@@ -923,6 +972,75 @@ End Function
 ' Charge et VALIDE les parametres du lien (liste blanche de caracteres) :
 ' une page quelconque peut ouvrir ce lien, rien d'autre que ces valeurs
 ' ne doit pouvoir atteindre SAP ou le disque.
+' Lot de taches a envoyer dans ZCA_TACHES : fichier taches-entree.txt (Unicode)
+' ecrit par l'application dans le dossier d'export. 1re ligne : compte ;
+' ensuite une tache par ligne : code <tab> libelle.
+Function ChargerLot()
+  Dim chemin, f, txt, lignes, i, parts, code, lib, c, k, v
+  ChargerLot = ""
+  chemin = DOSSIER & "taches-entree.txt"
+  If Not fso.FileExists(chemin) Then
+    ChargerLot = "Fichier des taches introuvable."
+    Exit Function
+  End If
+  On Error Resume Next
+  Set f = fso.OpenTextFile(chemin, 1, False, -1)
+  txt = f.ReadAll
+  f.Close
+  If Err.Number <> 0 Then
+    ChargerLot = "Fichier des taches illisible."
+    Exit Function
+  End If
+  On Error GoTo 0
+  lignes = Split(Replace(txt, vbCr, ""), vbLf)
+  Set LOT_CODES = CreateObject("Scripting.Dictionary")
+  Set LOT_LIBS = CreateObject("Scripting.Dictionary")
+  c = ""
+  For i = 0 To UBound(lignes)
+    If Trim(lignes(i)) <> "" Then
+      If c = "" Then
+        c = Trim(lignes(i))
+        If Not Valide("^[A-Z0-9._-]{4,24}$", c) Then
+          ChargerLot = "Numero de compte invalide."
+          Exit Function
+        End If
+      Else
+        parts = Split(lignes(i), vbTab, 2)
+        If UBound(parts) < 1 Then
+          ChargerLot = "Ligne de tache invalide."
+          Exit Function
+        End If
+        code = Trim(parts(0))
+        lib = ""
+        For k = 1 To Len(parts(1))
+          v = Mid(parts(1), k, 1)
+          If AscW(v) >= 32 Then lib = lib & v
+        Next
+        lib = Left(Trim(lib), 40)
+        If Not Valide("^[A-Za-z0-9]{1,8}$", code) Then
+          ChargerLot = "Code tache invalide (8 caracteres maxi) : " & Left(code, 12)
+          Exit Function
+        End If
+        If lib = "" Then
+          ChargerLot = "Libelle vide pour le code " & code
+          Exit Function
+        End If
+        LOT_CODES.Add LOT_CODES.Count, code
+        LOT_LIBS.Add LOT_LIBS.Count, lib
+      End If
+    End If
+  Next
+  If c = "" Or LOT_CODES.Count = 0 Then
+    ChargerLot = "Aucune tache a envoyer."
+    Exit Function
+  End If
+  If LOT_CODES.Count > 300 Then
+    ChargerLot = "Trop de taches."
+    Exit Function
+  End If
+  LISTE_OTP = Array(c)
+End Function
+
 Function ChargerDepuisUrl(url)
   Dim p, parts, i, kv, d, otps, j, base
   ChargerDepuisUrl = ""
@@ -951,6 +1069,25 @@ Function ChargerDepuisUrl(url)
   TYPE_EXTRACTION = d("t")
   If TYPE_EXTRACTION = "fo" Then FICHIER = "export-fo-sap.txt" Else FICHIER = "export-mo-sap.txt"
   If TYPE_EXTRACTION = "taches" Then
+    If d.Exists("m") Then
+      If d("m") <> "lot" Then
+        ChargerDepuisUrl = "Mode invalide."
+        Exit Function
+      End If
+      ChargerDepuisUrl = ChargerLot()
+      If ChargerDepuisUrl <> "" Then Exit Function
+      DATE_DEB = "" : DATE_FIN = "" : SOCIETE = "" : ORG_ACHATS = ""
+      VAR_LISTE_FO = "" : MISE_FORME_FO = "" : VAR_ALV_MO = "" : LIGNE_HIST = -1
+      POPUP_PROJET = False : PROFIL_PROJET = "" : AFFICHER_SAP = True : SYSTEME_SAP = ""
+      If d.Exists("sy") Then
+        If Not Valide("^[A-Za-z0-9_ .-]{0,40}$", d("sy")) Then
+          ChargerDepuisUrl = "Systeme SAP invalide."
+          Exit Function
+        End If
+        SYSTEME_SAP = Trim(d("sy"))
+      End If
+      Exit Function
+    End If
     If Not (d.Exists("o") And d.Exists("c") And d.Exists("l")) Then
       ChargerDepuisUrl = "Parametres ZCA_TACHES manquants."
       Exit Function
@@ -969,6 +1106,10 @@ Function ChargerDepuisUrl(url)
     End If
     LISTE_OTP = Array(d("o"))
     CODE_TACHE = d("c") : LIB_TACHE = d("l")
+    Set LOT_CODES = CreateObject("Scripting.Dictionary")
+    Set LOT_LIBS = CreateObject("Scripting.Dictionary")
+    LOT_CODES.Add 0, CODE_TACHE
+    LOT_LIBS.Add 0, LIB_TACHE
     DATE_DEB = "" : DATE_FIN = "" : SOCIETE = "" : ORG_ACHATS = ""
     VAR_LISTE_FO = "" : MISE_FORME_FO = "" : VAR_ALV_MO = "" : LIGNE_HIST = -1
     POPUP_PROJET = False : PROFIL_PROJET = "" : AFFICHER_SAP = True : SYSTEME_SAP = ""
