@@ -199,6 +199,18 @@ Sub Fin(message, code)
   End If
 End Sub
 
+' Fin sans donnee : ni achat ni heure pour ces affaires, ce n'est pas une erreur.
+Sub FinVide(message)
+  FermerSessionDediee
+  If MODE_APPLI Then
+    EcrireStatut "VIDE", message
+    WScript.Quit 0
+  Else
+    MsgBox message, 64, "Extraction SAP"
+    WScript.Quit
+  End If
+End Sub
+
 Function Existe(id)
   Dim o
   Set o = Nothing
@@ -467,6 +479,7 @@ Sub ExtraireFo()
   session.findById("wnd[0]/usr/ctxtLISTU").SetFocus
   session.findById("wnd[0]/usr/ctxtLISTU").caretPosition = Len(session.findById("wnd[0]/usr/ctxtLISTU").Text)
   session.findById("wnd[0]/tbar[1]/btn[8]").press
+  If Existe("wnd[0]/usr/ctxtS_EKORG-LOW") Then FinVide "Aucun achat pour ces affaires."
 
   If MISE_FORME_FO <> "" Then
     session.findById("wnd[0]/tbar[1]/btn[33]").press
@@ -584,6 +597,7 @@ Sub ExtraireMo()
   session.findById("wnd[1]/tbar[0]/btn[8]").press
 
   session.findById("wnd[0]/tbar[1]/btn[8]").press
+  If Existe("wnd[0]/usr/ctxtPNPBEGDA") Then FinVide "Aucune heure pour ces affaires sur la periode."
   ChargerMiseEnFormeMo
 
   session.findById(LISTE_ALV).pressToolbarContextButton "&MB_EXPORT"

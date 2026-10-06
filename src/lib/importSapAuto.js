@@ -45,9 +45,10 @@ async function supprimerParLots(refs) {
 export async function importerExportSap({ type, texte, nomFichier, otpDemandes, debut, fin }) {
   const cfg = CONFIG[type];
   const lignes = cfg.analyser(texte);
-  if (lignes.length === 0) {
-    throw new Error("Aucune ligne de données reconnue dans l'export SAP.");
-  }
+  // Export sans aucune ligne (pas d'achat ou d'heure sur ces affaires) :
+  // ce n'est pas une erreur ; on n'efface rien (on ne peut pas distinguer
+  // « rien dans SAP » d'un export illisible).
+  if (lignes.length === 0) return { nbLignes: 0, nbRemplacees: 0 };
 
   const sansPoint = (o) => String(o || "").replace(/\./g, "");
   const otps = new Set();

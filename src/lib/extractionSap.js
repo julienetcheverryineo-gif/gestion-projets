@@ -58,6 +58,7 @@ async function executerPasse({ handle, type, codes, titre, params, debut, fin, o
       const [code, ...reste] = st.texte.split(/\r?\n/);
       const detail = reste.join(" ").trim();
       if (code.trim() === "ERREUR") return { ok: false, message: detail || "L'extraction SAP a échoué." };
+      if (code.trim() === "VIDE") return { ok: true, resume: `${type === "fo" ? "Achats" : "Heures"} : aucune ligne` };
       if (code.trim() === "OK") {
         fini = true;
         break;
@@ -95,7 +96,8 @@ async function executerPasse({ handle, type, codes, titre, params, debut, fin, o
     return {
       ok: true,
       resume:
-        `${type === "fo" ? "Achats" : "Heures"} : ${res.nbLignes} ligne(s)` +
+        `${type === "fo" ? "Achats" : "Heures"} : ` +
+        (res.nbLignes === 0 ? "aucune ligne" : `${res.nbLignes} ligne(s)`) +
         (res.nbRemplacees > 0 ? ` (${res.nbRemplacees} remplacée(s))` : ""),
     };
   } catch (e) {
@@ -111,22 +113,22 @@ export async function executerExtraction({ handle, types, otp, debut, fin, param
   const groupes = grouperParAgence(otp);
   const passes = groupes.flatMap((g) => types.map((type) => ({ type, ...g })));
   const resumes = [];
+  const echecs = [];
   for (let i = 0; i < passes.length; i++) {
     const { type, prefixe, codes } = passes[i];
+    const nom = (groupes.length > 1 ? `${prefixe} ` : "") + (type === "fo" ? "Achats" : "Heures");
     const titre =
       (passes.length > 1 ? `[${i + 1}/${passes.length}] ` : "") + (groupes.length > 1 ? `${prefixe} — ` : "");
     const r = await executerPasse({ handle, type, codes, titre, params, debut, fin, onEtat, estAnnule });
     if (r.annule) return { ok: false, annule: true };
-    if (!r.ok) {
-      const message = titre + r.message + (resumes.length ? ` (déjà importé : ${resumes.join(" ; ")})` : "");
-      onEtat({ phase: "erreur", message });
-      return { ok: false, message };
-    }
-    resumes.push((groupes.length > 1 ? `${prefixe} ` : "") + r.resume);
+    // Une passe en échec (ou sans donnée) ne bloque pas les suivantes : on
+    // avance et on récapitule à la fin.
+    if (r.ok) resumes.push((groupes.length > 1 ? `${prefixe} ` : "") + r.resume);
+    else echecs.push(`${nom} : ${r.message}`);
   }
-  const message = resumes.join(" ; ") + ".";
-  onEtat({ phase: "ok", message });
-  return { ok: true, message };
+  const message = [...resumes, ...echecs.map((e) => "⚠ " + e)].join(" ; ") + (echecs.length ? "" : ".");
+  onEtat({ phase: echecs.length > 0 && resumes.length === 0 ? "erreur" : "ok", message });
+  return { ok: echecs.length === 0, message };
 }
 
 export { validerParametres };
