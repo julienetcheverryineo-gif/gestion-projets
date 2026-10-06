@@ -167,6 +167,7 @@ Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT, AFFICHER_SAP, SESSION_CREEE, SYSTEM
 
 Const TABLE_SEL = "wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE"
 Const LISTE_ALV = "wnd[0]/usr/cntlO_CONTAINER/shellcont/shell/shellcont[1]/shell"
+Const GRILLE_TACHES = "wnd[0]/shellcont/shell"
 Const SHELL_VAR = "wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell"
 
 Set fso = CreateObject("Scripting.FileSystemObject")
@@ -685,6 +686,7 @@ Function ScannerEcran(nomFichier)
   On Error GoTo 0
   sortie.Add 0, info
   Collecter session.findById("wnd[0]"), 0, sortie
+  DecrireGrille sortie
   On Error Resume Next
   Set f = fso.CreateTextFile(DOSSIER & nomFichier, True, False)
   For Each k In sortie.Keys
@@ -695,31 +697,125 @@ Function ScannerEcran(nomFichier)
   ScannerEcran = CHAMPS_SAISIE.Count
 End Function
 
+' Description de la grille ALV de ZCA_TACHES : colonnes, lignes, boutons.
+Sub DecrireGrille(sortie)
+  Dim g, i, n, col, r, ligne, nr, tit
+  If Not Existe("wnd[0]/shellcont/shell") Then Exit Sub
+  Set g = session.findById(GRILLE_TACHES)
+  On Error Resume Next
+  nr = g.RowCount
+  sortie.Add sortie.Count, "GRILLE lignes=" & nr & " colonnes=" & g.ColumnCount & " ligneCourante=" & g.CurrentCellRow & " colCourante=" & g.CurrentCellColumn
+  Err.Clear
+  n = g.ColumnOrder.Count
+  For i = 0 To n - 1
+    col = g.ColumnOrder.Item(CLng(i))
+    tit = ""
+    tit = g.GetColumnTitles(col).Item(0)
+    Err.Clear
+    sortie.Add sortie.Count, "GRILLE colonne " & i & " : " & col & " | titre=" & tit & " | modifiable(ligne0)=" & g.GetCellChangeable(0, col)
+    Err.Clear
+  Next
+  For r = 0 To nr - 1
+    If r > 15 Then Exit For
+    ligne = ""
+    For i = 0 To n - 1
+      col = g.ColumnOrder.Item(CLng(i))
+      ligne = ligne & g.GetCellValue(r, col) & " ; "
+    Next
+    sortie.Add sortie.Count, "GRILLE ligne " & r & " : " & ligne
+    Err.Clear
+  Next
+  n = g.ToolbarButtonCount
+  For i = 0 To n - 1
+    sortie.Add sortie.Count, "GRILLE bouton " & i & " : id=" & g.GetToolbarButtonId(i) & " | texte=" & g.GetToolbarButtonText(i) & " | info=" & g.GetToolbarButtonToolTip(i) & " | type=" & g.GetToolbarButtonType(i)
+    Err.Clear
+  Next
+  Err.Clear
+End Sub
+
+' Identifiant du bouton de la barre d'outils de la grille correspondant a un motif.
+Function BoutonGrille(g, motif)
+  Dim i, n, id, tx, re
+  BoutonGrille = ""
+  Set re = New RegExp
+  re.IgnoreCase = True
+  re.Pattern = motif
+  On Error Resume Next
+  n = g.ToolbarButtonCount
+  For i = 0 To n - 1
+    id = "" : tx = ""
+    id = g.GetToolbarButtonId(i)
+    tx = g.GetToolbarButtonText(i) & " " & g.GetToolbarButtonToolTip(i)
+    Err.Clear
+    If re.Test(id) Or re.Test(tx) Then
+      BoutonGrille = id
+      Exit Function
+    End If
+  Next
+End Function
+
 Sub EcrireTaches()
-  Dim n, idCompte, ids, k, barre
+  Dim n, g, idChamp, bouton, nl, ligne, i, nc, col, cibles, k, barre, msgFenetre
   EcrireStatut "EN_COURS", "Ouverture de ZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/okcd").Text = "/nZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
   WScript.Sleep 2000
   n = ScannerEcran("zca-taches-ecran-1.txt")
-  If n = 0 Then Fin "ZCA_TACHES : aucun champ saisissable trouve (voir zca-taches-ecran-1.txt).", 48
-  idCompte = CHAMPS_SAISIE(0)
-  session.findById(idCompte).Text = LISTE_OTP(0)
-  session.findById("wnd[0]").sendVKey 8
-  WScript.Sleep 1500
+  If Existe("wnd[0]/usr/ctxtP_CHARGE") Then
+    idChamp = "wnd[0]/usr/ctxtP_CHARGE"
+  ElseIf n > 0 Then
+    idChamp = CHAMPS_SAISIE(0)
+  Else
+    Fin "ZCA_TACHES : champ Imputation introuvable (voir zca-taches-ecran-1.txt).", 48
+  End If
+  session.findById(idChamp).Text = LISTE_OTP(0)
+  session.findById("wnd[0]/tbar[1]/btn[8]").press
+  WScript.Sleep 2500
   n = ScannerEcran("zca-taches-ecran-2.txt")
-  Set ids = CreateObject("Scripting.Dictionary")
-  For Each k In CHAMPS_SAISIE.Keys
-    If CHAMPS_SAISIE(k) <> idCompte Then ids.Add ids.Count, CHAMPS_SAISIE(k)
-  Next
-  If ids.Count < 2 Then Fin "ZCA_TACHES : compte saisi, mais les champs de la ligne sont introuvables (voir zca-taches-ecran-2.txt).", 48
-  session.findById(ids(0)).Text = CODE_TACHE
-  session.findById(ids(1)).Text = LIB_TACHE
-  session.findById("wnd[0]").sendVKey 0
-  WScript.Sleep 500
+  If Not Existe(GRILLE_TACHES) Then Fin "ZCA_TACHES : la grille des taches n'est pas affichee (voir zca-taches-ecran-2.txt).", 48
+  Set g = session.findById(GRILLE_TACHES)
+  nl = g.RowCount
+
+  ' 1) ajouter une ligne a la grille
+  bouton = BoutonGrille(g, "APPEND")
+  If bouton = "" Then bouton = BoutonGrille(g, "INSERT_ROW")
+  If bouton = "" Then bouton = BoutonGrille(g, "Ajouter|Cr.er|Nouvelle|Ins.rer")
+  If bouton = "" Then Fin "ZCA_TACHES : aucun bouton d'ajout de ligne trouve dans la grille (voir zca-taches-ecran-2.txt, lignes GRILLE bouton).", 48
+  g.pressToolbarButton bouton
+  WScript.Sleep 1200
+  If Existe("wnd[1]") Then Fin "ZCA_TACHES : une fenetre s'est ouverte apres l'ajout de ligne (voir zca-taches-ecran-3.txt).", 48
+  Set g = session.findById(GRILLE_TACHES)
+  If g.RowCount > nl Then
+    ligne = g.RowCount - 1
+  Else
+    ligne = g.CurrentCellRow
+  End If
   n = ScannerEcran("zca-taches-ecran-3.txt")
+
+  ' 2) code puis libelle dans les deux premieres colonnes modifiables de la ligne
+  Set cibles = CreateObject("Scripting.Dictionary")
+  nc = g.ColumnOrder.Count
+  For i = 0 To nc - 1
+    col = g.ColumnOrder.Item(CLng(i))
+    If g.GetCellChangeable(ligne, col) Then cibles.Add cibles.Count, col
+  Next
+  If cibles.Count < 2 Then Fin "ZCA_TACHES : moins de 2 colonnes modifiables sur la nouvelle ligne (voir zca-taches-ecran-3.txt).", 48
+  g.ModifyCell ligne, cibles(0), CODE_TACHE
+  g.ModifyCell ligne, cibles(1), LIB_TACHE
+  g.SetCurrentCell ligne, cibles(1)
+  g.PressEnter
+  WScript.Sleep 800
+
+  ' 3) enregistrer
   session.findById("wnd[0]").sendVKey 11
-  WScript.Sleep 1500
+  WScript.Sleep 1800
+  msgFenetre = ""
+  If Existe("wnd[1]") Then
+    On Error Resume Next
+    msgFenetre = " Fenetre SAP : " & session.findById("wnd[1]").Text & " " & session.findById("wnd[1]/usr").Text
+    Err.Clear
+    On Error GoTo 0
+  End If
   n = ScannerEcran("zca-taches-ecran-4.txt")
   barre = ""
   On Error Resume Next
@@ -727,7 +823,7 @@ Sub EcrireTaches()
   Err.Clear
   On Error GoTo 0
   SESSION_CREEE = False
-  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", ligne '" & CODE_TACHE & "' / '" & LIB_TACHE & "' saisie puis enregistree (Ctrl+S). Message SAP : " & barre, 64
+  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", ligne '" & CODE_TACHE & "' / '" & LIB_TACHE & "' saisie (colonnes " & cibles(0) & " / " & cibles(1) & ") puis Ctrl+S. Message SAP : " & barre & msgFenetre, 64
 End Sub
 
 Sub Lancer()
