@@ -760,6 +760,29 @@ Function BoutonGrille(g, motif)
   Next
 End Function
 
+' Ligne de la grille dont la colonne code est vide (la ligne qu'on vient d'ajouter).
+Function LigneVide(g, colCode)
+  Dim r, nr
+  LigneVide = -1
+  nr = g.RowCount
+  For r = 0 To nr - 1
+    If Trim(g.GetCellValue(r, colCode)) = "" Then
+      LigneVide = r
+      Exit Function
+    End If
+  Next
+End Function
+
+' Retour a l'ecran d'accueil SAP.
+Sub RetourAccueil()
+  On Error Resume Next
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "/n"
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+  WScript.Sleep 800
+  Err.Clear
+  On Error GoTo 0
+End Sub
+
 Sub EcrireTaches()
   Dim n, g, idChamp, bouton, nl, ligne, i, j, nc, col, cibles, barre, msgFenetre
   Dim colCode, colLib, existants, aEnvoyer, cree, deja, code, lib, nbAvant
@@ -794,7 +817,7 @@ Sub EcrireTaches()
   If Existe("wnd[1]") Then Fin "ZCA_TACHES : une fenetre s'est ouverte apres l'ajout de ligne.", 48
   Set g = session.findById(GRILLE_TACHES)
   If g.RowCount > nbAvant Then
-    ligne = g.RowCount - 1
+    ligne = g.CurrentCellRow
   Else
     ligne = g.CurrentCellRow
   End If
@@ -810,8 +833,9 @@ Sub EcrireTaches()
 
   ' Taches deja presentes dans SAP pour ce compte : on ne les recree pas.
   Set existants = CreateObject("Scripting.Dictionary")
-  For j = 0 To nbAvant - 1
-    existants(UCase(Trim(g.GetCellValue(j, colCode)))) = True
+  For j = 0 To g.RowCount - 1
+    code = UCase(Trim(g.GetCellValue(j, colCode)))
+    If code <> "" Then existants(code) = True
   Next
   Set aEnvoyer = CreateObject("Scripting.Dictionary")
   deja = 0
@@ -834,9 +858,10 @@ Sub EcrireTaches()
     i = aEnvoyer(j)
     If j > 0 Then
       g.pressToolbarButton bouton
-      WScript.Sleep 700
+      WScript.Sleep 1200
       Set g = session.findById(GRILLE_TACHES)
-      ligne = g.RowCount - 1
+      ligne = LigneVide(g, colCode)
+      If ligne < 0 Then ligne = g.CurrentCellRow
     End If
     g.ModifyCell ligne, colCode, LOT_CODES(i)
     g.ModifyCell ligne, colLib, LOT_LIBS(i)
@@ -863,6 +888,7 @@ Sub EcrireTaches()
   barre = session.findById("wnd[0]/sbar").Text
   Err.Clear
   On Error GoTo 0
+  RetourAccueil
   SESSION_CREEE = False
   Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", " & cree & " tache(s) saisie(s) et enregistree(s)" & IIf2(deja > 0, ", " & deja & " deja presente(s)", "") & ". Message SAP : " & barre & msgFenetre, 64
 End Sub
