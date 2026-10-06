@@ -121,6 +121,12 @@ export function validerParametres(params, otp, { dates = false, debut, fin, fo =
   return [...new Set(erreurs)];
 }
 
+// Lien du test d'écriture ZCA_TACHES (saisie d'une ligne, sans enregistrer).
+export function construireUrlTaches(params, compte, code, libelle) {
+  const e = (v) => String(v ?? "").replace(/ /g, "+");
+  return `${PROTOCOLE_SAP}://run?t=taches&o=${e(compte)}&c=${e(code)}&l=${e(libelle)}&sy=${e(String(params.systemeSap || "").trim())}`;
+}
+
 // Lien ouvert par l'appli pour lancer le gestionnaire installé. Jeu de
 // caractères volontairement restreint (pas de « % » : le gestionnaire passe
 // ce lien à une ligne de commande Windows) ; l'espace devient « + ».
@@ -156,6 +162,7 @@ const DECLARATIONS = String.raw`Option Explicit
 Dim SapGuiAuto, SapApp, SapCon, session, fso, wsh
 Dim MODE_APPLI, TYPE_EXTRACTION, LISTE_OTP, DATE_DEB, DATE_FIN, SOCIETE, ORG_ACHATS
 Dim VAR_LISTE_FO, MISE_FORME_FO, VAR_ALV_MO, LIGNE_HIST, POPUP_PROJET, PROFIL_PROJET
+Dim CODE_TACHE, LIB_TACHE, CHAMPS_SAISIE
 Dim DOSSIER, FICHIER, CHEMIN, CHEMIN_STATUT, AFFICHER_SAP, SESSION_CREEE, SYSTEME_SAP, CONNEXION_OUVERTE
 
 Const TABLE_SEL = "wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE"
@@ -621,11 +628,86 @@ Sub ExtraireMo()
   Terminer "ZCAT3", ""
 End Sub
 
+' ---- Test d'ecriture : transaction ZCA_TACHES (saisie SANS enregistrement) ----
+Sub Collecter(obj, prof, sortie)
+  Dim i, n, t, ch, id, tx, enf
+  If prof > 12 Then Exit Sub
+  If sortie.Count > 3000 Then Exit Sub
+  On Error Resume Next
+  t = "" : ch = False : id = "" : tx = ""
+  t = obj.Type
+  ch = obj.Changeable
+  id = obj.Id
+  tx = obj.Text
+  Err.Clear
+  sortie.Add sortie.Count, String(prof * 2, " ") & id & " | " & t & " | chg=" & ch & " | " & Replace(Replace(tx, vbCr, " "), vbLf, " ")
+  If (t = "GuiTextField" Or t = "GuiCTextField") And ch = True Then CHAMPS_SAISIE.Add CHAMPS_SAISIE.Count, id
+  n = 0
+  n = obj.Children.Count
+  If Err.Number <> 0 Then n = 0
+  Err.Clear
+  For i = 0 To n - 1
+    Set enf = Nothing
+    Set enf = obj.Children(i)
+    If Err.Number = 0 Then Collecter enf, prof + 1, sortie
+    Err.Clear
+  Next
+End Sub
+
+Function ScannerEcran(nomFichier)
+  Dim sortie, k, f
+  Set sortie = CreateObject("Scripting.Dictionary")
+  Set CHAMPS_SAISIE = CreateObject("Scripting.Dictionary")
+  Collecter session.findById("wnd[0]/usr"), 0, sortie
+  On Error Resume Next
+  Set f = fso.CreateTextFile(DOSSIER & nomFichier, True, False)
+  For Each k In sortie.Keys
+    f.WriteLine sortie(k)
+  Next
+  f.Close
+  On Error GoTo 0
+  ScannerEcran = CHAMPS_SAISIE.Count
+End Function
+
+Sub EcrireTaches()
+  Dim n, idCompte, ids, nb, k, i
+  EcrireStatut "EN_COURS", "Ouverture de ZCA_TACHES"
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "/nZCA_TACHES"
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+  WScript.Sleep 800
+  n = ScannerEcran("zca-taches-ecran-1.txt")
+  If n = 0 Then Fin "ZCA_TACHES : aucun champ saisissable trouve (voir zca-taches-ecran-1.txt).", 48
+  idCompte = CHAMPS_SAISIE(0)
+  session.findById(idCompte).Text = LISTE_OTP(0)
+  session.findById("wnd[0]").sendVKey 0
+  WScript.Sleep 1000
+  n = ScannerEcran("zca-taches-ecran-2.txt")
+  If Existe(idCompte) And n <= 1 And Existe("wnd[0]/tbar[1]/btn[8]") Then
+    session.findById("wnd[0]/tbar[1]/btn[8]").press
+    WScript.Sleep 1000
+    n = ScannerEcran("zca-taches-ecran-2.txt")
+  End If
+  Set ids = CreateObject("Scripting.Dictionary")
+  For Each k In CHAMPS_SAISIE.Keys
+    If CHAMPS_SAISIE(k) <> idCompte Then ids.Add ids.Count, CHAMPS_SAISIE(k)
+  Next
+  If ids.Count < 2 Then Fin "ZCA_TACHES : compte saisi, mais les champs de la ligne sont introuvables (voir zca-taches-ecran-2.txt).", 48
+  session.findById(ids(0)).Text = CODE_TACHE
+  session.findById(ids(1)).Text = LIB_TACHE
+  session.findById("wnd[0]").sendVKey 0
+  WScript.Sleep 500
+  n = ScannerEcran("zca-taches-ecran-3.txt")
+  SESSION_CREEE = False
+  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", ligne '" & CODE_TACHE & "' / '" & LIB_TACHE & "' saisie, NON enregistree. Verifiez dans SAP.", 64
+End Sub
+
 Sub Lancer()
   InitChemins
   PreparerDossier
   ConnecterSap
-  If TYPE_EXTRACTION = "fo" Then
+  If TYPE_EXTRACTION = "taches" Then
+    EcrireTaches
+  ElseIf TYPE_EXTRACTION = "fo" Then
     ExtraireFo
   Else
     ExtraireMo
@@ -737,12 +819,43 @@ Function ChargerDepuisUrl(url)
     ChargerDepuisUrl = "Type d'extraction manquant."
     Exit Function
   End If
-  If Not Valide("^(fo|mo)$", d("t")) Then
+  If Not Valide("^(fo|mo|taches)$", d("t")) Then
     ChargerDepuisUrl = "Type d'extraction invalide."
     Exit Function
   End If
   TYPE_EXTRACTION = d("t")
   If TYPE_EXTRACTION = "fo" Then FICHIER = "export-fo-sap.txt" Else FICHIER = "export-mo-sap.txt"
+  If TYPE_EXTRACTION = "taches" Then
+    If Not (d.Exists("o") And d.Exists("c") And d.Exists("l")) Then
+      ChargerDepuisUrl = "Parametres ZCA_TACHES manquants."
+      Exit Function
+    End If
+    If Not Valide("^[A-Z0-9._-]{4,24}$", d("o")) Then
+      ChargerDepuisUrl = "Numero de compte invalide."
+      Exit Function
+    End If
+    If Not Valide("^[A-Za-z0-9]{1,8}$", d("c")) Then
+      ChargerDepuisUrl = "Code tache invalide (8 caracteres maxi)."
+      Exit Function
+    End If
+    If Not Valide("^[A-Za-z0-9 _.-]{1,40}$", d("l")) Then
+      ChargerDepuisUrl = "Libelle de tache invalide."
+      Exit Function
+    End If
+    LISTE_OTP = Array(d("o"))
+    CODE_TACHE = d("c") : LIB_TACHE = d("l")
+    DATE_DEB = "" : DATE_FIN = "" : SOCIETE = "" : ORG_ACHATS = ""
+    VAR_LISTE_FO = "" : MISE_FORME_FO = "" : VAR_ALV_MO = "" : LIGNE_HIST = -1
+    POPUP_PROJET = False : PROFIL_PROJET = "" : AFFICHER_SAP = True : SYSTEME_SAP = ""
+    If d.Exists("sy") Then
+      If Not Valide("^[A-Za-z0-9_ .-]{0,40}$", d("sy")) Then
+        ChargerDepuisUrl = "Systeme SAP invalide."
+        Exit Function
+      End If
+      SYSTEME_SAP = Trim(d("sy"))
+    End If
+    Exit Function
+  End If
   If Not d.Exists("o") Then
     ChargerDepuisUrl = "Aucune affaire dans le lien."
     Exit Function

@@ -1,6 +1,7 @@
 import {
   PARAMS_SAP_DEFAUT,
   construireUrlLancement,
+  construireUrlTaches,
   dateSap,
   grouperParAgence,
   validerParametres,
@@ -149,3 +150,23 @@ export const definirAutoActif = (actif) => {
     /* ignoré */
   }
 };
+
+// Test d'écriture : saisit une ligne dans ZCA_TACHES (sans enregistrer) et
+// attend le compte rendu du gestionnaire.
+export async function executerTestTaches({ handle, params, compte, code, libelle, onEtat, estAnnule }) {
+  const t0 = Date.now();
+  onEtat({ phase: "attente", type: "taches", message: "Test ZCA_TACHES : lancement…" });
+  ouvrirLien(construireUrlTaches(params, compte, code, libelle));
+  while (!estAnnule() && Date.now() < t0 + 3 * 60 * 1000) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const st = await lireFichier(handle, "statut-taches.txt");
+    if (st && st.modifieLe >= t0 - 2000) {
+      const [c, ...reste] = st.texte.split(/\r?\n/);
+      const detail = reste.join(" ").trim();
+      if (c.trim() === "OK") return onEtat({ phase: "ok", message: detail });
+      if (c.trim() === "ERREUR") return onEtat({ phase: "erreur", message: detail || "Échec du test." });
+      onEtat({ phase: "attente", type: "taches", message: "Test ZCA_TACHES : " + (detail || "en cours…") });
+    }
+  }
+  if (!estAnnule()) onEtat({ phase: "erreur", message: "Délai dépassé (gestionnaire SAP installé et à jour ?)." });
+}

@@ -13,6 +13,7 @@ import {
   autoActif,
   definirAutoActif,
   executerExtraction,
+  executerTestTaches,
   isoAujourdhui,
   lireParamsSap,
   optionsValidation,
@@ -189,6 +190,32 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
     });
   };
 
+  // Test d'écriture dans SAP : ZCA_TACHES, compte AAQ5JE607, ligne test / test julien.
+  const testerTaches = async () => {
+    if (etat && (etat.phase === "attente" || etat.phase === "import")) return;
+    let h = dossier;
+    try {
+      if (!h) {
+        h = await choisirDossier();
+        setDossier(h);
+      }
+      if (!(await autoriser(h))) return setEtat({ phase: "erreur", message: "Accès au dossier d'export refusé." });
+    } catch (e) {
+      if (e?.name !== "AbortError") setEtat({ phase: "erreur", message: "Dossier non accessible : " + e.message });
+      return;
+    }
+    annule.current = false;
+    await executerTestTaches({
+      handle: h,
+      params,
+      compte: "AAQ5JE607",
+      code: "test",
+      libelle: "test julien",
+      onEtat: setEtat,
+      estAnnule: () => annule.current,
+    });
+  };
+
   const enCours = etat && (etat.phase === "attente" || etat.phase === "import");
 
   const champ = (label, nom, aide) => (
@@ -283,6 +310,9 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
         </button>
         <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo", "mo"])}>
           ▶ Achats + Heures
+        </button>
+        <button type="button" className="btn" disabled={enCours} onClick={testerTaches} title="Saisit une ligne test dans ZCA_TACHES (sans enregistrer)">
+          🧪 Test ZCA_TACHES
         </button>
         <button type="button" className="btn" onClick={() => setOuvert((o) => !o)}>
           {ouvert ? "Fermer les paramètres" : "⚙ Paramètres SAP"}
