@@ -1,4 +1,4 @@
-# Pilotage de projets — Automatisme & GTB
+# Pilotage de projets — Automatisme & GTB & Elec
 
 Application de gestion de projet/équipe : projets, tâches (Kanban), suivi de
 temps, rôles utilisateurs. React + Firebase, déployée automatiquement via
