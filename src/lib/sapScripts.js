@@ -670,7 +670,7 @@ Function ScannerEcran(nomFichier)
 End Function
 
 Sub EcrireTaches()
-  Dim n, idCompte, ids, nb, k, i
+  Dim n, idCompte, ids, k, barre
   EcrireStatut "EN_COURS", "Ouverture de ZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/okcd").Text = "/nZCA_TACHES"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
@@ -679,14 +679,9 @@ Sub EcrireTaches()
   If n = 0 Then Fin "ZCA_TACHES : aucun champ saisissable trouve (voir zca-taches-ecran-1.txt).", 48
   idCompte = CHAMPS_SAISIE(0)
   session.findById(idCompte).Text = LISTE_OTP(0)
-  session.findById("wnd[0]").sendVKey 0
-  WScript.Sleep 1000
+  session.findById("wnd[0]").sendVKey 8
+  WScript.Sleep 1500
   n = ScannerEcran("zca-taches-ecran-2.txt")
-  If Existe(idCompte) And n <= 1 And Existe("wnd[0]/tbar[1]/btn[8]") Then
-    session.findById("wnd[0]/tbar[1]/btn[8]").press
-    WScript.Sleep 1000
-    n = ScannerEcran("zca-taches-ecran-2.txt")
-  End If
   Set ids = CreateObject("Scripting.Dictionary")
   For Each k In CHAMPS_SAISIE.Keys
     If CHAMPS_SAISIE(k) <> idCompte Then ids.Add ids.Count, CHAMPS_SAISIE(k)
@@ -697,8 +692,16 @@ Sub EcrireTaches()
   session.findById("wnd[0]").sendVKey 0
   WScript.Sleep 500
   n = ScannerEcran("zca-taches-ecran-3.txt")
+  session.findById("wnd[0]").sendVKey 11
+  WScript.Sleep 1500
+  n = ScannerEcran("zca-taches-ecran-4.txt")
+  barre = ""
+  On Error Resume Next
+  barre = session.findById("wnd[0]/sbar").Text
+  Err.Clear
+  On Error GoTo 0
   SESSION_CREEE = False
-  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", ligne '" & CODE_TACHE & "' / '" & LIB_TACHE & "' saisie, NON enregistree. Verifiez dans SAP.", 64
+  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", ligne '" & CODE_TACHE & "' / '" & LIB_TACHE & "' saisie puis enregistree (Ctrl+S). Message SAP : " & barre, 64
 End Sub
 
 Sub Lancer()

@@ -311,7 +311,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
         <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo", "mo"])}>
           ▶ Achats + Heures
         </button>
-        <button type="button" className="btn" disabled={enCours} onClick={testerTaches} title="Saisit une ligne test dans ZCA_TACHES (sans enregistrer)">
+        <button type="button" className="btn" disabled={enCours} onClick={testerTaches} title="Saisit une ligne test dans ZCA_TACHES (puis enregistre)">
           🧪 Test ZCA_TACHES
         </button>
         <button type="button" className="btn" onClick={() => setOuvert((o) => !o)}>
