@@ -853,8 +853,19 @@ function LigneDevisRow({
           {modeSelection && peutGerer && (
             <input type="checkbox" checked={selectionnee} onChange={onBasculerSelection} />
           )}
-          <span className="elec-designation-texte" style={imbriquee ? { paddingLeft: 12 } : undefined}>{l.designation}</span>
           {entete && (
+            <button
+              type="button"
+              className="elec-groupe-toggle"
+              onClick={entete.onToggle}
+              title={entete.ouvert ? "Replier le groupe" : "Déplier le groupe"}
+              aria-label={entete.ouvert ? "Replier le groupe" : "Déplier le groupe"}
+            >
+              {entete.ouvert ? "−" : "+"}
+            </button>
+          )}
+          <span className="elec-designation-texte" style={{ flex: 1, paddingLeft: imbriquee ? 12 : 0 }}>{l.designation}</span>
+          {entete && entete.ouvert && peutGerer && (
             <span className="elec-groupe-actions">
               {entete.ouvert && peutGerer && (
                 <button
@@ -865,15 +876,6 @@ function LigneDevisRow({
                   Dissoudre
                 </button>
               )}
-              <button
-                type="button"
-                className="elec-groupe-toggle"
-                onClick={entete.onToggle}
-                title={entete.ouvert ? "Replier le groupe" : "Déplier le groupe"}
-                aria-label={entete.ouvert ? "Replier le groupe" : "Déplier le groupe"}
-              >
-                {entete.ouvert ? "−" : "+"}
-              </button>
             </span>
           )}
         </div>
@@ -1013,7 +1015,16 @@ function GroupeEnteteRow({
         style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
       >
         <div className="elec-designation-cellule">
-          <span>
+          <button
+            type="button"
+            className="elec-groupe-toggle"
+            onClick={onToggle}
+            title={ouvert ? "Replier le groupe" : "Déplier le groupe"}
+            aria-label={ouvert ? "Replier le groupe" : "Déplier le groupe"}
+          >
+            {ouvert ? "−" : "+"}
+          </button>
+          <span style={{ flex: 1 }}>
             📁 {groupe.nom}
             <span className="simple-list-meta" style={{ marginLeft: 8 }}>
               {nbMembres} ligne(s)
@@ -1025,15 +1036,6 @@ function GroupeEnteteRow({
                 Dissoudre
               </button>
             )}
-            <button
-              type="button"
-              className="elec-groupe-toggle"
-              onClick={onToggle}
-              title={ouvert ? "Replier le groupe" : "Déplier le groupe"}
-              aria-label={ouvert ? "Replier le groupe" : "Déplier le groupe"}
-            >
-              {ouvert ? "−" : "+"}
-            </button>
           </span>
         </div>
       </td>
