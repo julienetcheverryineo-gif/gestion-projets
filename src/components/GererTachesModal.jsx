@@ -24,7 +24,7 @@ export default function GererTachesModal({ chantierId, chantier, taches, lignesC
     const label = nouveau.trim();
     if (!label) return;
     if (items.some((i) => i.label.trim().toLowerCase() === label.toLowerCase())) {
-      setErreur("Cette tâche existe déjà.");
+      setErreur("Ce libellé existe déjà.");
       return;
     }
     setErreur("");
@@ -89,16 +89,16 @@ export default function GererTachesModal({ chantierId, chantier, taches, lignesC
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-        <h2>Gérer les tâches</h2>
+        <h2>Types de FO / tâches</h2>
         <p className="simple-list-meta" style={{ marginBottom: 10 }}>
-          Modifiez le libellé d'une tâche : toutes les lignes de devis qui l'utilisent sont mises à
-          jour. Vous pouvez aussi en ajouter une nouvelle.
+          Modifiez le libellé : toutes les lignes de devis qui l'utilisent sont mises à
+          jour. Vous pouvez aussi en ajouter un nouveau.
         </p>
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
           <input
             type="text"
             style={{ flex: 1 }}
-            placeholder="Nouvelle tâche…"
+            placeholder="Nouveau libellé…"
             value={nouveau}
             onChange={(e) => setNouveau(e.target.value)}
             onKeyDown={(e) => {

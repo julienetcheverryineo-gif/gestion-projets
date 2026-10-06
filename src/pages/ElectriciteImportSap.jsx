@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { libelleTypeActivite, estActiviteIgnoree } from "../lib/typesActiviteSap";
 import { lireTexteSap } from "../lib/lireTexteSap";
 import {
   addDoc,
@@ -293,6 +294,7 @@ function TableauConsultation({ config }) {
   const filtrees = useMemo(() => {
     const termes = recherche.trim().toLowerCase();
     return lignes.filter((l) => {
+      if (config.collectionLignes === "sapLignesMo" && estActiviteIgnoree(l.typAct)) return false;
       if (otpFiltre && l.otp !== otpFiltre) return false;
       if (!termes) return true;
       return config.champsRecherche.some((c) => String(l[c] ?? "").toLowerCase().includes(termes));
@@ -360,7 +362,7 @@ function TableauConsultation({ config }) {
                   <tr key={l.id}>
                     {config.colonnes.map((c) => (
                       <td key={c.champ} data-label={c.label}>
-                        {formatValeur(l[c.champ], c.numerique, c.euro)}
+                        {c.champ === "typAct" ? libelleTypeActivite(l.typAct) : formatValeur(l[c.champ], c.numerique, c.euro)}
                       </td>
                     ))}
                   </tr>
