@@ -3893,3 +3893,7 @@ textarea:focus {
   line-height: 1.3;
   letter-spacing: 0.01em;
 }
+.elec-lignes-table td.elec-th-figee-bord,
+.elec-lignes-table th.elec-th-figee-bord {
+  padding-left: 4px;
+}

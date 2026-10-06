@@ -31,7 +31,7 @@ import {
 // les colonnes Matériel / Main d'œuvre, très nombreuses. (La colonne
 // Référence n'est pas affichée — elle ne sert pas sur ce projet — mais
 // reste importée et stockée, affichée en infobulle sur la désignation.)
-const LARGEUR_NUMERO = 22;
+const LARGEUR_NUMERO = 0; // colonne N° supprimée (la désignation démarre en bord de tableau)
 const LARGEUR_UNITE = 36;
 const LARGEUR_QTE = 68;
 // Désignation doit rester large et lisible (c'est le texte qui identifie
@@ -844,18 +844,16 @@ function LigneDevisRow({
         (imbriquee ? "elec-ligne-membre-groupe" : "")
       }
     >
-      <td className="elec-td-figee elec-col-etroite" style={{ left: 0, width: LARGEUR_NUMERO }}>
-        {modeSelection && peutGerer ? (
-          <input type="checkbox" checked={selectionnee} onChange={onBasculerSelection} />
-        ) : null}
-      </td>
       <td
         className="elec-td-figee elec-th-figee-bord"
         style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
         title={titreDesignation}
       >
         <div className="elec-designation-cellule">
-          <span className="elec-designation-texte" style={imbriquee ? { paddingLeft: 20 } : undefined}>{l.designation}</span>
+          {modeSelection && peutGerer && (
+            <input type="checkbox" checked={selectionnee} onChange={onBasculerSelection} />
+          )}
+          <span className="elec-designation-texte" style={imbriquee ? { paddingLeft: 12 } : undefined}>{l.designation}</span>
           {entete && (
             <span className="elec-groupe-actions">
               {entete.ouvert && peutGerer && (
@@ -1010,7 +1008,6 @@ function GroupeEnteteRow({
   const pctMo = Math.max(0, Math.min(100, Math.round(moyenneMo * 10) / 10));
   return (
     <tr className="elec-ligne-groupe-entete">
-      <td className="elec-td-figee elec-col-etroite" style={{ left: 0, width: LARGEUR_NUMERO }} />
       <td
         className="elec-td-figee elec-th-figee-bord"
         style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
@@ -1874,7 +1871,6 @@ export default function ElectriciteSiteDetail() {
               <div className="data-table-wrapper elec-lignes-wrapper">
                 <table className="data-table elec-lignes-table" style={{ width: largeurTableLignes }}>
                   <colgroup>
-                    <col style={{ width: LARGEUR_NUMERO }} />
                     <col style={{ width: LARGEUR_DESIGNATION }} />
                     <col style={{ width: LARGEUR_UNITE }} />
                     <col style={{ width: LARGEUR_QTE }} />
@@ -1888,7 +1884,7 @@ export default function ElectriciteSiteDetail() {
                   <thead>
                     <tr className="elec-entete-groupes">
                       <th
-                        colSpan={4}
+                        colSpan={3}
                         className="elec-th-figee"
                         style={{
                           left: 0,
@@ -1903,11 +1899,6 @@ export default function ElectriciteSiteDetail() {
                       </th>
                     </tr>
                     <tr>
-                      <th
-                        className="elec-th-figee elec-col-etroite"
-                        style={{ left: 0, width: LARGEUR_NUMERO }}
-                      >
-                      </th>
                       <th
                         className="elec-th-figee elec-th-figee-bord"
                         style={{ left: LARGEUR_NUMERO, width: LARGEUR_DESIGNATION }}
@@ -1964,7 +1955,7 @@ export default function ElectriciteSiteDetail() {
                         const l = item.ligne;
                         return (
                           <tr key={l.id} className="elec-ligne-poste">
-                            <td colSpan={14} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
+                            <td colSpan={13} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
                               {l.code ? l.code + " — " : ""}
                               {l.designation}
                             </td>
