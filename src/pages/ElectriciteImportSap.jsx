@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { lireTexteSap } from "../lib/lireTexteSap";
 import {
   addDoc,
   collection,
@@ -58,7 +59,7 @@ function BlocImport({ type, config }) {
     setEnLecture(true);
     setNomFichier(fichier.name);
     try {
-      const texte = await fichier.text();
+      const texte = await lireTexteSap(fichier);
       const resultat = config.analyser(texte);
       if (resultat.length === 0) {
         setErreur("Aucune ligne de données reconnue dans ce fichier — c'est bien le bon export ?");

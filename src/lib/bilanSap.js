@@ -72,6 +72,32 @@ export function rapprocherAchats(parType, achatsSap, affectations = {}) {
   return { parCle, horsBudget, totalReel };
 }
 
+// Identifiant stable d'une ligne de pointage SAP (personne + jour + tâche +
+// type d'activité + heures) : identique si le même export est ré-importé.
+export function cleLigneHeure(h) {
+  return [h.nomPrenom, h.date, h.tache, h.typAct, h.heures, h.imputation]
+    .map((v) => String(v ?? ""))
+    .join("_")
+    .replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+// Heures SAP rapprochées des Tâches du Récap MO. SAP ne connaît pas les
+// tâches du devis : aucune affectation automatique, chaque ligne de pointage
+// reste « non affectée » tant qu'elle n'est pas réaffectée à la main
+// (`affectations` : { "<cleLigneHeure>": "<clé de tâche>" }). Une affectation
+// vers une tâche qui n'est plus dans le budget est ignorée.
+export function rapprocherHeures(parType, heuresSap, affectations = {}) {
+  const parCle = new Map(parType.map((t) => [t.cle, { reel: 0, lignes: [] }]));
+  const nonAffectees = { reel: 0, lignes: [] };
+  heuresSap.forEach((h) => {
+    const manuel = affectations[cleLigneHeure(h)];
+    const cible = manuel && parCle.has(manuel) ? parCle.get(manuel) : nonAffectees;
+    cible.reel += Number(h.heures) || 0;
+    cible.lignes.push(h);
+  });
+  return { parCle, nonAffectees, ...totaliserHeures(heuresSap) };
+}
+
 // Heures SAP réellement pointées sur le chantier, avec le détail par
 // personne. SAP ne connaît pas les Types de FO : côté Main d'œuvre, le
 // rapprochement ne se fait donc qu'au niveau du chantier.

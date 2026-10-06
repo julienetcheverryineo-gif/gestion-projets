@@ -15,6 +15,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
+import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 import { exporterGoat } from "../lib/exportGoat";
@@ -23,7 +24,8 @@ import {
   AFFECTATION_HORS_BUDGET,
   cleLigneAchat,
   rapprocherAchats,
-  totaliserHeures,
+  rapprocherHeures,
+  cleLigneHeure,
 } from "../lib/bilanSap";
 
 // Largeurs des 2 colonnes d'identification figées (gel de volets, comme
@@ -169,7 +171,7 @@ function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
   const parType = Array.from(groupes.values())
     .map((g) => ({
       cle: g.cle,
-      libelle: g.cle ? formatTypeFo(g.cle) : "Sans type de FO",
+      libelle: g.cle ? formatTypeFo(g.cle) : "Sans tâche",
       numero: g.cle ? Number(g.cle.match(/^\s*(\d+)/)?.[1]) : null,
       budget: g.budget,
       realise: g.realise,
@@ -320,6 +322,57 @@ function TableauRecap({
     </tr>
   );
 
+  // Détail des heures SAP d'une tâche (ou non affectées) : chaque pointage
+  // peut être réaffecté à une tâche du budget.
+  const detailSapMo = (lignes) => (
+    <tr className="recap-detail-sap">
+      <td colSpan={nbColonnes}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              {COLONNES_SAP_MO.map((c) => (
+                <th key={c.champ}>{c.label}</th>
+              ))}
+              <th>Affecter à</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((h, i) => {
+              const cleH = cleLigneHeure(h);
+              const manuel = sap?.affectations?.[cleH];
+              const valeur = manuel && sapMo.parCle.has(manuel) ? manuel : "";
+              return (
+                <tr key={h.id || i}>
+                  {COLONNES_SAP_MO.map((c) => (
+                    <td key={c.champ} data-label={c.label}>
+                      {formatValeurSap(h[c.champ], c.numerique, false)}
+                    </td>
+                  ))}
+                  <td data-label="Affecter à">
+                    <select
+                      value={valeur}
+                      disabled={!sap?.onAffecter}
+                      onChange={(e) => sap.onAffecter(cleH, e.target.value)}
+                    >
+                      <option value="">Non affectée</option>
+                      {recap.parType
+                        .filter((t) => t.cle)
+                        .map((t) => (
+                          <option key={t.cle} value={t.cle}>
+                            {t.libelle}
+                          </option>
+                        ))}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
       <div className="panel-header">
@@ -330,7 +383,7 @@ function TableauRecap({
       </div>
       {modifiable && (
         <p className="simple-list-meta" style={{ marginBottom: 10 }}>
-          Modifiez un % ici pour l'appliquer d'un coup à toutes les lignes de ce type de FO
+          Modifiez un % ici pour l'appliquer d'un coup à toutes les lignes de cette tâche
           {portee === "devis" ? ", dans ce devis." : ", dans tous les devis du chantier."}
         </p>
       )}
@@ -345,7 +398,7 @@ function TableauRecap({
                   N°
                 </th>
                 <th className="col-type" style={{ width: largeurColType }}>
-                  Type de FO
+                  Tâche
                 </th>
                 <th className="col-num">{libelleValeur}</th>
                 <th className="col-num">Réalisé (avancement)</th>
@@ -379,7 +432,7 @@ function TableauRecap({
                   </td>
                   <td
                     className="col-type"
-                    data-label="Type de FO"
+                    data-label="Tâche"
                     style={{ fontFamily: "var(--font-ui)" }}
                   >
                     {l.libelle}
@@ -413,7 +466,7 @@ function TableauRecap({
                             <button
                               type="button"
                               className="btn-ghost recap-sap-toggle"
-                              title="Afficher les lignes d'achat SAP de ce type"
+                              title="Afficher les lignes d'achat SAP de cette tâche"
                               onClick={() => basculer(l.cle)}
                             >
                               {ouverts.has(l.cle) ? "▾" : "▸"} {formatEuro(g.reel)} € ({g.lignes.length})
@@ -431,15 +484,37 @@ function TableauRecap({
                       </>
                     );
                   })()}
-                  {sapMo && (
-                    <>
-                      <td className="col-num" data-label={libelleReel}>—</td>
-                      <td className="col-num" data-label="Reste budget">—</td>
-                      <td className="col-avancement" data-label="Réel / Budget"></td>
-                    </>
-                  )}
+                  {sapMo && (() => {
+                    const g = sapMo.parCle.get(l.cle);
+                    const reste = l.budget - g.reel;
+                    return (
+                      <>
+                        <td className="col-num" data-label={libelleReel}>
+                          {g.lignes.length > 0 ? (
+                            <button
+                              type="button"
+                              className="btn-ghost recap-sap-toggle"
+                              title="Afficher les heures SAP de cette tâche"
+                              onClick={() => basculer(l.cle)}
+                            >
+                              {ouverts.has(l.cle) ? "▾" : "▸"} {formatNombre(g.reel)} h ({g.lignes.length})
+                            </button>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className={"col-num " + classeReste(reste)} data-label="Reste budget">
+                          {formatMontant(reste, uniteValeur)}
+                        </td>
+                        <td className="col-avancement" data-label="Réel / Budget">
+                          <BarreReelBudget reel={g.reel} budget={l.budget} />
+                        </td>
+                      </>
+                    );
+                  })()}
                 </tr>
                 {sapFo && ouverts.has(l.cle) && detailSapFo(sapFo.parCle.get(l.cle).lignes)}
+                {sapMo && ouverts.has(l.cle) && detailSapMo(sapMo.parCle.get(l.cle).lignes)}
                 </Fragment>
               ))}
               {sapFo && sapFo.horsBudget.lignes.length > 0 && (
@@ -448,9 +523,9 @@ function TableauRecap({
                     <td className="col-ordre" data-label="N°"></td>
                     <td
                       className="col-type"
-                      data-label="Type de FO"
+                      data-label="Tâche"
                       style={{ fontFamily: "var(--font-ui)", fontStyle: "italic" }}
-                      title="Achats SAP dont le Code SAP ne correspond à aucun Type de FO du budget"
+                      title="Achats SAP dont le Code SAP ne correspond à aucune tâche du budget"
                     >
                       Achats SAP hors budget
                     </td>
@@ -474,9 +549,41 @@ function TableauRecap({
                   {ouverts.has("__hors") && detailSapFo(sapFo.horsBudget.lignes)}
                 </>
               )}
+              {sapMo && sapMo.nonAffectees.lignes.length > 0 && (
+                <>
+                  <tr>
+                    <td className="col-ordre" data-label="N°"></td>
+                    <td
+                      className="col-type"
+                      data-label="Tâche"
+                      style={{ fontFamily: "var(--font-ui)", fontStyle: "italic" }}
+                      title="Heures SAP pas encore réaffectées à une tâche"
+                    >
+                      Heures SAP non affectées
+                    </td>
+                    <td className="col-num" data-label={libelleValeur}>—</td>
+                    <td className="col-num" data-label="Réalisé">—</td>
+                    <td className="col-avancement" data-label="% avancement"></td>
+                    <td className="col-num" data-label="Restant">—</td>
+                    <td className="col-num" data-label={libelleReel}>
+                      <button
+                        type="button"
+                        className="btn-ghost recap-sap-toggle"
+                        onClick={() => basculer("__non")}
+                      >
+                        {ouverts.has("__non") ? "▾" : "▸"} {formatNombre(sapMo.nonAffectees.reel)} h (
+                        {sapMo.nonAffectees.lignes.length})
+                      </button>
+                    </td>
+                    <td className="col-num" data-label="Reste budget">—</td>
+                    <td className="col-avancement" data-label="Réel / Budget"></td>
+                  </tr>
+                  {ouverts.has("__non") && detailSapMo(sapMo.nonAffectees.lignes)}
+                </>
+              )}
               <tr className="table-recap-total">
                 <td className="col-ordre" data-label="N°"></td>
-                <td className="col-type" data-label="Type de FO">
+                <td className="col-type" data-label="Tâche">
                   TOTAL
                 </td>
                 <td className="col-num" data-label={libelleValeur}>
@@ -557,7 +664,7 @@ function TableauRecap({
 }
 
 // Lien mailto pré-rempli avec le corps du mail de demande de consultation
-// pour un type de FO (liste des désignations/quantités) — le destinataire
+// pour une tâche (liste des désignations/quantités) — le destinataire
 // et l'objet restent volontairement vides, à saisir à la main dans le
 // client de messagerie (Outlook) qui s'ouvre.
 function construireMailtoAchat(groupe) {
@@ -588,7 +695,7 @@ function TableauAchats({ titre, sousTitre, achats }) {
         </h2>
       </div>
       {achats.length === 0 ? (
-        <p className="simple-list-meta">Aucune ligne avec un type de FO renseigné pour ce périmètre.</p>
+        <p className="simple-list-meta">Aucune ligne avec une tâche renseignée pour ce périmètre.</p>
       ) : (
         achats.map((groupe) => (
           <div key={groupe.cle} className="elec-achats-groupe">
@@ -773,7 +880,7 @@ function LigneAvancementBarre({ pct }) {
 }
 
 // Saisie groupée depuis la synthèse : modifier ce % applique la même
-// valeur à toutes les lignes de ce type de FO, tous devis confondus
+// valeur à toutes les lignes de cette tâche, tous devis confondus
 // (voir onModifierGroupe dans ElectriciteSiteDetail).
 function LigneAvancementModifiable({ pct, onValider }) {
   const pourcent = Math.max(0, Math.min(100, Math.round(pct * 1000) / 10));
@@ -813,6 +920,7 @@ function LigneDevisRow({
   onBasculerSelection,
   onChangerAvancement,
   onChangerType,
+  tachesFo,
   imbriquee,
   entete,
 }) {
@@ -918,10 +1026,10 @@ function LigneDevisRow({
         >
           <option value="">—</option>
           {l.typeFo &&
-            !LISTE_TYPES_FO.some((o) => valeurType(o.code, o.label) === l.typeFo) && (
+            !tachesFo.some((o) => valeurType(o.code, o.label) === l.typeFo) && (
               <option value={l.typeFo}>{formatTypeFo(l.typeFo)}</option>
             )}
-          {LISTE_TYPES_FO.map((o) => (
+          {tachesFo.map((o) => (
             <option key={o.code} value={valeurType(o.code, o.label)}>
               {o.code} · {o.label}
             </option>
@@ -1296,6 +1404,8 @@ export default function ElectriciteSiteDetail() {
   const [modeSelection, setModeSelection] = useState(false);
   const [lignesSelectionnees, setLignesSelectionnees] = useState(new Set());
   const [afficherGroupeModal, setAfficherGroupeModal] = useState(false);
+  const [afficherTaches, setAfficherTaches] = useState(false);
+  const tachesFo = chantier?.tachesFo || LISTE_TYPES_FO;
   const [groupesOuverts, setGroupesOuverts] = useState(new Set());
   const groupesDuDevis = devisOuvert
     ? tousGroupes.filter((g) => g.devisId === devisOuvert.id)
@@ -1480,6 +1590,15 @@ export default function ElectriciteSiteDetail() {
     await updateDoc(doc(db, "sites", chantierId), { affectationsSapLignes: maj });
   };
 
+  // Idem pour les heures pointées : ligne de pointage -> Tâche du Récap MO.
+  const affectationsHeures = chantier?.affectationsSapHeures || {};
+  const affecterHeureSap = async (cleLigne, valeur) => {
+    const maj = { ...affectationsHeures };
+    if (valeur) maj[cleLigne] = valeur;
+    else delete maj[cleLigne];
+    await updateDoc(doc(db, "sites", chantierId), { affectationsSapHeures: maj });
+  };
+
   // Réel SAP rapproché du bilan (synthèse tous devis seulement) : n'a de
   // sens que si des lignes SAP existent pour l'OTP de ce chantier.
   const sapRecap = (() => {
@@ -1493,7 +1612,12 @@ export default function ElectriciteSiteDetail() {
       };
     }
     if (recapActif === "mo" && heuresSap.length > 0) {
-      return { type: "mo", heures: totaliserHeures(heuresSap) };
+      return {
+        type: "mo",
+        heures: rapprocherHeures(recapSynthese.parType, heuresSap, affectationsHeures),
+        affectations: affectationsHeures,
+        onAffecter: peutGerer ? affecterHeureSap : null,
+      };
     }
     return null;
   })();
@@ -1845,6 +1969,9 @@ export default function ElectriciteSiteDetail() {
                   >
                     {modeSelection ? "Annuler la sélection" : "Sélectionner des lignes"}
                   </button>
+                  <button type="button" className="btn-ghost" onClick={() => setAfficherTaches(true)}>
+                    ⚙ Gérer les tâches
+                  </button>
                   {modeSelection && (
                     <>
                       <span className="simple-list-meta">
@@ -1923,7 +2050,7 @@ export default function ElectriciteSiteDetail() {
                         Coût unit.
                       </th>
                       <th className="elec-col-materiel" style={{ width: largeurTypeLigne }}>
-                        FO
+                        Tâche
                       </th>
                       <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[2] }}>
                         Coût total FO
@@ -2001,6 +2128,7 @@ export default function ElectriciteSiteDetail() {
                           onBasculerSelection={() => basculerSelectionLigne(l.id)}
                           onChangerAvancement={(champ, valeur) => changerAvancement(l, champ, valeur)}
                           onChangerType={(champ, valeur) => changerType(l, champ, valeur)}
+                          tachesFo={tachesFo}
                           imbriquee={item.kind === "membre"}
                           entete={
                             item.kind === "representative"
@@ -2058,6 +2186,16 @@ export default function ElectriciteSiteDetail() {
           devisExistants={devis}
           toutesLignes={toutesLignes}
           onClose={() => setAfficherImport(false)}
+        />
+      )}
+
+      {afficherTaches && (
+        <GererTachesModal
+          chantierId={chantierId}
+          chantier={chantier}
+          taches={tachesFo}
+          lignesChantier={lignesChantier}
+          onClose={() => setAfficherTaches(false)}
         />
       )}
 

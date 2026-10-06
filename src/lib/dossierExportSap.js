@@ -1,3 +1,4 @@
+import { lireTexteSap } from "./lireTexteSap";
 // Accès au dossier où le gestionnaire SAP installé sur le poste dépose ses
 // exports (%USERPROFILE%\PilotageSAP\exports). Le dossier est choisi une
 // seule fois dans l'appli (File System Access API : Chrome / Edge) et sa
@@ -68,7 +69,7 @@ export async function lireFichier(handle, nom) {
   try {
     const fh = await handle.getFileHandle(nom);
     const fichier = await fh.getFile();
-    return { texte: await fichier.text(), modifieLe: fichier.lastModified, taille: fichier.size };
+    return { texte: await lireTexteSap(fichier), modifieLe: fichier.lastModified, taille: fichier.size };
   } catch {
     return null;
   }
