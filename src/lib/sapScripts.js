@@ -127,12 +127,6 @@ export function construireUrlLotTaches(params) {
   return `${PROTOCOLE_SAP}://run?t=taches&m=lot&sy=${sy}`;
 }
 
-// Lien du test d'écriture ZCA_TACHES (saisie d'une ligne, sans enregistrer).
-export function construireUrlTaches(params, compte, code, libelle) {
-  const e = (v) => String(v ?? "").replace(/ /g, "+");
-  return `${PROTOCOLE_SAP}://run?t=taches&o=${e(compte)}&c=${e(code)}&l=${e(libelle)}&sy=${e(String(params.systemeSap || "").trim())}`;
-}
-
 // Lien ouvert par l'appli pour lancer le gestionnaire installé. Jeu de
 // caractères volontairement restreint (pas de « % » : le gestionnaire passe
 // ce lien à une ligne de commande Windows) ; l'espace devient « + ».

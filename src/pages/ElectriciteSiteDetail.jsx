@@ -784,7 +784,7 @@ function tsDateSap(texte) {
 // et le bouton qui affiche ce panneau sont gérés par le composant parent
 // — n'existe que lorsqu'une correspondance a été trouvée (voir
 // ElectriciteSiteDetail).
-function PanneauSap({ otp, achats, heures }) {
+function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
   const [onglet, setOnglet] = useState("fo");
 
   const colonnes = onglet === "fo" ? COLONNES_SAP_FO : COLONNES_SAP_MO;
@@ -810,6 +810,15 @@ function PanneauSap({ otp, achats, heures }) {
         >
           🕐 Heures ({heures.length})
         </button>
+        {onEnvoyerTaches && (
+          <button
+            className="btn-ghost"
+            title="Créer les tâches de tous les devis de ce chantier dans SAP (ZCA_TACHES)"
+            onClick={onEnvoyerTaches}
+          >
+            📤 Tâches vers SAP
+          </button>
+        )}
       </div>
       {lignes.length === 0 ? (
         <p className="simple-list-meta">Aucune ligne SAP de ce type pour ce chantier.</p>
@@ -1883,7 +1892,12 @@ export default function ElectriciteSiteDetail() {
           )}
 
           {recapActif === "sap" && (
-            <PanneauSap otp={otpSap} achats={achatsSap} heures={heuresSap} />
+            <PanneauSap
+              otp={otpSap}
+              achats={achatsSap}
+              heures={heuresSap}
+              onEnvoyerTaches={peutGerer ? () => setAfficherEnvoiSap(true) : null}
+            />
           )}
 
     {(recapActif === "fo" || recapActif === "mo") && (
@@ -1989,15 +2003,6 @@ export default function ElectriciteSiteDetail() {
                   </button>
                   <button type="button" className="btn-ghost" onClick={() => setAfficherTaches(true)}>
                     ⚙ Types de FO / tâches
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    disabled={!otpSap}
-                    title={otpSap ? "Créer ces tâches dans SAP (ZCA_TACHES)" : "Renseignez d'abord le compte du chantier"}
-                    onClick={() => setAfficherEnvoiSap(true)}
-                  >
-                    📤 Tâches vers SAP
                   </button>
                   {modeSelection && (
                     <>
