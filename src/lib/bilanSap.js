@@ -86,16 +86,38 @@ export function cleLigneHeure(h) {
 // reste « non affectée » tant qu'elle n'est pas réaffectée à la main
 // (`affectations` : { "<cleLigneHeure>": "<clé de tâche>" }). Une affectation
 // vers une tâche qui n'est plus dans le budget est ignorée.
-export function rapprocherHeures(parType, heuresSap, affectations = {}) {
+export const SEP_AFFECTATION = "||";
+
+// Une affectation vaut « <idDevis>||<clé de tâche> » (heures rattachées à un
+// devis précis) ou, pour les anciennes affectations, « <clé de tâche> » seule.
+export function lireAffectationHeure(valeur) {
+  if (!valeur) return { devisId: null, cle: null };
+  const i = String(valeur).indexOf(SEP_AFFECTATION);
+  if (i === -1) return { devisId: null, cle: String(valeur) };
+  return { devisId: valeur.slice(0, i), cle: valeur.slice(i + SEP_AFFECTATION.length) };
+}
+
+// Synthèse tous devis : une heure affectée compte pour sa tâche, quel que
+// soit le devis. Avec `devisId`, on ne garde que les heures rattachées à ce
+// devis (tableau d'un devis).
+export function rapprocherHeures(parType, heuresSap, affectations = {}, devisId = null) {
   const parCle = new Map(parType.map((t) => [t.cle, { reel: 0, lignes: [] }]));
   const nonAffectees = { reel: 0, lignes: [] };
+  const retenues = [];
   heuresSap.forEach((h) => {
-    const manuel = affectations[cleLigneHeure(h)];
-    const cible = manuel && parCle.has(manuel) ? parCle.get(manuel) : nonAffectees;
-    cible.reel += Number(h.heures) || 0;
-    cible.lignes.push(h);
+    const { devisId: dev, cle } = lireAffectationHeure(affectations[cleLigneHeure(h)]);
+    const valide = cle !== null && parCle.has(cle) && (devisId === null || dev === devisId);
+    if (valide) {
+      const g = parCle.get(cle);
+      g.reel += Number(h.heures) || 0;
+      g.lignes.push(h);
+      retenues.push(h);
+    } else if (devisId === null) {
+      nonAffectees.reel += Number(h.heures) || 0;
+      nonAffectees.lignes.push(h);
+    }
   });
-  return { parCle, nonAffectees, ...totaliserHeures(heuresSap) };
+  return { parCle, nonAffectees, ...totaliserHeures(devisId === null ? heuresSap : retenues) };
 }
 
 // Heures SAP réellement pointées sur le chantier, avec le détail par

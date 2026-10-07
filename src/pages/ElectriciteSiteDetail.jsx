@@ -29,6 +29,8 @@ import {
   rapprocherAchats,
   rapprocherHeures,
   cleLigneHeure,
+  lireAffectationHeure,
+  SEP_AFFECTATION,
 } from "../lib/bilanSap";
 
 // Largeurs des 2 colonnes d'identification figées (gel de volets, comme
@@ -344,7 +346,9 @@ function TableauRecap({
             {lignes.map((h, i) => {
               const cleH = cleLigneHeure(h);
               const manuel = sap?.affectations?.[cleH];
-              const valeur = manuel && sapMo.parCle.has(manuel) ? manuel : "";
+              const { cle: cleManuelle } = lireAffectationHeure(manuel);
+              const valeur = cleManuelle !== null && sapMo.parCle.has(cleManuelle) ? manuel : "";
+              const ancienne = manuel && !String(manuel).includes(SEP_AFFECTATION) && valeur === manuel;
               return (
                 <tr key={h.id || i}>
                   {COLONNES_SAP_MO.map((c) => (
@@ -359,13 +363,14 @@ function TableauRecap({
                       onChange={(e) => sap.onAffecter(cleH, e.target.value)}
                     >
                       <option value="">Non affectée</option>
-                      {recap.parType
-                        .filter((t) => t.cle)
-                        .map((t) => (
-                          <option key={t.cle} value={t.cle}>
-                            {t.libelle}
+                      {ancienne && <option value={manuel}>{formatTypeFo(manuel)} (devis non précisé)</option>}
+                      {(sap?.options || []).map((g) =>
+                        g.taches.map((t) => (
+                          <option key={g.devisId + t.cle} value={g.devisId + SEP_AFFECTATION + t.cle}>
+                            {g.nom} — {t.libelle}
                           </option>
-                        ))}
+                        ))
+                      )}
                     </select>
                   </td>
                 </tr>
@@ -1626,6 +1631,28 @@ export default function ElectriciteSiteDetail() {
     await updateDoc(doc(db, "sites", chantierId), { affectationsSapHeures: maj });
   };
 
+  // Cibles possibles d'une heure SAP : (devis, tâche), pour la synthèse
+  // comme pour le tableau d'un devis.
+  const optionsAffectationHeures = (devisId = null) =>
+    recapParDevis
+      .filter(({ devis: d }) => devisId === null || d.id === devisId)
+      .map(({ devis: d, recap }) => ({
+        devisId: d.id,
+        nom: d.nom,
+        taches: recap.parType.filter((t) => t.cle).map((t) => ({ cle: t.cle, libelle: t.libelle })),
+      }));
+  // Heures SAP rattachées à ce devis (tableau du devis, bilan MO).
+  const sapRecapDevis = (d, recap) =>
+    recapActif === "mo" && heuresSap.length > 0
+      ? {
+          type: "mo",
+          heures: rapprocherHeures(recap.parType, heuresSap, affectationsHeures, d.id),
+          affectations: affectationsHeures,
+          onAffecter: peutGerer ? affecterHeureSap : null,
+          options: optionsAffectationHeures(d.id),
+        }
+      : null;
+
   // Réel SAP rapproché du bilan (synthèse tous devis seulement) : n'a de
   // sens que si des lignes SAP existent pour l'OTP de ce chantier.
   const sapRecap = (() => {
@@ -1644,6 +1671,7 @@ export default function ElectriciteSiteDetail() {
         heures: rapprocherHeures(recapSynthese.parType, heuresSap, affectationsHeures),
         affectations: affectationsHeures,
         onAffecter: peutGerer ? affecterHeureSap : null,
+        options: optionsAffectationHeures(),
       };
     }
     return null;
@@ -1931,6 +1959,7 @@ export default function ElectriciteSiteDetail() {
                   devisId={d.id}
                   ordreTypes={ordreTypesChantier}
                   onModifierOrdre={peutGerer ? modifierOrdreType : null}
+                  sap={sapRecapDevis(d, recap)}
                 />
               ))}
             </>

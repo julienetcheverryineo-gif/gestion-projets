@@ -66,8 +66,14 @@ export default function GererTachesModal({ chantierId, chantier, taches, lignesC
       const cle = (v) => ancienVersNouveau.get(v) ?? v;
       const reCle = (obj) =>
         Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [cle(k), v]));
+      // Une affectation d'heures peut valoir « idDevis||tâche » : on ne
+      // remplace que la partie tâche.
+      const reValeur = (v) => {
+        const i = String(v).indexOf("||");
+        return i === -1 ? cle(v) : v.slice(0, i + 2) + cle(v.slice(i + 2));
+      };
       const reValeurs = (obj) =>
-        Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [k, cle(v)]));
+        Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [k, reValeur(v)]));
       await updateDoc(doc(db, "sites", chantierId), {
         tachesFo: finale,
         ordreTypesFo: reCle(chantier?.ordreTypesFo),
