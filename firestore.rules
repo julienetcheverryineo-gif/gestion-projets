@@ -95,7 +95,12 @@ service cloud.firestore {
         (!estClient() || chantierAutoriseAuClient(resource.data.chantierId));
       allow create: if estConnecte() &&
         (!estClient() || chantierAutoriseAuClient(request.resource.data.chantierId));
-      allow update: if estConnecte() && !estClient();
+      // Un client peut seulement ajouter des pièces jointes (champ
+      // piecesJointes) à une réserve de ses chantiers.
+      allow update: if estConnecte() &&
+        (!estClient() ||
+          (chantierAutoriseAuClient(resource.data.chantierId) &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['piecesJointes'])));
       allow delete: if estChefOuAdmin();
     }
 

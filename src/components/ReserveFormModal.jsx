@@ -1,6 +1,10 @@
 import { useState } from "react";
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { useAuth } from "../contexts/AuthContext";
+import { ACCEPT_PJ, televerserPieces, verifierFichiers } from "../lib/piecesJointes";
+import PiecesJointesReserve from "./PiecesJointesReserve";
+import { useCollection } from "../lib/firestoreHooks";
 
 // Formulaire de création/modification d'une réserve. Utilisé depuis
 // l'onglet Réserves d'un chantier (chantierId fixe, pas de sélecteur) et
@@ -14,35 +18,54 @@ export default function ReserveFormModal({ chantierId, chantiers, reserve, utili
   );
   const [dateEcheance, setDateEcheance] = useState(reserve?.dateEcheance ?? "");
   const [remarque, setRemarque] = useState(reserve?.remarque ?? "");
+  const [actionLevee, setActionLevee] = useState(reserve?.actionLevee ?? "");
+  const [nouveauxFichiers, setNouveauxFichiers] = useState([]);
+  const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
+  const { profile } = useAuth();
+  // Réserve ouverte pour modification : on suit la version à jour pour que
+  // les pièces ajoutées/retirées s'affichent tout de suite.
+  const { documents: reservesLive } = useCollection("reserves");
+  const reserveCourante = reserve ? reservesLive.find((r) => r.id === reserve.id) ?? reserve : null;
 
   const afficherSelecteurChantier = Array.isArray(chantiers);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErreur("");
+    const probleme = verifierFichiers(nouveauxFichiers);
+    if (probleme) return setErreur(probleme);
     setEnCours(true);
-    const donnees = {
-      designation,
-      responsable: responsable || null,
-      dateSignalement: dateSignalement || null,
-      dateEcheance: dateEcheance || null,
-      remarque: remarque || null,
-    };
-    if (afficherSelecteurChantier) {
-      donnees.chantierId = chantierChoisi || null;
+    try {
+      const donnees = {
+        designation,
+        responsable: responsable || null,
+        dateSignalement: dateSignalement || null,
+        dateEcheance: dateEcheance || null,
+        remarque: remarque || null,
+        actionLevee: actionLevee || null,
+      };
+      if (afficherSelecteurChantier) {
+        donnees.chantierId = chantierChoisi || null;
+      }
+      if (reserve) {
+        await updateDoc(doc(db, "reserves", reserve.id), donnees);
+      } else {
+        const reference = doc(collection(db, "reserves"));
+        const piecesJointes = await televerserPieces(reference.id, nouveauxFichiers, profile?.nom);
+        await setDoc(reference, {
+          ...donnees,
+          chantierId: afficherSelecteurChantier ? chantierChoisi || null : chantierId,
+          statut: "ouverte",
+          piecesJointes,
+          creeLe: serverTimestamp(),
+        });
+      }
+      onClose();
+    } catch (err) {
+      setErreur("Enregistrement impossible : " + (err.message || err));
+      setEnCours(false);
     }
-    if (reserve) {
-      await updateDoc(doc(db, "reserves", reserve.id), donnees);
-    } else {
-      await addDoc(collection(db, "reserves"), {
-        ...donnees,
-        chantierId: afficherSelecteurChantier ? chantierChoisi || null : chantierId,
-        statut: "ouverte",
-        creeLe: serverTimestamp(),
-      });
-    }
-    setEnCours(false);
-    onClose();
   };
 
   return (
@@ -105,6 +128,40 @@ export default function ReserveFormModal({ chantierId, chantiers, reserve, utili
             Remarque
             <textarea value={remarque} onChange={(e) => setRemarque(e.target.value)} rows={2} />
           </label>
+          <label>
+            Action menée pour lever la réserve
+            <textarea
+              value={actionLevee}
+              onChange={(e) => setActionLevee(e.target.value)}
+              rows={3}
+              placeholder="ex : Sonde recâblée et testée, PV signé le …"
+            />
+          </label>
+          <div>
+            <div style={{ marginBottom: 4 }}>Pièces jointes</div>
+            {reserveCourante ? (
+              <PiecesJointesReserve
+                reserveId={reserveCourante.id}
+                pieces={reserveCourante.piecesJointes || []}
+                peutAjouter
+                peutRetirer
+                auteur={profile?.nom}
+              />
+            ) : (
+              <>
+                <input
+                  type="file"
+                  multiple
+                  accept={ACCEPT_PJ}
+                  onChange={(e) => setNouveauxFichiers([...(e.target.files || [])])}
+                />
+                {nouveauxFichiers.length > 0 && (
+                  <div className="simple-list-meta">{nouveauxFichiers.length} fichier(s) joint(s) à l'enregistrement</div>
+                )}
+              </>
+            )}
+          </div>
+          {erreur && <div className="form-error">{erreur}</div>}
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>
               Annuler

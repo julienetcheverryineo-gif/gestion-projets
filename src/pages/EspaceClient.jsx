@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection, useCollectionParChantiers, useCollectionParIds } from "../lib/firestoreHooks";
 import { libelleChantier } from "../lib/usePlanningData";
+import PiecesJointesReserve from "../components/PiecesJointesReserve";
 import ReserveClientFormModal from "../components/ReserveClientFormModal";
 import logoIneo from "../assets/logo-ineo.png";
 
@@ -177,6 +178,20 @@ export default function EspaceClient() {
                     </div>
                     <div className="espace-client-carte-titre">{r.designation}</div>
                     {r.remarque && <div className="espace-client-carte-remarque">{r.remarque}</div>}
+                    {r.actionLevee && (
+                      <div className="reserve-action-menee">
+                        <strong>Action menée :</strong> {r.actionLevee}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 8 }}>
+                      <PiecesJointesReserve
+                        reserveId={r.id}
+                        pieces={r.piecesJointes || []}
+                        peutAjouter
+                        peutRetirer={false}
+                        auteur={profile?.nom}
+                      />
+                    </div>
                   </article>
                 ))}
               </div>

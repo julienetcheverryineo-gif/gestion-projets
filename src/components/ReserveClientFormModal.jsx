@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { ACCEPT_PJ, televerserPieces, verifierFichiers } from "../lib/piecesJointes";
 import { creerNotification, TYPE_RESERVE_CLIENT } from "../lib/notifications";
 import { libelleChantier } from "../lib/usePlanningData";
 
@@ -23,6 +24,7 @@ export default function ReserveClientFormModal({
 }) {
   const [designation, setDesignation] = useState("");
   const [remarque, setRemarque] = useState("");
+  const [fichiers, setFichiers] = useState([]);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -53,9 +55,14 @@ export default function ReserveClientFormModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErreur("");
+    const probleme = verifierFichiers(fichiers);
+    if (probleme) return setErreur(probleme);
     setEnCours(true);
     try {
-      await addDoc(collection(db, "reserves"), {
+      const reference = doc(collection(db, "reserves"));
+      const piecesJointes = await televerserPieces(reference.id, fichiers, nomSignalant);
+      await setDoc(reference, {
+        piecesJointes,
         chantierId,
         designation,
         remarque: remarque || null,
@@ -98,6 +105,15 @@ export default function ReserveClientFormModal({
               onChange={(e) => setRemarque(e.target.value)}
               placeholder="Localisation précise, depuis quand, etc."
               rows={3}
+            />
+          </label>
+          <label>
+            Photos ou documents (facultatif)
+            <input
+              type="file"
+              multiple
+              accept={ACCEPT_PJ}
+              onChange={(e) => setFichiers([...(e.target.files || [])])}
             />
           </label>
           {erreur && <div className="form-error">{erreur}</div>}

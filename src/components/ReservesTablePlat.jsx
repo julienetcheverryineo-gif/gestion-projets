@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { useAuth } from "../contexts/AuthContext";
+import PiecesJointesReserve from "./PiecesJointesReserve";
 
 // Largeurs de colonnes par défaut (px), redimensionnables et mémorisées —
 // même logique que TaskTable / MaterielTablePlat.
@@ -13,6 +15,8 @@ const LARGEURS_DEFAUT = {
   echeance: 118,
   statut: 120,
   remarque: 200,
+  action: 220,
+  pj: 190,
   actions: 90,
 };
 
@@ -48,6 +52,10 @@ function valeurColonne(r, colonne, nomChantier) {
       return r.statut || "";
     case "remarque":
       return r.remarque || "";
+    case "action":
+      return r.actionLevee || "";
+    case "pj":
+      return (r.piecesJointes || []).map((p) => p.nom).join(" ");
     default:
       return "";
   }
@@ -66,6 +74,7 @@ export default function ReservesTablePlat({
   onModifier,
   onSupprimer,
 }) {
+  const { profile } = useAuth();
   const [largeurs, setLargeurs] = useState(chargerLargeurs);
   const [tri, setTri] = useState({ colonne: null, sens: 1 });
   const [filtres, setFiltres] = useState({});
@@ -204,7 +213,7 @@ export default function ReservesTablePlat({
     );
   }
 
-  const nbColonnes = 6 + (afficherChantier ? 1 : 0) + (peutGerer ? 1 : 0);
+  const nbColonnes = 8 + (afficherChantier ? 1 : 0) + (peutGerer ? 1 : 0);
 
   return (
     <div className="hscroll-auto" style={{ overflowX: "auto" }}>
@@ -218,6 +227,8 @@ export default function ReservesTablePlat({
           <Entete colonne="echeance">Échéance</Entete>
           <Entete colonne="statut">Statut</Entete>
           <Entete colonne="remarque">Remarque</Entete>
+          <Entete colonne="action">Action menée</Entete>
+          <Entete colonne="pj">Pièces jointes</Entete>
           {peutGerer && <th style={{ width: largeurs.actions }}></th>}
         </tr>
         <tr>
@@ -228,6 +239,8 @@ export default function ReservesTablePlat({
           <FiltreCell colonne="echeance" />
           <FiltreCell colonne="statut" />
           <FiltreCell colonne="remarque" />
+          <FiltreCell colonne="action" />
+          <FiltreCell colonne="pj" />
           {peutGerer && <th></th>}
         </tr>
       </thead>
@@ -268,6 +281,18 @@ export default function ReservesTablePlat({
               </td>
               <td data-label="Remarque">
                 <span className="simple-list-meta">{r.remarque || "—"}</span>
+              </td>
+              <td data-label="Action menée" style={{ fontFamily: "var(--font-ui)" }}>
+                {r.actionLevee || "—"}
+              </td>
+              <td data-label="Pièces jointes">
+                <PiecesJointesReserve
+                  reserveId={r.id}
+                  pieces={r.piecesJointes || []}
+                  peutAjouter
+                  peutRetirer={peutGerer}
+                  auteur={profile?.nom}
+                />
               </td>
               {peutGerer && (
                 <td>

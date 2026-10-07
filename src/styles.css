@@ -3897,3 +3897,37 @@ textarea:focus {
 .elec-lignes-table th.elec-th-figee-bord {
   padding-left: 4px;
 }
+
+/* Pièces jointes des réserves */
+.pj-reserve {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+.pj-reserve-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+}
+.pj-reserve-item a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+  font-family: var(--font-ui);
+}
+.pj-reserve-x {
+  padding: 0 6px;
+}
+.pj-reserve-ajout {
+  padding: 2px 8px;
+}
+.reserve-action-menee {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--success, #2e7d32);
+  background: var(--panel-2, rgba(0, 0, 0, 0.04));
+  font-size: 0.9em;
+}
