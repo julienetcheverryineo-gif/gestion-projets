@@ -9,9 +9,7 @@ import logoIneo from "../assets/logo-ineo.png";
 const NAV_ITEMS_AUTOMATISME = [
   { to: "/", label: "Vue d'ensemble", end: true, icone: "🏠" },
   { to: "/chantiers", label: "Chantiers", icone: "🏗️" },
-  { to: "/taches", label: "Tâches", icone: "✅" },
   { to: "/planning", label: "Planning", icone: "📅" },
-  { to: "/reserves", label: "Réserves", icone: "🧰" },
   { to: "/notes", label: "Notes", icone: "📝" },
   { to: "/aide", label: "Aide", icone: "❓" },
 ];
