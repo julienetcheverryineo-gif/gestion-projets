@@ -30,14 +30,13 @@ export function libelleTypeActivite(code) {
   return LIBELLES[c] ? LIBELLES[c] + " (" + c + ")" : c;
 }
 
-// Les types « Jxxx » ne servent pas : importés mais jamais affichés ni comptés.
+// Les types d'activité « Jxxx », « Fxxx » et « Gxxx » ne sont pas des heures :
+// importés mais jamais affichés ni comptés.
 export function estActiviteIgnoree(code) {
-  return /^J/.test(normaliser(code));
+  return /^[JFG]/.test(normaliser(code));
 }
 
-// Lignes de pointage à ne pas afficher ni compter : type d'activité « Jxxx »
-// ou tâche « F » / « G » (ce ne sont pas des heures). Importées quand même.
+// Ligne de pointage à ne pas afficher ni compter (type d'activité J, F ou G).
 export function estLigneMoIgnoree(ligne) {
-  if (estActiviteIgnoree(ligne?.typAct)) return true;
-  return /^[FG]$/.test(normaliser(ligne?.tache));
+  return estActiviteIgnoree(ligne?.typAct);
 }
