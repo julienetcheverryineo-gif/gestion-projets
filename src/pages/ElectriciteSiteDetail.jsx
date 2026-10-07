@@ -21,7 +21,8 @@ import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
 import { codeTypeFo } from "../lib/exportGoat";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
-import { exporterGoat, lignesFournitureGoat, lignesMainOeuvreGoat } from "../lib/exportGoat";
+import { lignesFournitureGoat, lignesMainOeuvreGoat } from "../lib/exportGoat";
+import { IconeAccess, IconeSap } from "../components/IconesLogiciels";
 import EnvoyerFournituresGoatModal from "../components/EnvoyerFournituresGoatModal";
 import { otpDepuisCompte } from "../lib/parseSapExports";
 import {
@@ -822,7 +823,7 @@ function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
             title="Créer les tâches de tous les devis de ce chantier dans SAP (ZCA_TACHES)"
             onClick={onEnvoyerTaches}
           >
-            📤 Tâches vers SAP
+            <IconeSap /> Tâches vers SAP
           </button>
         )}
       </div>
@@ -1818,22 +1819,13 @@ export default function ElectriciteSiteDetail() {
           </p>
         </div>
         <div className="header-actions-row">
-          {devis.length > 0 && (
-            <button
-              className="btn-ghost"
-              onClick={() => exporterGoat({ chantier, lignesChantier })}
-              title="Génère le fichier d'import GOAT (onglets Fourniture / Main d'œuvre) à partir du Récap synthèse tous devis de ce chantier"
-            >
-              Exporter GOAT
-            </button>
-          )}
           {devis.length > 0 && peutGerer && (
             <button
               className="btn-ghost"
               onClick={() => setAfficherEnvoiGoat("fourniture")}
               title="Écrit les fournitures (code/libellé SAP, budget matériel) dans la table Fourniture de la base GOAT"
             >
-              📤 Fournitures vers GOAT
+              <IconeAccess /> Fournitures vers GOAT
             </button>
           )}
           {devis.length > 0 && peutGerer && (
@@ -1842,7 +1834,7 @@ export default function ElectriciteSiteDetail() {
               onClick={() => setAfficherEnvoiGoat("mo")}
               title="Écrit la main d'œuvre (poste, libellé, heures prévues) dans la table MainOeuvre de la base GOAT"
             >
-              📤 Main d'œuvre vers GOAT
+              <IconeAccess /> Main d'œuvre vers GOAT
             </button>
           )}
           {peutGerer && (

@@ -1,3 +1,4 @@
+import { IconeAccess } from "./IconesLogiciels";
 import { useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -153,7 +154,7 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
             disabled={enCours || selection.length === 0 || !idValide || !cheminValide}
             onClick={envoyer}
           >
-            📤 Envoyer {selection.length} ligne(s) vers GOAT
+            <IconeAccess /> Envoyer {selection.length} ligne(s) vers GOAT
           </button>
         </div>
       </div>

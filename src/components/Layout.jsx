@@ -1,3 +1,4 @@
+import { IconeSap } from "./IconesLogiciels";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -21,7 +22,7 @@ const NAV_ITEMS_AUTOMATISME = [
 const NAV_ITEMS_ELECTRICITE = [
   { to: "/electricite", label: "Chantiers", end: true, icone: "🏗️" },
   { to: "/electricite/plan-de-charge", label: "Plan de charge", icone: "📊" },
-  { to: "/electricite/import-sap", label: "Import SAP", icone: "📥" },
+  { to: "/electricite/import-sap", label: "Import SAP", icone: <IconeSap /> },
 ];
 
 // Un simple reload() peut resservir une version en cache (c'est ce qui

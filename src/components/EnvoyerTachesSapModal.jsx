@@ -1,3 +1,4 @@
+import { IconeSap } from "./IconesLogiciels";
 import { useRef, useState } from "react";
 import { autoriser, choisirDossier, dossierSupporte, lireDossierMemorise } from "../lib/dossierExportSap";
 import { envoyerTachesSap, lireParamsSap } from "../lib/extractionSap";
@@ -93,7 +94,7 @@ export default function EnvoyerTachesSapModal({ compte, taches, onClose }) {
             disabled={enCours || cochees.size === 0 || !compte}
             onClick={envoyer}
           >
-            📤 Envoyer {cochees.size} tâche(s) vers SAP
+            <IconeSap /> Envoyer {cochees.size} tâche(s) vers SAP
           </button>
         </div>
       </div>
