@@ -874,7 +874,7 @@ function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
       <div className="panel-header">
-        <h2>📡 Suivi SAP — {otp}</h2>
+        <h2><IconeSap /> Suivi SAP — {otp}</h2>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <button
@@ -2002,7 +2002,7 @@ export default function ElectriciteSiteDetail() {
                 className={recapActif === "sap" ? "btn-primary" : "btn-ghost"}
                 onClick={() => setRecapActif(recapActif === "sap" ? null : "sap")}
               >
-                📡 SAP
+                <IconeSap /> SAP
               </button>
             )}
           </div>
