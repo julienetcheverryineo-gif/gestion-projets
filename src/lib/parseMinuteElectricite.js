@@ -110,6 +110,11 @@ export function analyserMinuteElectricite(arrayBuffer) {
 
   const sequence = [];
   let ordre = 0;
+  // Quantité de chaque poste ouvert, par niveau (principal, secondaire...).
+  // Les montants et heures des lignes du fichier sont pour UNE unité du
+  // poste : on les multiplie par le produit des quantités des postes
+  // parents (ex. poste secondaire x3 dans un principal x2 -> x6).
+  const quantitesPostes = [];
   for (let i = iEntete + 1; i < rows.length; i++) {
     const ligne = rows[i];
     const numero = texte(ligne, c.numero);
@@ -119,6 +124,9 @@ export function analyserMinuteElectricite(arrayBuffer) {
 
     if (RE_CODE.test(numero)) {
       const profondeur = (numero.match(/\./g) || []).length;
+      const quantitePoste = nombre(ligne, c.quantite);
+      quantitesPostes[profondeur] = quantitePoste > 0 ? quantitePoste : 1;
+      quantitesPostes.length = profondeur + 1;
       sequence.push({
         estPoste: true,
         code: numero,
@@ -138,6 +146,7 @@ export function analyserMinuteElectricite(arrayBuffer) {
     const tempsUnitaire = nombre(ligne, c.tempsUnitaire);
     const coutUnitaireFo = nombre(ligne, c.coutUnitaireFo);
     const pvUnitaire = nombre(ligne, c.pvUnitaire);
+    const facteurPoste = quantitesPostes.reduce((p, q) => p * (q || 1), 1);
 
     // Ligne sans description : on l'importe quand même si elle porte une
     // vraie information (unité, référence, quantité ou montant non nuls),
@@ -174,13 +183,14 @@ export function analyserMinuteElectricite(arrayBuffer) {
       quantite,
       typeFo,
       coutUnitaireFo,
-      coutTotalFo: c.coutTotalFo >= 0 ? nombre(ligne, c.coutTotalFo) : coutUnitaireFo * quantite,
+      facteurPoste,
+      coutTotalFo: (c.coutTotalFo >= 0 ? nombre(ligne, c.coutTotalFo) : coutUnitaireFo * quantite) * facteurPoste,
       typeMo,
       tempsUnitaire,
       tempsTotalHeures:
-        c.tempsTotalHeures >= 0 ? nombre(ligne, c.tempsTotalHeures) : tempsUnitaire * quantite,
+        (c.tempsTotalHeures >= 0 ? nombre(ligne, c.tempsTotalHeures) : tempsUnitaire * quantite) * facteurPoste,
       pvUnitaire,
-      pvTotal: c.pvTotal >= 0 ? nombre(ligne, c.pvTotal) : pvUnitaire * quantite,
+      pvTotal: (c.pvTotal >= 0 ? nombre(ligne, c.pvTotal) : pvUnitaire * quantite) * facteurPoste,
       informative,
       sansDesignation,
       gris: grisDeLigne(i),

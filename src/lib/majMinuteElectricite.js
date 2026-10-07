@@ -57,6 +57,7 @@ export function champsDocumentLigne(ligne) {
     tempsTotalHeures: ligne.tempsTotalHeures || 0,
     pvUnitaire: ligne.pvUnitaire || 0,
     pvTotal: ligne.pvTotal || 0,
+    facteurPoste: ligne.facteurPoste || 1,
     informative: ligne.informative || false,
     avancementFo: 0,
     avancementMo: 0,
