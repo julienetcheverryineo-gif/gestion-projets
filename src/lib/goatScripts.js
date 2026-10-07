@@ -11,8 +11,8 @@
 export const PROTOCOLE_GOAT = "ineo-goat";
 export const CHEMIN_GOAT_DEFAUT = "C:\\GOAT\\0.21.0\\goat.accdb";
 
-export function construireUrlGoat() {
-  return `${PROTOCOLE_GOAT}://run?m=fourniture`;
+export function construireUrlGoat(mode = "fourniture") {
+  return `${PROTOCOLE_GOAT}://run?m=${mode === "mo" ? "mo" : "fourniture"}`;
 }
 
 const GESTIONNAIRE_GOAT = String.raw`
@@ -147,7 +147,8 @@ End Function
 Sub Principal()
   Dim url, chemin, txt, lignes, i, parts, affaire, rs, numAffaire, cmsg
   Dim typeId, code, lib, montant, tentatives, k, ok, errSql, idExistant, maxId
-  Dim nbAjout, nbMaj, cn, sauv, x86, cols, vals
+  Dim nbAjout, nbMaj, cn, sauv, x86, cols, vals, mode
+  Dim tTable, tId, tCode, tLib, tMont, nbParts, motifCode, majType, setType
 
   url = ""
   If WScript.Arguments.Count >= 1 Then url = WScript.Arguments(0)
@@ -156,7 +157,21 @@ Sub Principal()
   End If
   ' Le navigateur peut ajouter un "/" (ineo-goat://run/?m=fourniture) : on ne
   ' controle que le protocole et le parametre m.
-  If LCase(Left(url, 10)) <> "ineo-goat:" Or InStr(url, "?m=fourniture") = 0 Then Echec "Lien GOAT invalide : " & Left(url, 60)
+  If LCase(Left(url, 10)) <> "ineo-goat:" Then Echec "Lien GOAT invalide : " & Left(url, 60)
+  If InStr(url, "?m=fourniture") > 0 Then
+    mode = "fourniture"
+  ElseIf InStr(url, "?m=mo") > 0 Then
+    mode = "mo"
+  Else
+    Echec "Lien GOAT invalide : " & Left(url, 60)
+  End If
+  If mode = "fourniture" Then
+    tTable = "Fourniture" : tId = "FournitureID" : tCode = "Code" : tLib = "Libelle" : tMont = "MontantBudg"
+    nbParts = 3 : motifCode = "^[A-Za-z0-9._-]{1,25}$"
+  Else
+    tTable = "MainOeuvre" : tId = "MainOeuvreID" : tCode = "SegmentCode" : tLib = "SegmentLibelle" : tMont = "HeuresBudget"
+    nbParts = 2 : motifCode = "^[A-Za-z0-9._ -]{1,50}$"
+  End If
 
   Statut "EN_COURS", "Lecture du lot"
   If Not fso.FileExists(EXPO & "goat-entree.txt") Then Echec "Fichier goat-entree.txt introuvable."
@@ -179,11 +194,15 @@ Sub Principal()
   For i = 2 To UBound(lignes)
     If Trim(lignes(i)) <> "" Then
       parts = Split(lignes(i), vbTab)
-      If UBound(parts) <> 3 Then Echec "Ligne " & (i - 1) & " invalide."
-      If Not Valide("^[12]$", Trim(parts(0))) Then Echec "TypeID invalide ligne " & (i - 1) & "."
-      If Not Valide("^[A-Za-z0-9._-]{1,25}$", Trim(parts(1))) Then Echec "Code invalide ligne " & (i - 1) & " : " & Left(parts(1), 30)
-      If Len(parts(2)) > 255 Or Valide("[\x00-\x08\x0B-\x1F]", parts(2)) Then Echec "Libelle invalide ligne " & (i - 1) & "."
-      If Not Valide("^-?[0-9]{1,12}(\.[0-9]{1,4})?$", Trim(parts(3))) Then Echec "Montant invalide ligne " & (i - 1) & "."
+      If UBound(parts) <> nbParts Then Echec "Ligne " & (i - 1) & " invalide."
+      k = 0
+      If mode = "fourniture" Then
+        If Not Valide("^[12]$", Trim(parts(0))) Then Echec "TypeID invalide ligne " & (i - 1) & "."
+        k = 1
+      End If
+      If Not Valide(motifCode, Trim(parts(k))) Then Echec "Code invalide ligne " & (i - 1) & " : " & Left(parts(k), 30)
+      If Len(parts(k + 1)) > 255 Or Valide("[\x00-\x08\x0B-\x1F]", parts(k + 1)) Then Echec "Libelle invalide ligne " & (i - 1) & "."
+      If Not Valide("^-?[0-9]{1,12}(\.[0-9]{1,4})?$", Trim(parts(k + 2))) Then Echec "Montant ou heures invalide ligne " & (i - 1) & "."
     End If
   Next
 
@@ -222,35 +241,48 @@ Sub Principal()
   For i = 2 To UBound(lignes)
     If Trim(lignes(i)) <> "" Then
       parts = Split(lignes(i), vbTab)
-      typeId = Trim(parts(0)) : code = Trim(parts(1)) : lib = parts(2) : montant = Trim(parts(3))
+      typeId = ""
+      If mode = "fourniture" Then
+        typeId = Trim(parts(0)) : code = Trim(parts(1)) : lib = parts(2) : montant = Trim(parts(3))
+      Else
+        code = Trim(parts(0)) : lib = parts(1) : montant = Trim(parts(2))
+      End If
       Statut "EN_COURS", "Ecriture " & (i - 1) & "/" & (UBound(lignes) - 1) & " : " & code
 
       idExistant = ""
-      Set rs = cn.Execute("SELECT FournitureID FROM Fourniture WHERE AffaireID=" & affaire & " AND Code='" & Sq(code) & "'")
+      Set rs = cn.Execute("SELECT " & tId & " FROM " & tTable & " WHERE AffaireID=" & affaire & " AND " & tCode & "='" & Sq(code) & "'")
       If Not rs.EOF Then idExistant = CStr(rs.Fields(0).Value)
       rs.Close
 
       If idExistant <> "" Then
-        ok = Executer(cn, "UPDATE Fourniture SET TypeID=" & typeId & ", Libelle='" & Sq(lib) & "', MontantBudg=" & montant & " WHERE FournitureID=" & idExistant, errSql)
+        setType = ""
+        If typeId <> "" Then setType = "TypeID=" & typeId & ", "
+        ok = Executer(cn, "UPDATE " & tTable & " SET " & setType & tLib & "='" & Sq(lib) & "', " & tMont & "=" & montant & " WHERE " & tId & "=" & idExistant, errSql)
         If Not ok Then
           cn.Close
           Echec "Mise a jour de " & code & " impossible : " & errSql & sauv
         End If
         nbMaj = nbMaj + 1
       Else
-        ' Insertion : 5 champs. Si la base exige un identifiant ou l'horodatage
-        ' technique (SSMA_TimeStamp), on les fournit aux tentatives suivantes.
-        Set rs = cn.Execute("SELECT MAX(FournitureID) FROM Fourniture")
+        ' Insertion : champs utiles seulement. Si la base exige un identifiant
+        ' ou l'horodatage technique (SSMA_TimeStamp), on les fournit aux
+        ' tentatives suivantes.
+        Set rs = cn.Execute("SELECT MAX(" & tId & ") FROM " & tTable)
         maxId = 0
         If Not IsNull(rs.Fields(0).Value) Then maxId = CLng(rs.Fields(0).Value)
         rs.Close
-        cols = "AffaireID, TypeID, Code, Libelle, MontantBudg"
-        vals = affaire & ", " & typeId & ", '" & Sq(code) & "', '" & Sq(lib) & "', " & montant
+        If typeId <> "" Then
+          cols = "AffaireID, TypeID, " & tCode & ", " & tLib & ", " & tMont
+          vals = affaire & ", " & typeId & ", '" & Sq(code) & "', '" & Sq(lib) & "', " & montant
+        Else
+          cols = "AffaireID, " & tCode & ", " & tLib & ", " & tMont
+          vals = affaire & ", '" & Sq(code) & "', '" & Sq(lib) & "', " & montant
+        End If
         tentatives = Array( _
-          "INSERT INTO Fourniture (" & cols & ") VALUES (" & vals & ")", _
-          "INSERT INTO Fourniture (FournitureID, " & cols & ") VALUES (" & (maxId + 1) & ", " & vals & ")", _
-          "INSERT INTO Fourniture (" & cols & ", SSMA_TimeStamp) SELECT TOP 1 " & vals & ", SSMA_TimeStamp FROM Fourniture", _
-          "INSERT INTO Fourniture (FournitureID, " & cols & ", SSMA_TimeStamp) SELECT TOP 1 " & (maxId + 1) & ", " & vals & ", SSMA_TimeStamp FROM Fourniture")
+          "INSERT INTO " & tTable & " (" & cols & ") VALUES (" & vals & ")", _
+          "INSERT INTO " & tTable & " (" & tId & ", " & cols & ") VALUES (" & (maxId + 1) & ", " & vals & ")", _
+          "INSERT INTO " & tTable & " (" & cols & ", SSMA_TimeStamp) SELECT TOP 1 " & vals & ", SSMA_TimeStamp FROM " & tTable, _
+          "INSERT INTO " & tTable & " (" & tId & ", " & cols & ", SSMA_TimeStamp) SELECT TOP 1 " & (maxId + 1) & ", " & vals & ", SSMA_TimeStamp FROM " & tTable)
         ok = False
         For k = 0 To UBound(tentatives)
           If Executer(cn, tentatives(k), errSql) Then
@@ -267,7 +299,7 @@ Sub Principal()
     End If
   Next
   cn.Close
-  Statut "OK", nbAjout & " ligne(s) ajoutee(s), " & nbMaj & " mise(s) a jour dans Fourniture (affaire GOAT " & affaire & " - " & numAffaire & ")." & sauv
+  Statut "OK", nbAjout & " ligne(s) ajoutee(s), " & nbMaj & " mise(s) a jour dans " & tTable & " (affaire GOAT " & affaire & " - " & numAffaire & ")." & sauv
 End Sub
 
 Principal

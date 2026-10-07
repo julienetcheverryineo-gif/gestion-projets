@@ -20,7 +20,8 @@ function cheminMemorise() {
 // Envoi des lignes Fourniture du chantier (une par type de FO) vers la table
 // Fourniture de la base GOAT, via le gestionnaire installé sur le poste.
 // Une ligne existante (même AffaireID + Code) est mise à jour, sinon ajoutée.
-export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lignes, onClose }) {
+export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lignes, mode = "fourniture", onClose }) {
+  const estMo = mode === "mo";
   const [affaireId, setAffaireId] = useState(String(chantier?.affaireIdGoat ?? ""));
   const [chemin, setChemin] = useState(cheminMemorise);
   const [cochees, setCochees] = useState(() => new Set(lignes.map((l) => l.code)));
@@ -71,6 +72,7 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
       cheminBase: chemin,
       affaireId: affaireId.trim(),
       lignes: selection,
+      mode,
       onEtat: setEtat,
       estAnnule: () => annule.current,
     });
@@ -79,11 +81,21 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
   return (
     <div className="modal-backdrop" onClick={enCours ? undefined : onClose}>
       <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
-        <h2>Envoyer les fournitures vers GOAT</h2>
+        <h2>{estMo ? "Envoyer la main d'œuvre vers GOAT" : "Envoyer les fournitures vers GOAT"}</h2>
         <p className="simple-list-meta" style={{ marginBottom: 10 }}>
-          Table <strong>Fourniture</strong> de la base GOAT : AffaireID, TypeID (1 fourniture, 2 sous-traitant),
-          Code et Libellé SAP, Budget matériel. Une ligne déjà présente (même affaire + même code) est mise à jour.
-          Une copie de sauvegarde de la base est faite avant l'écriture.
+          {estMo ? (
+            <>
+              Table <strong>MainOeuvre</strong> de la base GOAT : AffaireID, SegmentCode (poste, 8 caractères),
+              SegmentLibelle, HeuresBudget (heures prévues).
+            </>
+          ) : (
+            <>
+              Table <strong>Fourniture</strong> de la base GOAT : AffaireID, TypeID (1 fourniture, 2 sous-traitant),
+              Code et Libellé SAP, Budget matériel.
+            </>
+          )}{" "}
+          Une ligne déjà présente (même affaire + même code) est mise à jour. Une copie de sauvegarde de la base
+          est faite avant l'écriture.
         </p>
         <div className="form-inline" style={{ marginBottom: 10 }}>
           <label>
@@ -102,17 +114,19 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
           </label>
         </div>
         {lignes.length === 0 ? (
-          <p className="simple-list-meta">Aucun budget matériel par type de FO dans les devis de ce chantier.</p>
+          <p className="simple-list-meta">Aucune donnée à envoyer dans les devis de ce chantier.</p>
         ) : (
           <div style={{ maxHeight: "40vh", overflow: "auto", marginBottom: 10 }}>
             {lignes.map((l) => (
               <label key={l.code} className="team-checklist-item">
                 <input type="checkbox" disabled={enCours} checked={cochees.has(l.code)} onChange={() => bascule(l.code)} />
                 <span style={{ width: 70, display: "inline-block" }}>{l.code}</span>
-                <span style={{ width: 24, display: "inline-block" }} title={l.typeId === 2 ? "Sous-traitant" : "Fourniture"}>
-                  {l.typeId}
-                </span>
-                {l.libelle} — {formatEuro(l.budget)} €
+                {!estMo && (
+                  <span style={{ width: 24, display: "inline-block" }} title={l.typeId === 2 ? "Sous-traitant" : "Fourniture"}>
+                    {l.typeId}
+                  </span>
+                )}
+                {l.libelle} — {estMo ? formatEuro(l.heures) + " h" : formatEuro(l.budget) + " €"}
               </label>
             ))}
           </div>

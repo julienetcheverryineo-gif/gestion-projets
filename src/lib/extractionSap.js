@@ -198,7 +198,7 @@ export async function envoyerTachesSap({ handle, params, compte, taches, onEtat,
 // Envoi des lignes Fourniture vers la base GOAT (Access) : même principe que
 // les tâches SAP (lot UTF-16 dans le dossier d'export, lien ineo-goat://,
 // compte rendu dans statut-goat.txt).
-export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, lignes, onEtat, estAnnule }) {
+export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, lignes, mode = "fourniture", onEtat, estAnnule }) {
   try {
     if ((await handle.requestPermission({ mode: "readwrite" })) !== "granted") {
       return onEtat({ phase: "erreur", message: "Écriture dans le dossier d'export refusée." });
@@ -210,7 +210,12 @@ export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, li
       String(affaireId).trim() +
       "\r\n" +
       lignes
-        .map((l) => [l.typeId, nettoie(l.code), nettoie(l.libelle), Number(l.budget).toFixed(2)].join("\t"))
+        .map((l) =>
+          (mode === "mo"
+            ? [nettoie(l.code), nettoie(l.libelle), Number(l.heures).toFixed(2)]
+            : [l.typeId, nettoie(l.code), nettoie(l.libelle), Number(l.budget).toFixed(2)]
+          ).join("\t")
+        )
         .join("\r\n") +
       "\r\n";
     const octets = new Uint8Array(2 + texte.length * 2);
@@ -230,7 +235,7 @@ export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, li
   }
   const t0 = Date.now();
   onEtat({ phase: "attente", message: "Envoi vers GOAT : lancement…" });
-  ouvrirLien(construireUrlGoat());
+  ouvrirLien(construireUrlGoat(mode));
   while (!estAnnule() && Date.now() < t0 + 3 * 60 * 1000) {
     await new Promise((r) => setTimeout(r, 1000));
     const st = await lireFichier(handle, "statut-goat.txt");

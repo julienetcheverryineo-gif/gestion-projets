@@ -134,6 +134,19 @@ export function lignesFournitureGoat(lignesChiffrables) {
   });
 }
 
+// Lignes Main d'œuvre à écrire dans GOAT (fichier d'import ou table
+// MainOeuvre de la base) : une par Type de FO, Poste = résumé 8 caractères du
+// libellé, heures = somme des heures prévues.
+export function lignesMainOeuvreGoat(lignesChiffrables) {
+  const parCode = new Map();
+  sommeParTypeFo(lignesChiffrables, "tempsTotalHeures").forEach((t) => {
+    const code = resumerPoste(t.libelle) || String(t.code).slice(0, 8);
+    if (parCode.has(code)) parCode.get(code).heures += t.valeur;
+    else parCode.set(code, { code, libelle: String(t.libelle || t.code).trim().slice(0, 255), heures: t.valeur });
+  });
+  return [...parCode.values()].map((m) => ({ ...m, heures: Math.round(m.heures * 100) / 100 }));
+}
+
 function feuilleAvecEntetes(lignes, entetes) {
   if (lignes.length === 0) return XLSX.utils.aoa_to_sheet([entetes]);
   return XLSX.utils.json_to_sheet(lignes, { header: entetes });
@@ -173,10 +186,10 @@ export function exporterGoat({ chantier, lignesChantier }) {
     Commentaires: 0,
   }));
 
-  const mainOeuvre = sommeParTypeFo(lignesChiffrables, "tempsTotalHeures").map((t) => ({
-    "Poste ": resumerPoste(t.libelle),
-    Libellé: t.libelle,
-    "Budget H": t.valeur,
+  const mainOeuvre = lignesMainOeuvreGoat(lignesChiffrables).map((m) => ({
+    "Poste ": m.code,
+    Libellé: m.libelle,
+    "Budget H": m.heures,
     Réalisé: 0,
     RAE: 0,
     EAT: 0,
