@@ -110,6 +110,30 @@ function sommeParTypeFo(lignes, champValeur, normaliserCode) {
   );
 }
 
+// Types de FO de sous-traitance / co-traitance (TypeID GOAT = 2) : les
+// familles STOR/STIN/STPD/COT et leurs sous-codes (70-79, 80-85, 90-95).
+export function estSousTraitance(code) {
+  const c = String(code || "").trim().toUpperCase();
+  if (/^(STOR|STIN|STPD|COT\d?)$/.test(c)) return true;
+  const n = /^\d+$/.test(c) ? Number(c) : null;
+  return n != null && ((n >= 70 && n <= 85) || (n >= 90 && n <= 95));
+}
+
+// Lignes Fourniture à écrire dans GOAT (fichier d'import ou table Fourniture
+// de la base) : une par Type de FO, code/libellé SAP quand une correspondance
+// existe, budget = somme du coût total FO. typeId : 1 fourniture, 2 sous-traitant.
+export function lignesFournitureGoat(lignesChiffrables) {
+  return sommeParTypeFo(lignesChiffrables, "coutTotalFo", codeParentFourniture).map((t) => {
+    const sap = SAP_PAR_CODE_QDV.get(t.code);
+    return {
+      typeId: estSousTraitance(t.code) ? 2 : 1,
+      code: String(sap ? sap.codeSap : t.code).trim(),
+      libelle: String(sap ? sap.libelleSap : t.libelle).trim(),
+      budget: Math.round(t.valeur * 100) / 100,
+    };
+  });
+}
+
 function feuilleAvecEntetes(lignes, entetes) {
   if (lignes.length === 0) return XLSX.utils.aoa_to_sheet([entetes]);
   return XLSX.utils.json_to_sheet(lignes, { header: entetes });
@@ -134,23 +158,20 @@ function feuilleAvecEntetes(lignes, entetes) {
 export function exporterGoat({ chantier, lignesChantier }) {
   const lignesChiffrables = lignesChantier.filter((l) => !l.estPoste);
 
-  const fournitures = sommeParTypeFo(lignesChiffrables, "coutTotalFo", codeParentFourniture).map((t) => {
-    const sap = SAP_PAR_CODE_QDV.get(t.code);
-    return {
-      Type: "Fourniture",
-      "Besoin / GO": sap ? sap.codeSap : t.code,
-      Libellé: sap ? sap.libelleSap : t.libelle,
-      "Budget €": t.valeur,
-      Devis: 0,
-      Réalisé: 0,
-      "Gain potentiel": 0,
-      RAE: 0,
-      EAT: 0,
-      "Boni Mali": 0,
-      "Achat prévu": 0,
-      Commentaires: 0,
-    };
-  });
+  const fournitures = lignesFournitureGoat(lignesChiffrables).map((f) => ({
+    Type: f.typeId === 2 ? "Sous-Traitance" : "Fourniture",
+    "Besoin / GO": f.code,
+    Libellé: f.libelle,
+    "Budget €": f.budget,
+    Devis: 0,
+    Réalisé: 0,
+    "Gain potentiel": 0,
+    RAE: 0,
+    EAT: 0,
+    "Boni Mali": 0,
+    "Achat prévu": 0,
+    Commentaires: 0,
+  }));
 
   const mainOeuvre = sommeParTypeFo(lignesChiffrables, "tempsTotalHeures").map((t) => ({
     "Poste ": resumerPoste(t.libelle),

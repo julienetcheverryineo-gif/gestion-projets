@@ -1,3 +1,4 @@
+import { genererGestionnaireGoat, PROTOCOLE_GOAT } from "./goatScripts";
 // Pilotage de SAP GUI (extraction des achats ME2J et des pointages CATS
 // ZCAT3) par VBScript.
 //
@@ -1295,14 +1296,15 @@ export function genererGestionnaire() {
 // écrit le gestionnaire dans %USERPROFILE%\PilotageSAP et déclare le lien
 // ineo-sap:// pour l'utilisateur courant (HKCU).
 export function genererInstallateur() {
-  const lignes = genererGestionnaire()
-    .split("\r\n")
-    .map((l) => `f.WriteLine "${l.replace(/"/g, '""')}"`);
+  const ecrire = (texte) =>
+    texte.split("\r\n").map((l) => `f.WriteLine "${l.replace(/"/g, '""')}"`);
+  const lignes = ecrire(genererGestionnaire());
+  const lignesGoat = ecrire(genererGestionnaireGoat());
   return [
     "' Installation de Pilotage SAP sur ce poste (une seule fois).",
     "' Cree %USERPROFILE%\\PilotageSAP et declare le lien " + PROTOCOLE_SAP + ":// pour l'utilisateur courant.",
     "Option Explicit",
-    "Dim wsh, fso, base, expo, hand, f",
+    "Dim wsh, fso, base, expo, hand, handGoat, f",
     'Set wsh = CreateObject("WScript.Shell")',
     'Set fso = CreateObject("Scripting.FileSystemObject")',
     'base = wsh.ExpandEnvironmentStrings("%USERPROFILE%") & "\\PilotageSAP"',
@@ -1313,6 +1315,13 @@ export function genererInstallateur() {
     "Set f = fso.CreateTextFile(hand, True, False)",
     ...lignes,
     "f.Close",
+    'handGoat = base & "\\pilotage-goat.vbs"',
+    "Set f = fso.CreateTextFile(handGoat, True, False)",
+    ...lignesGoat,
+    "f.Close",
+    `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_GOAT}\\", "URL:Pilotage GOAT", "REG_SZ"`,
+    `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_GOAT}\\URL Protocol", "", "REG_SZ"`,
+    `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_GOAT}\\shell\\open\\command\\", "wscript.exe """ & handGoat & """ ""%1""", "REG_SZ"`,
     `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_SAP}\\", "URL:Pilotage SAP", "REG_SZ"`,
     `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_SAP}\\URL Protocol", "", "REG_SZ"`,
     `wsh.RegWrite "HKCU\\Software\\Classes\\${PROTOCOLE_SAP}\\shell\\open\\command\\", "wscript.exe """ & hand & """ ""%1""", "REG_SZ"`,

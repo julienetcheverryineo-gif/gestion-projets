@@ -7,6 +7,7 @@ import {
   validerParametres,
 } from "./sapScripts";
 import { lireFichier, ouvrirLien } from "./dossierExportSap";
+import { construireUrlGoat } from "./goatScripts";
 import { importerExportSap } from "./importSapAuto";
 
 const CLE_PARAMS = "scriptsSapParams";
@@ -192,4 +193,54 @@ export async function envoyerTachesSap({ handle, params, compte, taches, onEtat,
     }
   }
   if (!estAnnule()) onEtat({ phase: "erreur", message: "Délai dépassé (gestionnaire SAP installé et à jour ?)." });
+}
+
+// Envoi des lignes Fourniture vers la base GOAT (Access) : même principe que
+// les tâches SAP (lot UTF-16 dans le dossier d'export, lien ineo-goat://,
+// compte rendu dans statut-goat.txt).
+export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, lignes, onEtat, estAnnule }) {
+  try {
+    if ((await handle.requestPermission({ mode: "readwrite" })) !== "granted") {
+      return onEtat({ phase: "erreur", message: "Écriture dans le dossier d'export refusée." });
+    }
+    const nettoie = (v) => String(v ?? "").replace(/[\t\r\n]+/g, " ");
+    const texte =
+      cheminBase.trim() +
+      "\r\n" +
+      String(affaireId).trim() +
+      "\r\n" +
+      lignes
+        .map((l) => [l.typeId, nettoie(l.code), nettoie(l.libelle), Number(l.budget).toFixed(2)].join("\t"))
+        .join("\r\n") +
+      "\r\n";
+    const octets = new Uint8Array(2 + texte.length * 2);
+    octets[0] = 0xff;
+    octets[1] = 0xfe;
+    for (let i = 0; i < texte.length; i++) {
+      const c = texte.charCodeAt(i);
+      octets[2 + i * 2] = c & 0xff;
+      octets[3 + i * 2] = c >> 8;
+    }
+    const fh = await handle.getFileHandle("goat-entree.txt", { create: true });
+    const w = await fh.createWritable();
+    await w.write(octets);
+    await w.close();
+  } catch (e) {
+    return onEtat({ phase: "erreur", message: "Préparation impossible : " + e.message });
+  }
+  const t0 = Date.now();
+  onEtat({ phase: "attente", message: "Envoi vers GOAT : lancement…" });
+  ouvrirLien(construireUrlGoat());
+  while (!estAnnule() && Date.now() < t0 + 3 * 60 * 1000) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const st = await lireFichier(handle, "statut-goat.txt");
+    if (st && st.modifieLe >= t0 - 2000) {
+      const [c, ...reste] = st.texte.split(/\r?\n/);
+      const detail = reste.join(" ").trim();
+      if (c.trim() === "OK") return onEtat({ phase: "ok", message: detail });
+      if (c.trim() === "ERREUR") return onEtat({ phase: "erreur", message: detail || "Échec de l'envoi." });
+      onEtat({ phase: "attente", message: "Envoi vers GOAT : " + (detail || "en cours…") });
+    }
+  }
+  if (!estAnnule()) onEtat({ phase: "erreur", message: "Délai dépassé (gestionnaire GOAT installé et à jour ?)." });
 }

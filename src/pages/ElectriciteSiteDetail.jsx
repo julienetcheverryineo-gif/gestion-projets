@@ -21,7 +21,8 @@ import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
 import { codeTypeFo } from "../lib/exportGoat";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
-import { exporterGoat } from "../lib/exportGoat";
+import { exporterGoat, lignesFournitureGoat } from "../lib/exportGoat";
+import EnvoyerFournituresGoatModal from "../components/EnvoyerFournituresGoatModal";
 import { otpDepuisCompte } from "../lib/parseSapExports";
 import {
   AFFECTATION_HORS_BUDGET,
@@ -1424,6 +1425,7 @@ export default function ElectriciteSiteDetail() {
   const [afficherGroupeModal, setAfficherGroupeModal] = useState(false);
   const [afficherTaches, setAfficherTaches] = useState(false);
   const [afficherEnvoiSap, setAfficherEnvoiSap] = useState(false);
+  const [afficherEnvoiGoat, setAfficherEnvoiGoat] = useState(false);
   const tachesFo = chantier?.tachesFo || LISTE_TYPES_FO;
   const [groupesOuverts, setGroupesOuverts] = useState(new Set());
   const groupesDuDevis = devisOuvert
@@ -1823,6 +1825,15 @@ export default function ElectriciteSiteDetail() {
               title="Génère le fichier d'import GOAT (onglets Fourniture / Main d'œuvre) à partir du Récap synthèse tous devis de ce chantier"
             >
               Exporter GOAT
+            </button>
+          )}
+          {devis.length > 0 && peutGerer && (
+            <button
+              className="btn-ghost"
+              onClick={() => setAfficherEnvoiGoat(true)}
+              title="Écrit les fournitures (code/libellé SAP, budget matériel) dans la table Fourniture de la base GOAT"
+            >
+              📤 Fournitures vers GOAT
             </button>
           )}
           {peutGerer && (
@@ -2247,6 +2258,15 @@ export default function ElectriciteSiteDetail() {
           devisExistants={devis}
           toutesLignes={toutesLignes}
           onClose={() => setAfficherImport(false)}
+        />
+      )}
+
+      {afficherEnvoiGoat && (
+        <EnvoyerFournituresGoatModal
+          chantierId={chantierId}
+          chantier={chantier}
+          lignes={lignesFournitureGoat(lignesChantier)}
+          onClose={() => setAfficherEnvoiGoat(false)}
         />
       )}
 
