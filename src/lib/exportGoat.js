@@ -52,7 +52,7 @@ export function codeTypeFo(typeFo) {
   const m = typeFo.match(/^(.*?)\s*\[/);
   return (m ? m[1] : typeFo).trim();
 }
-function libelleTypeFo(typeFo) {
+export function libelleTypeFo(typeFo) {
   if (!typeFo) return "";
   const m = typeFo.match(/\[([^\]]*)\]/);
   return (m ? m[1] : typeFo).trim();
@@ -60,7 +60,7 @@ function libelleTypeFo(typeFo) {
 
 // "Automatisme & Contrôle" -> "AUTOMATI" : 8 caractères max, majuscules,
 // sans accents ni ponctuation — résumé du Poste (onglet Main d'œuvre).
-function resumerPoste(libelle) {
+export function resumerPoste(libelle) {
   return (libelle || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -134,13 +134,20 @@ export function lignesFournitureGoat(lignesChiffrables) {
   });
 }
 
+// Code MO à 8 caractères (SAP tâche + GOAT) : valeur saisie si elle existe,
+// sinon le résumé du libellé. Majuscules, lettres/chiffres, 8 max.
+export function codeMo(saisi, defaut) {
+  const net = String(saisi ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  return net || String(defaut || "");
+}
+
 // Lignes Main d'œuvre à écrire dans GOAT (fichier d'import ou table
 // MainOeuvre de la base) : une par Type de FO, Poste = résumé 8 caractères du
 // libellé, heures = somme des heures prévues.
-export function lignesMainOeuvreGoat(lignesChiffrables, lignesSup = []) {
+export function lignesMainOeuvreGoat(lignesChiffrables, lignesSup = [], codesMo = {}) {
   const parCode = new Map();
   sommeParTypeFo(lignesChiffrables, "tempsTotalHeures").forEach((t) => {
-    const code = resumerPoste(t.libelle) || String(t.code).slice(0, 8);
+    const code = codeMo(codesMo[t.code], resumerPoste(t.libelle) || String(t.code).slice(0, 8));
     if (parCode.has(code)) parCode.get(code).heures += t.valeur;
     else parCode.set(code, { code, libelle: String(t.libelle || t.code).trim().slice(0, 255), heures: t.valeur });
   });
@@ -148,7 +155,7 @@ export function lignesMainOeuvreGoat(lignesChiffrables, lignesSup = []) {
   lignesSup
     .filter((t) => t.budget > 0)
     .forEach((t) => {
-      const code = resumerPoste(t.libelle) || "TACHE";
+      const code = codeMo(codesMo[t.cle], resumerPoste(t.libelle) || "TACHE");
       if (parCode.has(code)) parCode.get(code).heures += t.budget;
       else parCode.set(code, { code, libelle: String(t.libelle).trim().slice(0, 255), heures: t.budget });
     });

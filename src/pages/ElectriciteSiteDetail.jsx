@@ -19,7 +19,7 @@ import { libelleTypeActivite, estLigneMoIgnoree } from "../lib/typesActiviteSap"
 import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
-import { codeTypeFo } from "../lib/exportGoat";
+import { codeTypeFo, codeMo, libelleTypeFo, resumerPoste } from "../lib/exportGoat";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 import { lignesFournitureGoat, lignesMainOeuvreGoat } from "../lib/exportGoat";
 import { IconeAccess, IconeSap } from "../components/IconesLogiciels";
@@ -250,7 +250,7 @@ function calculerAchats(lignes, ordreTypes) {
 function TableauRecap({
   titre,
   sousTitre,
-  recap,
+  recap: recapBrut,
   uniteValeur,
   libelleValeur,
   modifiable,
@@ -262,6 +262,8 @@ function TableauRecap({
   onModifierOrdre,
   sap,
   sup,
+  codesMo,
+  onChangerCodeMo,
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Lignes SAP dépliées (clé d'un Type de FO, ou "__hors" / "__mo").
@@ -281,9 +283,35 @@ function TableauRecap({
   const sapFo = sap?.type === "fo" ? sap.achats : null;
   const sapMo = sap?.type === "mo" ? sap.heures : null;
   const aSap = Boolean(sapFo || sapMo);
+  const avecCode = uniteValeur === "h";
+  // Tâches complémentaires : réalisé = heures SAP réaffectées, % = réel / budget.
+  const recap = (() => {
+    if (!sapMo) return recapBrut;
+    let supReel = 0;
+    const parType = recapBrut.parType.map((l) => {
+      if (!l.sup) return l;
+      const reel = sapMo.parCle.get(l.cle)?.reel || 0;
+      supReel += reel;
+      return { ...l, realise: reel, restant: l.budget - reel, pctAvancement: l.budget > 0 ? reel / l.budget : 0 };
+    });
+    const t = recapBrut.total;
+    const realise = t.realise + supReel;
+    return {
+      parType,
+      total: { ...t, realise, restant: t.restant - supReel, pctAvancement: t.budget > 0 ? realise / t.budget : 0 },
+    };
+  })();
+  const codeAffiche = (l) =>
+    l.sup
+      ? codeMo(codesMo?.[l.cle], resumerPoste(l.libelle) || "TACHE")
+      : l.cle
+      ? codeMo(codesMo?.[codeTypeFo(l.cle)], resumerPoste(libelleTypeFo(l.cle)) || String(codeTypeFo(l.cle)).slice(0, 8))
+      : "";
+  const clePourCode = (l) => (l.sup ? l.cle : codeTypeFo(l.cle));
+  const codesUtilises = recap.parType.map(codeAffiche).filter(Boolean);
   const libType = uniteValeur === "h" ? "Tâche" : "Type de FO";
   const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
-  const nbColonnes = 6 + (aSap ? 3 : 0);
+  const nbColonnes = 6 + (aSap ? 3 : 0) + (avecCode ? 1 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
   // Détail des lignes d'achat SAP d'un type (ou hors budget) : chaque ligne
   // peut être réaffectée à un autre Type de FO du budget, ou laissée hors
@@ -423,6 +451,11 @@ function TableauRecap({
                 <th className="col-type" style={{ width: largeurColType }}>
                   {libType}
                 </th>
+                {avecCode && (
+                  <th className="col-code" title="Code à 8 caractères : tâche SAP et poste GOAT">
+                    Code
+                  </th>
+                )}
                 <th className="col-num">{libelleValeur}</th>
                 <th className="col-num">Réalisé (avancement)</th>
                 <th className="col-avancement">% avancement</th>
@@ -474,6 +507,31 @@ function TableauRecap({
                       </button>
                     )}
                   </td>
+                  {avecCode && (
+                    <td className="col-code" data-label="Code">
+                      {l.cle ? (
+                        <input
+                          className="elec-code-input"
+                          maxLength={8}
+                          key={codeAffiche(l)}
+                          defaultValue={codeAffiche(l)}
+                          disabled={!onChangerCodeMo}
+                          title="Code à 8 caractères (import SAP des tâches et GOAT) — modifiable"
+                          style={
+                            codesUtilises.filter((c) => c === codeAffiche(l)).length > 1
+                              ? { borderColor: "var(--danger, #c0392b)" }
+                              : undefined
+                          }
+                          onBlur={(e) => onChangerCodeMo && onChangerCodeMo(clePourCode(l), e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                        />
+                      ) : (
+                        ""
+                      )}
+                    </td>
+                  )}
                   <td className="col-num" data-label={libelleValeur}>
                     {l.sup && sup?.onChangerHeures ? (
                       <>
@@ -621,6 +679,7 @@ function TableauRecap({
                     >
                       Heures SAP non affectées
                     </td>
+                    {avecCode && <td className="col-code"></td>}
                     <td className="col-num" data-label={libelleValeur}>—</td>
                     <td className="col-num" data-label="Réalisé">—</td>
                     <td className="col-avancement" data-label="% avancement"></td>
@@ -646,6 +705,7 @@ function TableauRecap({
                 <td className="col-type" data-label={libType}>
                   TOTAL
                 </td>
+                {avecCode && <td className="col-code"></td>}
                 <td className="col-num" data-label={libelleValeur}>
                   {formatMontant(recap.total.budget, uniteValeur)}
                 </td>
@@ -1634,13 +1694,23 @@ export default function ElectriciteSiteDetail() {
   // code + libellé, pour l'envoi vers SAP.
   const tachesUtilisees = (() => {
     const parCode = new Map();
-    lignesChantier.forEach((l) => {
-      const code = codeTypeFo(l.typeFo);
+    const ajoute = (code, libelle) => {
       if (!code || parCode.has(code)) return;
-      const connue = tachesFo.find((t) => t.code === code);
-      const m = String(l.typeFo).match(/\[([^\]]*)\]/);
-      parCode.set(code, { code, libelle: (connue?.label || (m ? m[1] : "") || code).trim() });
+      parCode.set(code, { code, libelle: String(libelle || code).trim() });
+    };
+    const vusType = new Set();
+    lignesChantier.forEach((l) => {
+      const cleType = codeTypeFo(l.typeFo);
+      if (!cleType || vusType.has(cleType)) return;
+      vusType.add(cleType);
+      const connue = tachesFo.find((t) => t.code === cleType);
+      const lib = (connue?.label || libelleTypeFo(l.typeFo) || cleType).trim();
+      ajoute(codeMo(chantier?.codesMo?.[cleType], resumerPoste(libelleTypeFo(l.typeFo)) || cleType.slice(0, 8)), lib);
     });
+    // Tâches complémentaires (suivi, étude, levée de réserve + ajoutées).
+    tachesMoChantier(chantier).forEach((t) =>
+      ajoute(codeMo(chantier?.codesMo?.[cleSup(t.id)], resumerPoste(t.libelle) || "TACHE"), t.libelle)
+    );
     return [...parCode.values()].sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
   })();
   const champRecap = recapActif === "mo" ? "tempsTotalHeures" : "coutTotalFo";
@@ -1685,6 +1755,14 @@ export default function ElectriciteSiteDetail() {
     if (v === 0) delete maj[cle];
     else maj[cle] = v;
     await updateDoc(doc(db, "sites", chantierId), { heuresMoSup: maj });
+  };
+  const codesMoChantier = chantier?.codesMo || {};
+  const changerCodeMo = async (cle, valeur) => {
+    const code = codeMo(valeur, "");
+    const maj = { ...codesMoChantier };
+    if (code) maj[cle] = code;
+    else delete maj[cle];
+    await updateDoc(doc(db, "sites", chantierId), { codesMo: maj });
   };
   const ajouterTacheSup = async (libelle, portee) => {
     const taches = tachesMoChantier(chantier).map(({ id, libelle: l, portee: p }) => ({ id, libelle: l, portee: p }));
@@ -2069,6 +2147,8 @@ export default function ElectriciteSiteDetail() {
                 ordreTypes={ordreTypesChantier}
                 onModifierOrdre={peutGerer ? modifierOrdreType : null}
                 sap={sapRecap}
+                codesMo={avecSup ? codesMoChantier : null}
+                onChangerCodeMo={avecSup && peutGerer ? changerCodeMo : null}
                 sup={
                   avecSup && peutGerer
                     ? {
@@ -2096,6 +2176,8 @@ export default function ElectriciteSiteDetail() {
                   ordreTypes={ordreTypesChantier}
                   onModifierOrdre={peutGerer ? modifierOrdreType : null}
                   sap={sapRecapDevis(d, recap)}
+                  codesMo={avecSup ? codesMoChantier : null}
+                  onChangerCodeMo={avecSup && peutGerer ? changerCodeMo : null}
                   sup={
                     avecSup && peutGerer
                       ? {
@@ -2401,7 +2483,7 @@ export default function ElectriciteSiteDetail() {
           chantierId={chantierId}
           chantier={chantier}
           mode={afficherEnvoiGoat}
-          lignes={afficherEnvoiGoat === "mo" ? lignesMainOeuvreGoat(lignesChantier, lignesSupSynthese(chantier, devis)) : lignesFournitureGoat(lignesChantier)}
+          lignes={afficherEnvoiGoat === "mo" ? lignesMainOeuvreGoat(lignesChantier, lignesSupSynthese(chantier, devis), chantier?.codesMo || {}) : lignesFournitureGoat(lignesChantier)}
           onClose={() => setAfficherEnvoiGoat(null)}
         />
       )}
