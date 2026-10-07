@@ -34,3 +34,10 @@ export function libelleTypeActivite(code) {
 export function estActiviteIgnoree(code) {
   return /^J/.test(normaliser(code));
 }
+
+// Lignes de pointage à ne pas afficher ni compter : type d'activité « Jxxx »
+// ou tâche « F » / « G » (ce ne sont pas des heures). Importées quand même.
+export function estLigneMoIgnoree(ligne) {
+  if (estActiviteIgnoree(ligne?.typAct)) return true;
+  return /^[FG]$/.test(normaliser(ligne?.tache));
+}

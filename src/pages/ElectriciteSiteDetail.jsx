@@ -15,7 +15,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
-import { libelleTypeActivite, estActiviteIgnoree } from "../lib/typesActiviteSap";
+import { libelleTypeActivite, estLigneMoIgnoree } from "../lib/typesActiviteSap";
 import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
@@ -1401,7 +1401,7 @@ export default function ElectriciteSiteDetail() {
   const heuresSap = useMemo(
     () =>
       otpSap
-        ? sapLignesMo.filter((l) => memeOtp(l.otp, otpSap) && !estActiviteIgnoree(l.typAct)).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
+        ? sapLignesMo.filter((l) => memeOtp(l.otp, otpSap) && !estLigneMoIgnoree(l)).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
         : [],
     [sapLignesMo, otpSap]
   );

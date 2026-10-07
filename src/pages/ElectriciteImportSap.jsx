@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { libelleTypeActivite, estActiviteIgnoree } from "../lib/typesActiviteSap";
+import { libelleTypeActivite, estLigneMoIgnoree } from "../lib/typesActiviteSap";
 import { lireTexteSap } from "../lib/lireTexteSap";
 import {
   addDoc,
@@ -294,7 +294,7 @@ function TableauConsultation({ config }) {
   const filtrees = useMemo(() => {
     const termes = recherche.trim().toLowerCase();
     return lignes.filter((l) => {
-      if (config.collectionLignes === "sapLignesMo" && estActiviteIgnoree(l.typAct)) return false;
+      if (config.collectionLignes === "sapLignesMo" && estLigneMoIgnoree(l)) return false;
       if (otpFiltre && l.otp !== otpFiltre) return false;
       if (!termes) return true;
       return config.champsRecherche.some((c) => String(l[c] ?? "").toLowerCase().includes(termes));
