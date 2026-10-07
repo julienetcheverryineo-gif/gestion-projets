@@ -154,7 +154,9 @@ Sub Principal()
   If WScript.Arguments.Count >= 2 Then
     If WScript.Arguments(1) = "--x86" Then ARG_X86 = True
   End If
-  If LCase(Left(url, 28)) <> "ineo-goat://run?m=fourniture" Then Echec "Lien GOAT invalide."
+  ' Le navigateur peut ajouter un "/" (ineo-goat://run/?m=fourniture) : on ne
+  ' controle que le protocole et le parametre m.
+  If LCase(Left(url, 10)) <> "ineo-goat:" Or InStr(url, "?m=fourniture") = 0 Then Echec "Lien GOAT invalide : " & Left(url, 60)
 
   Statut "EN_COURS", "Lecture du lot"
   If Not fso.FileExists(EXPO & "goat-entree.txt") Then Echec "Fichier goat-entree.txt introuvable."
