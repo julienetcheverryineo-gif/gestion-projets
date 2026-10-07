@@ -112,6 +112,7 @@ a {
   align-items: center;
   gap: 10px;
 }
+.nav-link-icone .icone-logiciel { max-width: 1.4em; object-fit: contain; }
 .nav-link-icone {
   font-size: 1.05rem;
   flex-shrink: 0;
