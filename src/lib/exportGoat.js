@@ -137,13 +137,21 @@ export function lignesFournitureGoat(lignesChiffrables) {
 // Lignes Main d'œuvre à écrire dans GOAT (fichier d'import ou table
 // MainOeuvre de la base) : une par Type de FO, Poste = résumé 8 caractères du
 // libellé, heures = somme des heures prévues.
-export function lignesMainOeuvreGoat(lignesChiffrables) {
+export function lignesMainOeuvreGoat(lignesChiffrables, lignesSup = []) {
   const parCode = new Map();
   sommeParTypeFo(lignesChiffrables, "tempsTotalHeures").forEach((t) => {
     const code = resumerPoste(t.libelle) || String(t.code).slice(0, 8);
     if (parCode.has(code)) parCode.get(code).heures += t.valeur;
     else parCode.set(code, { code, libelle: String(t.libelle || t.code).trim().slice(0, 255), heures: t.valeur });
   });
+  // Tâches complémentaires (suivi, étude…) ayant des heures budgétées.
+  lignesSup
+    .filter((t) => t.budget > 0)
+    .forEach((t) => {
+      const code = resumerPoste(t.libelle) || "TACHE";
+      if (parCode.has(code)) parCode.get(code).heures += t.budget;
+      else parCode.set(code, { code, libelle: String(t.libelle).trim().slice(0, 255), heures: t.budget });
+    });
   return [...parCode.values()].map((m) => ({ ...m, heures: Math.round(m.heures * 100) / 100 }));
 }
 

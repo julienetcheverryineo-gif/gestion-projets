@@ -24,6 +24,16 @@ import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectric
 import { lignesFournitureGoat, lignesMainOeuvreGoat } from "../lib/exportGoat";
 import { IconeAccess, IconeSap } from "../components/IconesLogiciels";
 import EnvoyerFournituresGoatModal from "../components/EnvoyerFournituresGoatModal";
+import {
+  GENERAL,
+  cleSup,
+  injecterSup,
+  lignesSupDevis,
+  lignesSupSynthese,
+  nouvelIdTache,
+  tachesGenerales,
+  tachesMoChantier,
+} from "../lib/tachesMoSup";
 import { otpDepuisCompte } from "../lib/parseSapExports";
 import {
   AFFECTATION_HORS_BUDGET,
@@ -251,7 +261,9 @@ function TableauRecap({
   ordreTypes,
   onModifierOrdre,
   sap,
+  sup,
 }) {
+  const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Lignes SAP dépliées (clé d'un Type de FO, ou "__hors" / "__mo").
   const [ouverts, setOuverts] = useState(new Set());
   const basculer = (cle) =>
@@ -447,15 +459,52 @@ function TableauRecap({
                     style={{ fontFamily: "var(--font-ui)" }}
                   >
                     {l.libelle}
+                    {l.sup && !l.fixe && sup?.onSupprimer && (
+                      <button
+                        type="button"
+                        className="btn-ghost btn-danger"
+                        title="Supprimer cette tâche"
+                        style={{ marginLeft: 8, padding: "0 6px" }}
+                        onClick={() => {
+                          if (window.confirm("Supprimer la tâche « " + l.libelle + " » et ses heures ?"))
+                            sup.onSupprimer(l.tacheId);
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
                   </td>
                   <td className="col-num" data-label={libelleValeur}>
-                    {formatMontant(l.budget, uniteValeur)}
+                    {l.sup && sup?.onChangerHeures ? (
+                      <>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          className="elec-ordre-input"
+                          style={{ width: 80 }}
+                          key={l.saisie}
+                          defaultValue={l.saisie}
+                          title="Heures budgétées sur cette tâche"
+                          onBlur={(e) => sup.onChangerHeures(l.tacheId, sup.portee, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                        />{" "}
+                        h
+                        {l.dansDevis > 0 && (
+                          <span className="simple-list-meta"> + {formatNombre(l.dansDevis)} h dans les devis</span>
+                        )}
+                      </>
+                    ) : (
+                      formatMontant(l.budget, uniteValeur)
+                    )}
                   </td>
                   <td className="col-num" data-label="Réalisé">
                     {formatMontant(l.realise, uniteValeur)}
                   </td>
                   <td className="col-avancement" data-label="% avancement">
-                    {modifiable ? (
+                    {modifiable && !l.sup ? (
                       <LigneAvancementModifiable
                         pct={l.pctAvancement}
                         onValider={(v) => onModifierGroupe(l.cle, l.libelle, v, devisId)}
@@ -669,6 +718,29 @@ function TableauRecap({
             </tbody>
           </table>
         </div>
+      )}
+      {sup?.onAjouter && (
+        <form
+          style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!nouveauLibelle.trim()) return;
+            sup.onAjouter(nouveauLibelle.trim(), sup.portee);
+            setNouveauLibelle("");
+          }}
+        >
+          <input
+            value={nouveauLibelle}
+            onChange={(e) => setNouveauLibelle(e.target.value)}
+            placeholder={
+              sup.portee === GENERAL ? "Nouvelle tâche (au général)" : "Nouvelle tâche (dans ce devis)"
+            }
+            style={{ minWidth: 220 }}
+          />
+          <button type="submit" className="btn-ghost" disabled={!nouveauLibelle.trim()}>
+            + Ajouter une tâche
+          </button>
+        </form>
       )}
     </div>
   );
@@ -1582,22 +1654,53 @@ export default function ElectriciteSiteDetail() {
   // Gantt du chantier dans cet ordre. FO et MO ont chacun le leur.
   const champOrdreChantier = recapActif === "mo" ? "ordreTypesMo" : "ordreTypesFo";
   const ordreTypesChantier = chantier?.[champOrdreChantier] || {};
+  // Bilan MO : on y ajoute les tâches complémentaires (socle fixe Suivi /
+  // Étude / Levée de réserve + tâches ajoutées), avec leurs heures saisies.
+  const avecSup = recapActif === "mo";
   const recapSynthese =
     recapActif === "fo" || recapActif === "mo"
-      ? calculerRecap(lignesChantier, champRecap, champAvancementRecap, ordreTypesChantier)
+      ? (() => {
+          const base = calculerRecap(lignesChantier, champRecap, champAvancementRecap, ordreTypesChantier);
+          return avecSup ? injecterSup(base, lignesSupSynthese(chantier, devis)) : base;
+        })()
       : null;
   const recapParDevis =
     recapActif === "fo" || recapActif === "mo"
-      ? devis.map((d) => ({
-          devis: d,
-          recap: calculerRecap(
+      ? devis.map((d) => {
+          const base = calculerRecap(
             lignesChantier.filter((l) => l.devisId === d.id),
             champRecap,
             champAvancementRecap,
             ordreTypesChantier
-          ),
-        }))
+          );
+          return { devis: d, recap: avecSup ? injecterSup(base, lignesSupDevis(chantier, d.id)) : base };
+        })
       : [];
+  // Saisie des heures d'une tâche complémentaire ("" ou 0 retire la valeur).
+  const changerHeuresSup = async (tacheId, portee, valeur) => {
+    const v = valeur === "" ? 0 : Number(String(valeur).replace(",", "."));
+    if (Number.isNaN(v) || v < 0) return;
+    const maj = { ...(chantier?.heuresMoSup || {}) };
+    const cle = portee + "||" + tacheId;
+    if (v === 0) delete maj[cle];
+    else maj[cle] = v;
+    await updateDoc(doc(db, "sites", chantierId), { heuresMoSup: maj });
+  };
+  const ajouterTacheSup = async (libelle, portee) => {
+    const taches = tachesMoChantier(chantier).map(({ id, libelle: l, portee: p }) => ({ id, libelle: l, portee: p }));
+    taches.push({ id: nouvelIdTache(), libelle, portee });
+    await updateDoc(doc(db, "sites", chantierId), { tachesMoSup: taches });
+  };
+  const supprimerTacheSup = async (tacheId) => {
+    const taches = tachesMoChantier(chantier)
+      .filter((t) => t.id !== tacheId)
+      .map(({ id, libelle: l, portee: p }) => ({ id, libelle: l, portee: p }));
+    const heures = { ...(chantier?.heuresMoSup || {}) };
+    Object.keys(heures).forEach((k) => {
+      if (k.endsWith("||" + tacheId)) delete heures[k];
+    });
+    await updateDoc(doc(db, "sites", chantierId), { tachesMoSup: taches, heuresMoSup: heures });
+  };
   // Bilan Achats : toujours basé sur le Type de FO (pas de distinction
   // FO/MO ici), avec le même ordre personnalisé que le Récap FO.
   const ordreTypesFoChantier = chantier?.ordreTypesFo || {};
@@ -1636,14 +1739,25 @@ export default function ElectriciteSiteDetail() {
 
   // Cibles possibles d'une heure SAP : (devis, tâche), pour la synthèse
   // comme pour le tableau d'un devis.
-  const optionsAffectationHeures = (devisId = null) =>
-    recapParDevis
+  const optionsAffectationHeures = (devisId = null) => [
+    ...recapParDevis
       .filter(({ devis: d }) => devisId === null || d.id === devisId)
       .map(({ devis: d, recap }) => ({
         devisId: d.id,
         nom: d.nom,
         taches: recap.parType.filter((t) => t.cle).map((t) => ({ cle: t.cle, libelle: t.libelle })),
-      }));
+      })),
+    // Synthèse : tâches complémentaires « au général » (hors devis).
+    ...(devisId === null
+      ? [
+          {
+            devisId: GENERAL,
+            nom: "Général",
+            taches: tachesGenerales(chantier).map((t) => ({ cle: cleSup(t.id), libelle: t.libelle })),
+          },
+        ]
+      : []),
+  ];
   // Heures SAP rattachées à ce devis (tableau du devis, bilan MO).
   const sapRecapDevis = (d, recap) =>
     recapActif === "mo" && heuresSap.length > 0
@@ -1955,6 +2069,16 @@ export default function ElectriciteSiteDetail() {
                 ordreTypes={ordreTypesChantier}
                 onModifierOrdre={peutGerer ? modifierOrdreType : null}
                 sap={sapRecap}
+                sup={
+                  avecSup && peutGerer
+                    ? {
+                        portee: GENERAL,
+                        onChangerHeures: changerHeuresSup,
+                        onAjouter: ajouterTacheSup,
+                        onSupprimer: supprimerTacheSup,
+                      }
+                    : null
+                }
               />
               {recapParDevis.map(({ devis: d, recap }) => (
                 <TableauRecap
@@ -1972,6 +2096,16 @@ export default function ElectriciteSiteDetail() {
                   ordreTypes={ordreTypesChantier}
                   onModifierOrdre={peutGerer ? modifierOrdreType : null}
                   sap={sapRecapDevis(d, recap)}
+                  sup={
+                    avecSup && peutGerer
+                      ? {
+                          portee: d.id,
+                          onChangerHeures: changerHeuresSup,
+                          onAjouter: ajouterTacheSup,
+                          onSupprimer: supprimerTacheSup,
+                        }
+                      : null
+                  }
                 />
               ))}
             </>
@@ -2267,7 +2401,7 @@ export default function ElectriciteSiteDetail() {
           chantierId={chantierId}
           chantier={chantier}
           mode={afficherEnvoiGoat}
-          lignes={afficherEnvoiGoat === "mo" ? lignesMainOeuvreGoat(lignesChantier) : lignesFournitureGoat(lignesChantier)}
+          lignes={afficherEnvoiGoat === "mo" ? lignesMainOeuvreGoat(lignesChantier, lignesSupSynthese(chantier, devis)) : lignesFournitureGoat(lignesChantier)}
           onClose={() => setAfficherEnvoiGoat(null)}
         />
       )}
