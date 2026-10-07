@@ -1,13 +1,7 @@
-import { useState } from "react";
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-  updateDoc,
-  writeBatch,
-  doc,
-} from "firebase/firestore";
+import { useRef, useState } from "react";
+import { collection, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
+import { ecrireDevisElec, ecrireParLots, preparerAutomatismeDepuisMinute } from "../lib/importCroise";
 import { analyserMinuteElectricite, DESIGNATION_VIDE } from "../lib/parseMinuteElectricite";
 import {
   calculerMiseAJour,
@@ -42,6 +36,9 @@ export default function ImportMinuteElectriciteModal({
   const [mode, setMode] = useState("nouveau");
   const [devisCibleId, setDevisCibleId] = useState("");
   const [supprimerAbsentes, setSupprimerAbsentes] = useState(false);
+  const bufferRef = useRef(null);
+  const [preparerAuto, setPreparerAuto] = useState(true);
+  const [bilan, setBilan] = useState("");
 
   const handleFichier = async (e) => {
     const fichier = e.target.files?.[0];
@@ -52,6 +49,7 @@ export default function ImportMinuteElectriciteModal({
     setNomDevis(fichier.name.replace(/\.[^.]+$/, ""));
     try {
       const buffer = await fichier.arrayBuffer();
+      bufferRef.current = buffer;
       const resultat = analyserMinuteElectricite(buffer);
       setSequence(resultat);
       // Même nom de fichier qu'un devis déjà importé : on propose d'emblée
@@ -87,55 +85,23 @@ export default function ImportMinuteElectriciteModal({
   const nbChangements = diff ? diff.ajouts.length + diff.modifications.length : 0;
   const nbSuppressions = diff && supprimerAbsentes ? diff.absentes.length : 0;
 
-  // Écriture par lots de 400 (marge sous la limite de 500 opérations par
-  // batch Firestore) — une minute peut compter plusieurs centaines de lignes.
-  const ecrireParLots = async (operations) => {
-    const TAILLE_LOT = 400;
-    for (let i = 0; i < operations.length; i += TAILLE_LOT) {
-      const batch = writeBatch(db);
-      operations.slice(i, i + TAILLE_LOT).forEach((op) => op(batch));
-      await batch.commit();
-    }
-  };
-
   const importer = async () => {
     if (!sequence || !nomDevis.trim()) return;
     setEnImport(true);
     try {
-      const devisRef = await addDoc(collection(db, "elecDevis"), {
+      await ecrireDevisElec({
         chantierId,
-        nom: nomDevis.trim(),
+        nomDevis,
         nomFichier,
+        sequence,
         ordre: nbDevisExistants,
-        creeLe: serverTimestamp(),
       });
-      const refs = sequence.map(() => doc(collection(db, "elecLignes")));
-      const groupes = groupesDuFichier(sequence).map((g) => ({
-        ...g,
-        ref: doc(collection(db, "elecGroupes")),
-      }));
-      const groupeDe = new Map();
-      groupes.forEach((g) => g.membres.forEach((i) => groupeDe.set(i, g.ref.id)));
-      await ecrireParLots([
-        ...groupes.map((g) => (batch) => {
-          batch.set(g.ref, {
-            chantierId,
-            devisId: devisRef.id,
-            nom: g.nom,
-            ligneRepresentativeId: refs[g.tete].id,
-            creeLe: serverTimestamp(),
-          });
-        }),
-        ...sequence.map((ligne, i) => (batch) => {
-          batch.set(refs[i], {
-            ...champsDocumentLigne(ligne),
-            ...(groupeDe.has(i) ? { groupeId: groupeDe.get(i) } : {}),
-            devisId: devisRef.id,
-            chantierId,
-            creeLe: serverTimestamp(),
-          });
-        }),
-      ]);
+      if (preparerAuto && bufferRef.current) {
+        const msg = await preparerAutomatismeDepuisMinute(bufferRef.current, chantierId);
+        setBilan(msg);
+        setEnImport(false);
+        return;
+      }
       onClose();
     } catch (err) {
       setErreur("Erreur pendant l'import : " + err.message);
@@ -216,6 +182,23 @@ export default function ImportMinuteElectriciteModal({
       setEnImport(false);
     }
   };
+
+  if (bilan) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <h2>Minute importée</h2>
+          <p className="simple-list-meta" style={{ margin: "8px 0" }}>✅ Électricité : devis importé.</p>
+          <p className="simple-list-meta" style={{ margin: "8px 0 16px" }}>{bilan}</p>
+          <div className="modal-actions">
+            <button type="button" className="btn-primary" onClick={onClose}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -376,6 +359,17 @@ export default function ImportMinuteElectriciteModal({
               <label>
                 Nom du devis (visible comme onglet)
                 <input value={nomDevis} onChange={(e) => setNomDevis(e.target.value)} required />
+              </label>
+              <label style={{ display: "flex", gap: 6, alignItems: "flex-start", marginTop: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={preparerAuto}
+                  onChange={(e) => setPreparerAuto(e.target.checked)}
+                />
+                <span>
+                  Préparer aussi l'Automatisme avec cette minute (équipements, matériel et tâches), si le
+                  chantier n'en a pas encore.
+                </span>
               </label>
               <div className="hscroll-auto" style={{ overflowX: "auto", marginTop: 16 }}>
                 <table className="data-table import-edit-table">

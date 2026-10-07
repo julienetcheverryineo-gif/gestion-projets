@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
+import { useRef, useState } from "react";
+import { ecrireAutomatisme, preparerElecDepuisMinute } from "../lib/importCroise";
 import { analyserClasseur, grouperParProfondeur } from "../lib/parseDevis";
 
 export default function ImportDevisModal({ chantierId, onClose }) {
@@ -11,6 +10,9 @@ export default function ImportDevisModal({ chantierId, onClose }) {
   const [enLecture, setEnLecture] = useState(false);
   const [enImport, setEnImport] = useState(false);
   const [posteOuvert, setPosteOuvert] = useState(null);
+  const bufferRef = useRef(null);
+  const [preparerElec, setPreparerElec] = useState(true);
+  const [bilan, setBilan] = useState("");
 
   const handleFichier = async (e) => {
     const fichier = e.target.files?.[0];
@@ -20,6 +22,7 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     setNomFichier(fichier.name);
     try {
       const buffer = await fichier.arrayBuffer();
+      bufferRef.current = buffer;
       const resultat = analyserClasseur(buffer);
       if (resultat.postesDirects) {
         // Format sans codes lettrés : chaque poste est déjà déterminé sans
@@ -162,56 +165,13 @@ export default function ImportDevisModal({ chantierId, onClose }) {
     const aImporter = postes.filter((p) => p.selectionne);
     if (aImporter.length === 0) return;
     setEnImport(true);
-    const baseOrdre = Date.now();
     try {
-      for (let index = 0; index < aImporter.length; index++) {
-        const poste = aImporter[index];
-        const aDuMateriel = poste.items.some(
-          (it) => it.type === "materiel" && it.designation.trim()
-        );
-        let regRef = null;
-        if (aDuMateriel) {
-          regRef = await addDoc(collection(db, "regequipements"), {
-            nom: poste.nomEdite,
-            chantierId,
-            code: poste.code,
-            ordre: baseOrdre + index,
-            creeLe: serverTimestamp(),
-          });
-        }
-        let ordreTache = 0;
-        for (const item of poste.items) {
-          if (!item.designation.trim()) continue;
-          if (item.type === "tache") {
-            ordreTache += 1;
-            await addDoc(collection(db, "tasks"), {
-              titre: item.designation,
-              chantierId,
-              equipementSource: poste.nomEdite,
-              assigneA: [],
-              heuresPrevues: item.heuresPrevues || null,
-              dateDebut: null,
-              echeance: null,
-              lienDevis: null,
-              commentaires: null,
-              statut: "a_faire",
-              ordre: baseOrdre + index * 1000 + ordreTache,
-              creeLe: serverTimestamp(),
-            });
-            continue;
-          }
-          if (!regRef) continue;
-          await addDoc(collection(db, "regitems"), {
-            regEquipementId: regRef.id,
-            type: "materiel",
-            designation: item.designation,
-            remarque: item.detail || "",
-            unite: item.unite || "",
-            quantite: item.quantite || 0,
-            statut: "a_acheter",
-            creeLe: serverTimestamp(),
-          });
-        }
+      await ecrireAutomatisme({ chantierId, postes: aImporter });
+      if (preparerElec && bufferRef.current) {
+        const msg = await preparerElecDepuisMinute(bufferRef.current, chantierId, nomFichier);
+        setBilan(msg);
+        setEnImport(false);
+        return;
       }
       onClose();
     } catch (err) {
@@ -222,6 +182,23 @@ export default function ImportDevisModal({ chantierId, onClose }) {
   };
 
   const etapeChoixNiveau = analyse && !postes;
+
+  if (bilan) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <h2>Minute importée</h2>
+          <p className="simple-list-meta" style={{ margin: "8px 0" }}>✅ Automatisme : équipements et tâches importés.</p>
+          <p className="simple-list-meta" style={{ margin: "8px 0 16px" }}>{bilan}</p>
+          <div className="modal-actions">
+            <button type="button" className="btn-primary" onClick={onClose}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -377,6 +354,16 @@ export default function ImportDevisModal({ chantierId, onClose }) {
           <button type="button" className="btn-ghost" onClick={onClose}>
             Annuler
           </button>
+          {postes && (
+            <label style={{ display: "flex", gap: 6, alignItems: "center", marginRight: "auto" }}>
+              <input
+                type="checkbox"
+                checked={preparerElec}
+                onChange={(e) => setPreparerElec(e.target.checked)}
+              />
+              Préparer aussi l'Électricité avec cette minute
+            </label>
+          )}
           {postes && (
             <button
               className="btn-primary"
