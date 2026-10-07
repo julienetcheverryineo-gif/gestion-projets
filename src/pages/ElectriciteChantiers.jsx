@@ -102,7 +102,9 @@ export default function ElectriciteChantiers() {
                       className={"status-dot status-" + (chantier.statut ?? "actif")}
                       style={{ marginRight: 8 }}
                     />
-                    {chantier.nom}
+                    <Link to={"/electricite/chantiers/" + chantier.id} className="lien-chantier">
+                      {chantier.nom}
+                    </Link>
                   </td>
                   <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
                     {formatStatutChantier(chantier.statut)}

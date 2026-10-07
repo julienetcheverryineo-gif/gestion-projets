@@ -16,6 +16,7 @@ import { db, auth, getSecondaryAuth } from "../firebase";
 import { useCollection } from "../lib/firestoreHooks";
 import { estChantierAutomatisme } from "../components/SiteFormModal";
 import { libelleChantier } from "../lib/usePlanningData";
+import { renommerUtilisateur } from "../lib/renommerUtilisateur";
 import ChantierMultiSelect from "../components/ChantierMultiSelect";
 
 const ROLES = [
@@ -68,6 +69,28 @@ export default function Users() {
   const chantiers = tousChantiers.filter(estChantierAutomatisme);
   const [afficherAjout, setAfficherAjout] = useState(false);
   const [messageParUtilisateur, setMessageParUtilisateur] = useState({});
+  // Édition du nom : { id, valeur } pour la ligne en cours de modification.
+  const [edition, setEdition] = useState(null);
+  const [renommageEnCours, setRenommageEnCours] = useState(false);
+
+  const enregistrerNom = async (u) => {
+    const nouveau = edition.valeur.trim();
+    if (!nouveau || nouveau === u.nom) return setEdition(null);
+    setRenommageEnCours(true);
+    try {
+      const nb = await renommerUtilisateur(u, nouveau);
+      setMessageParUtilisateur((m) => ({
+        ...m,
+        [u.id]: nb > 0 ? "Renommé ✓ (" + nb + " référence(s) mise(s) à jour)" : "Renommé ✓",
+      }));
+      setTimeout(() => setMessageParUtilisateur((m) => ({ ...m, [u.id]: undefined })), 6000);
+      setEdition(null);
+    } catch (err) {
+      console.error("Erreur renommage:", err);
+      alert("Renommage impossible : " + (err?.message || err));
+    }
+    setRenommageEnCours(false);
+  };
 
   const changerRole = async (userId, role) => {
     await updateDoc(doc(db, "users", userId), { role });
@@ -148,7 +171,42 @@ export default function Users() {
               const chantiersAffectes = u.chantierIds || [];
               return (
                 <tr key={u.id} style={{ opacity: u.actif === false ? 0.5 : 1 }}>
-                  <td data-label="Nom">{u.nom}</td>
+                  <td data-label="Nom">
+                    {edition?.id === u.id ? (
+                      <form
+                        style={{ display: "flex", gap: 6 }}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          enregistrerNom(u);
+                        }}
+                      >
+                        <input
+                          value={edition.valeur}
+                          autoFocus
+                          onChange={(e) => setEdition({ id: u.id, valeur: e.target.value })}
+                          onKeyDown={(e) => e.key === "Escape" && setEdition(null)}
+                        />
+                        <button type="submit" className="btn-primary" disabled={renommageEnCours}>
+                          {renommageEnCours ? "…" : "OK"}
+                        </button>
+                        <button type="button" className="btn-ghost" onClick={() => setEdition(null)}>
+                          ✕
+                        </button>
+                      </form>
+                    ) : (
+                      <span>
+                        {u.nom}{" "}
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          title="Modifier le nom"
+                          onClick={() => setEdition({ id: u.id, valeur: u.nom })}
+                        >
+                          ✎
+                        </button>
+                      </span>
+                    )}
+                  </td>
                   <td data-label="E-mail">{u.email}</td>
                   <td data-label="Rôle">
                     <select

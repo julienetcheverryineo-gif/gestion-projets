@@ -4,7 +4,6 @@ import { deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
-import { normaliserAssignes } from "../lib/assignes";
 import { exporterMaterielAchats } from "../lib/exportMateriel";
 import ImportSuiviModal from "../components/ImportSuiviModal";
 import SiteFormModal, {
@@ -24,7 +23,6 @@ export default function Sites() {
   const { documents: taches } = useCollection("tasks");
   const { documents: tempsEntries } = useCollection("timeEntries");
   const { documents: utilisateurs } = useCollection("users", "email");
-  const { documents: reserves } = useCollection("reserves");
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [seulementNonInstalle, setSeulementNonInstalle] = useState(true);
@@ -134,34 +132,6 @@ export default function Sites() {
   const avancement = (chantierId) =>
     calculerAvancementChantier(chantierId, { regEquipements, regItems, taches });
 
-  // Une tâche est "bien configurée" quand titre, responsable, heures et
-  // les deux dates sont renseignés — ce sont justement les champs
-  // nécessaires au Planning (Gantt, charge) pour la prendre en compte.
-  // Les tâches issues d'un équipement régulé (sans dates par nature) ne
-  // sont pas comptées ici : le drapeau porte sur les tâches "projet".
-  const tacheEstComplete = (t) =>
-    Boolean(t.titre && t.titre.trim()) &&
-    normaliserAssignes(t.assigneA).length > 0 &&
-    t.heuresPrevues !== null &&
-    t.heuresPrevues !== undefined &&
-    t.heuresPrevues !== "" &&
-    Boolean(t.dateDebut) &&
-    Boolean(t.echeance);
-
-  const completudeTaches = (chantierId) => {
-    const tachesChantier = taches.filter((t) => t.chantierId === chantierId);
-    if (tachesChantier.length === 0) return { etat: "aucune", total: 0, incompletes: 0 };
-    const incompletes = tachesChantier.filter((t) => !tacheEstComplete(t)).length;
-    return {
-      etat: incompletes === 0 ? "completes" : "incompletes",
-      total: tachesChantier.length,
-      incompletes,
-    };
-  };
-
-  const reservesOuvertes = (chantierId) =>
-    reserves.filter((r) => r.chantierId === chantierId && r.statut !== "levee").length;
-
   const basculerTri = (colonne) => {
     setTri((t) =>
       t.colonne === colonne ? { colonne, sens: -t.sens } : { colonne, sens: 1 }
@@ -188,13 +158,6 @@ export default function Sites() {
       if (colonne === "avancement") {
         va = avancement(a.id) ?? -1;
         vb = avancement(b.id) ?? -1;
-      } else if (colonne === "reserves") {
-        va = reservesOuvertes(a.id);
-        vb = reservesOuvertes(b.id);
-      } else if (colonne === "taches") {
-        const rang = { incompletes: 0, aucune: 1, completes: 2 };
-        va = rang[completudeTaches(a.id).etat];
-        vb = rang[completudeTaches(b.id).etat];
       } else if (colonne === "client") {
         va = (a.client ?? "").toLowerCase();
         vb = (b.client ?? "").toLowerCase();
@@ -312,22 +275,6 @@ export default function Sites() {
           <table className="data-table chantiers-table">
             <thead>
               <tr>
-                <th
-                  className="th-tri"
-                  style={{ width: 40, textAlign: "center" }}
-                  onClick={() => basculerTri("taches")}
-                  title="Toutes les tâches du chantier ont-elles titre, responsable, heures et dates ?"
-                >
-                  ✓{tri.colonne === "taches" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
-                </th>
-                <th
-                  className="th-tri"
-                  style={{ width: 40, textAlign: "center" }}
-                  onClick={() => basculerTri("reserves")}
-                  title="Le chantier a-t-il des réserves ouvertes ?"
-                >
-                  🚩{tri.colonne === "reserves" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
-                </th>
                 <th className="th-tri" onClick={() => basculerTri("client")}>
                   Client{tri.colonne === "client" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
@@ -338,9 +285,6 @@ export default function Sites() {
                 <th className="th-tri" onClick={() => basculerTri("avancement")}>
                   Avancement{tri.colonne === "avancement" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
                 </th>
-                <th className="th-tri" onClick={() => basculerTri("reserves")}>
-                  Réserves{tri.colonne === "reserves" ? (tri.sens > 0 ? " ▾" : " ▴") : ""}
-                </th>
                 <th>Responsable</th>
                 <th></th>
               </tr>
@@ -348,53 +292,8 @@ export default function Sites() {
             <tbody>
               {chantiersAffiches.map((chantier) => {
                 const pct = avancement(chantier.id);
-                const nbReserves = reservesOuvertes(chantier.id);
-                const completude = completudeTaches(chantier.id);
                 return (
                   <tr key={chantier.id}>
-                    <td data-label="Tâches" style={{ textAlign: "center" }}>
-                      {completude.etat === "aucune" ? (
-                        <span className="simple-list-meta" title="Aucune tâche pour l'instant">
-                          —
-                        </span>
-                      ) : completude.etat === "completes" ? (
-                        <span
-                          className="taches-flag-icone taches-flag-ok"
-                          title={
-                            completude.total +
-                            " tâche(s), toutes complètes (titre, responsable, heures, dates)"
-                          }
-                        >
-                          ✓
-                        </span>
-                      ) : (
-                        <span
-                          className="taches-flag-icone taches-flag-warn"
-                          title={
-                            completude.incompletes +
-                            " tâche(s) sur " +
-                            completude.total +
-                            " avec titre, responsable, heures ou dates manquant(s)"
-                          }
-                        >
-                          ⚠
-                        </span>
-                      )}
-                    </td>
-                    <td data-label="Réserve ouverte" style={{ textAlign: "center" }}>
-                      {nbReserves > 0 ? (
-                        <span
-                          className="taches-flag-icone taches-flag-warn"
-                          title={nbReserves + " réserve(s) ouverte(s)"}
-                        >
-                          🚩
-                        </span>
-                      ) : (
-                        <span className="simple-list-meta" title="Aucune réserve ouverte">
-                          —
-                        </span>
-                      )}
-                    </td>
                     <td
                       data-label="Client"
                       style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
@@ -409,7 +308,9 @@ export default function Sites() {
                         className={"status-dot status-" + (chantier.statut ?? "actif")}
                         style={{ marginRight: 8 }}
                       />
-                      {chantier.nom}
+                      <Link to={"/chantiers/" + chantier.id} className="lien-chantier">
+                        {chantier.nom}
+                      </Link>
                     </td>
                     <td data-label="Statut" style={{ fontFamily: "var(--font-ui)" }}>
                       {formatStatutChantier(chantier.statut)}
@@ -422,13 +323,6 @@ export default function Sites() {
                           </div>
                           <span className="simple-list-meta">{pct}%</span>
                         </div>
-                      ) : (
-                        <span className="simple-list-meta">—</span>
-                      )}
-                    </td>
-                    <td data-label="Réserves">
-                      {nbReserves > 0 ? (
-                        <span className="chantiers-reserves-alerte">{nbReserves} ouverte(s)</span>
                       ) : (
                         <span className="simple-list-meta">—</span>
                       )}

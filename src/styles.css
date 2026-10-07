@@ -3931,3 +3931,12 @@ textarea:focus {
   background: var(--panel-2, rgba(0, 0, 0, 0.04));
   font-size: 0.9em;
 }
+
+/* Nom de chantier cliquable dans les listes */
+.lien-chantier {
+  color: inherit;
+  text-decoration: none;
+}
+.lien-chantier:hover {
+  text-decoration: underline;
+}
