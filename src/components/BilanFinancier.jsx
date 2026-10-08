@@ -201,7 +201,21 @@ export default function BilanFinancier({
     <input
       type="text"
       inputMode="decimal"
-      style={{ width: 150, textAlign: "right" }}
+      title="Cliquer pour modifier le CA"
+      style={{
+        width: "8.5em",
+        padding: 0,
+        margin: 0,
+        height: "auto",
+        border: "none",
+        borderBottom: "1px dotted currentColor",
+        borderRadius: 0,
+        background: "transparent",
+        boxShadow: "none",
+        font: "inherit",
+        textAlign: "right",
+        color: caSaisi != null ? "var(--accent, inherit)" : "inherit",
+      }}
       disabled={!onChangerCa}
       value={
         saisieCa[champ] !== undefined
