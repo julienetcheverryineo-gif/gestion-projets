@@ -11,6 +11,9 @@ import {
   useParametresFoa,
   enregistrerParametreFoa,
   PARAMS_FOA_DEFAUT,
+  ZONES_DEFAUT,
+  useMontantsZone,
+  enregistrerMontantZone,
 } from "../lib/tauxHoraires";
 import { lireTexteSap } from "../lib/lireTexteSap";
 import {
@@ -564,6 +567,67 @@ function ParametresFoaPanel({ peutModifier }) {
   );
 }
 
+// Montants des zones de déplacement (€ par jour) : valorisent les pointages
+// SAP J et F dans le bilan financier. Zone choisie dans la fiche chantier.
+function MontantsZonePanel({ peutModifier }) {
+  const montant = useMontantsZone();
+  const [saisies, setSaisies] = useState({});
+  const valider = async (code) => {
+    if (saisies[code] === undefined) return;
+    const t = String(saisies[code]).replace(",", ".").trim();
+    const n = t === "" ? null : Number(t);
+    setSaisies((p) => {
+      const { [code]: _omis, ...reste } = p;
+      return reste;
+    });
+    if (n === null || n >= 0) await enregistrerMontantZone(code, n);
+  };
+  return (
+    <div className="panel">
+      <h2 style={{ marginTop: 0 }}>Montants des zones de déplacement</h2>
+      <p className="simple-list-meta" style={{ marginBottom: 10 }}>
+        Indemnité par jour et par zone (FOA). Dans le bilan financier, les pointages SAP J et F sont valorisés
+        heures × montant ÷ 7,2 h.{" "}
+        {peutModifier ? "Modifiable par un administrateur." : "Modification réservée aux administrateurs."}
+      </p>
+      <div className="data-table-wrapper">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Zone</th>
+              <th>Montant (€/jour)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ZONES_DEFAUT.map((z) => {
+              const m = montant(z.code);
+              const manquant = m === null;
+              return (
+                <tr key={z.code}>
+                  <td data-label="Zone">{z.label}</td>
+                  <td data-label="Montant (€/jour)">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      style={{ width: 110, ...(manquant ? { borderColor: "#c0392b", background: "rgba(192,57,43,0.08)" } : {}) }}
+                      disabled={!peutModifier}
+                      placeholder={manquant ? "À renseigner" : ""}
+                      value={saisies[z.code] !== undefined ? saisies[z.code] : m === null ? "" : String(m).replace(".", ",")}
+                      onChange={(e) => setSaisies((p) => ({ ...p, [z.code]: e.target.value }))}
+                      onBlur={() => valider(z.code)}
+                      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 const LIBELLE_SEUL = (c) => libelleTypeActivite(c).replace(/ \([^)]*\)$/, "").replace(c, "");
 
 export default function ElectriciteImportSap() {
@@ -607,6 +671,7 @@ export default function ElectriciteImportSap() {
         />
         <TauxHorairesPanel peutModifier={Boolean(isAdmin)} />
         <ParametresFoaPanel peutModifier={Boolean(isAdmin)} />
+        <MontantsZonePanel peutModifier={Boolean(isAdmin)} />
         <VueConsultation />
       </div>
     </div>

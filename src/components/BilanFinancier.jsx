@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { libelleTypeActivite, normaliserTypeActivite } from "../lib/typesActiviteSap";
+import { HEURES_PAR_JOUR_ZONE } from "../lib/tauxHoraires";
 
 const eur = (v) =>
   (Number(v) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -28,6 +29,10 @@ function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) 
 }
 
 export default function BilanFinancier({
+  zone,
+  montantZone,
+  heuresZoneSap,
+  heuresProductionPrevues,
   caCalcule,
   caSaisi,
   caNonSoumis,
@@ -86,22 +91,29 @@ export default function BilanFinancier({
   // (réel + reste à faire au budget).
   const ca = caSaisi ?? caCalcule;
   const base = ca - (caNonSoumis || 0);
-  const colonne = (a, b) => {
+  const colonne = (aBrut, b, zoneEuro) => {
+    const a = aBrut; // MO hors zone : base des frais divers
     const C_prorata = foa.prorata * ca;
     const C_divers = foa.fraisDivers * a;
     const C_aleas = foa.aleas * base;
     const C_nego = foa.negociation * base;
     const C = C_prorata + C_divers + C_aleas + C_nego;
-    const D = foa.fra * (a + b + C);
-    const dep = a + b + C + D;
+    const D = foa.fra * (a + zoneEuro + b + C);
+    const dep = a + zoneEuro + b + C + D;
     const brute = base - dep;
     const fg = foa.fg * base;
     const nette = brute - fg;
-    return { a, b, C, C_prorata, C_divers, C_aleas, C_nego, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
+    return { a: a + zoneEuro, aHorsZone: a, zoneEuro, b, C, C_prorata, C_divers, C_aleas, C_nego, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
   };
-  const prevu = colonne(budgetMo, budgetFo);
-  const reel = colonne(reelMo, reelFo);
-  const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo));
+  // Indemnités de zone (pointages J et F) : heures × montant de la zone ÷ 7,2 h.
+  const tauxZone = montantZone ? montantZone / HEURES_PAR_JOUR_ZONE : 0;
+  const heuresZoneReelles = (heuresZoneSap || []).reduce((s, h) => s + (Number(h.heures) || 0), 0);
+  const zonePrevu = heuresProductionPrevues * tauxZone;
+  const zoneReel = heuresZoneReelles * tauxZone;
+  const zoneAtterr = zoneReel + zonePrevu * (1 - pctMo);
+  const prevu = colonne(budgetMo, budgetFo, zonePrevu);
+  const reel = colonne(reelMo, reelFo, zoneReel);
+  const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo), zoneAtterr);
   const cols = [prevu, reel, atterr];
   const alerte = (c) => c.k !== null && c.k < foa.margePreconisee;
 
@@ -197,6 +209,25 @@ export default function BilanFinancier({
           </thead>
           <tbody>
             <Ligne cols={cols} nom="A – Main d'œuvre" champ="a" fort />
+            <Ligne
+              cols={cols}
+              nom={
+                <>
+                  dont indemnités de zone (J et F){" "}
+                  {zone && montantZone ? (
+                    <span className="simple-list-meta">
+                      {zone} : {eur(montantZone)}/j ÷ 7,2 h
+                    </span>
+                  ) : (
+                    <span style={{ color: ROUGE }}>
+                      {zone ? "montant de la zone manquant (Import SAP)" : "zone non renseignée (fiche chantier)"}
+                    </span>
+                  )}
+                </>
+              }
+              champ="zoneEuro"
+              retrait
+            />
             <tr>
               <td style={{ paddingLeft: 24 }}>dont Suivi / Études / Production (réel)</td>
               <td>—</td>

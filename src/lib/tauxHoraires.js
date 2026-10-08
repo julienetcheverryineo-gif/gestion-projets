@@ -99,3 +99,47 @@ export function useParametresFoa() {
 export async function enregistrerParametreFoa(cle, valeur) {
   await setDoc(doc(db, ...DOC_FOA), { valeurs: { [cle]: valeur }, majLe: new Date() }, { merge: true });
 }
+
+// Indemnités de petit déplacement par zone (€ par jour, centre de profit
+// IAQ5 dans la FOA). Valorisent les pointages SAP « J » et « F » : heures ×
+// montant ÷ 7,2 h (journée de référence de la FOA).
+export const HEURES_PAR_JOUR_ZONE = 7.2;
+export const ZONES_DEFAUT = [
+  { code: "Z1", label: "Z1 -> 0 - 10 km", montant: 24.28 },
+  { code: "Z2", label: "Z2 -> 10 - 20 km", montant: 30.28 },
+  { code: "Z3", label: "Z3 -> 20 - 30 km", montant: 37.23 },
+  { code: "Z4", label: "Z4 -> 30 - 40 km", montant: 43.45 },
+  { code: "Z5", label: "Z5 -> 40 - 50 km", montant: 50.82 },
+  { code: "Z6", label: "Z6 -> Sup. 50 km", montant: 57.08 },
+  { code: "GD", label: "GD -> Grand déplacement", montant: 97 },
+];
+export const DOC_ZONES = ["parametresElec", "zones"];
+
+// Rend `montant(codeZone)` : montant enregistré, sinon valeur par défaut.
+export function useMontantsZone() {
+  const [enregistres, setEnregistres] = useState({});
+  useEffect(
+    () =>
+      onSnapshot(
+        doc(db, ...DOC_ZONES),
+        (snap) => setEnregistres(snap.exists() ? snap.data().montants || {} : {}),
+        () => {}
+      ),
+    []
+  );
+  return useMemo(
+    () => (code) => {
+      if (!code) return null;
+      if (Object.prototype.hasOwnProperty.call(enregistres, code)) {
+        const v = enregistres[code];
+        return typeof v === "number" && v >= 0 ? v : null;
+      }
+      return ZONES_DEFAUT.find((z) => z.code === code)?.montant ?? null;
+    },
+    [enregistres]
+  );
+}
+
+export async function enregistrerMontantZone(code, valeur) {
+  await setDoc(doc(db, ...DOC_ZONES), { montants: { [code]: valeur }, majLe: new Date() }, { merge: true });
+}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ZONES_DEFAUT } from "../lib/tauxHoraires";
 import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -47,6 +48,7 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
   const [adresse, setAdresse] = useState(chantier?.adresse ?? "");
   const [statut, setStatut] = useState(chantier?.statut ?? "actif");
   const [compte, setCompte] = useState(chantier?.compte ?? "");
+  const [zone, setZone] = useState(chantier?.zone ?? "");
   const [espaceAutomatisme, setEspaceAutomatisme] = useState(
     chantier ? estChantierAutomatisme(chantier) : service !== "electricite"
   );
@@ -107,6 +109,7 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
       adresse,
       statut,
       compte,
+      zone: zone || null,
       ra,
       responsableChantier,
       espaceAutomatisme,
@@ -167,6 +170,17 @@ export default function SiteFormModal({ chantier, utilisateurs, service = "autom
                 onChange={(e) => setCompte(e.target.value)}
                 placeholder="ex : JE602"
               />
+            </label>
+            <label>
+              Zone de déplacement
+              <select value={zone} onChange={(e) => setZone(e.target.value)}>
+                <option value="">Non renseignée</option>
+                {ZONES_DEFAUT.map((z) => (
+                  <option key={z.code} value={z.code}>
+                    {z.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 

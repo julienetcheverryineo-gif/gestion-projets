@@ -1,6 +1,6 @@
 import { estLigneSomme } from "../lib/ligneSomme";
 import BilanFinancier from "../components/BilanFinancier";
-import { useTauxHoraires, useParametresFoa } from "../lib/tauxHoraires";
+import { useTauxHoraires, useParametresFoa, useMontantsZone } from "../lib/tauxHoraires";
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -1784,8 +1784,16 @@ export default function ElectriciteSiteDetail() {
         : [],
     [sapLignesFo, otpSap]
   );
+  const heuresSapZone = useMemo(
+    () =>
+      otpSap
+        ? sapLignesMo.filter((l) => memeOtp(l.otp, otpSap) && /^[JF]/i.test(String(l.typAct || "").trim()))
+        : [],
+    [sapLignesMo, otpSap]
+  );
   const { taux: tauxHoraire } = useTauxHoraires();
   const paramsFoa = useParametresFoa();
+  const montantZone = useMontantsZone();
   const heuresSap = useMemo(
     () =>
       otpSap
@@ -2500,8 +2508,18 @@ export default function ElectriciteSiteDetail() {
                 const t = profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
                 return sm + (l.budget || 0) * t;
               }, 0);
+              // Heures prévues de production (profil I3xx / E) : base des
+              // indemnités de zone, comme les lignes J de la FOA.
+              const heuresProductionPrevues = recapMoSynthese.parType.reduce((sm, l) => {
+                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
+                return /^(I3|E)/.test(profil || "") ? sm + (l.budget || 0) : sm;
+              }, 0);
               return (
                 <BilanFinancier
+                  zone={chantier?.zone || ""}
+                  montantZone={montantZone(chantier?.zone || "")}
+                  heuresZoneSap={heuresSapZone}
+                  heuresProductionPrevues={heuresProductionPrevues}
                   budgetMoEuro={budgetMoEuro}
                   caCalcule={lignesChantier
                     .filter((l) => !estLigneSomme(l))
