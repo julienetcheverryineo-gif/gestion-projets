@@ -13,7 +13,7 @@ const ROUGE = "#c0392b";
 // pointées valorisées au taux de leur type d'activité (voir Import SAP).
 const BLOC_MO = (code) => (/^I1/.test(code) ? "Suivi" : /^I2/.test(code) ? "Études" : "Production");
 
-const classeNeg = (v) => (v < -0.005 ? { color: ROUGE, fontWeight: 600 } : {});
+const classeNeg = (v) => (v < -1e-9 ? { color: ROUGE, fontWeight: 600 } : {});
 
 function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) {
   return (
@@ -45,6 +45,7 @@ export default function BilanFinancier({
   pctFo,
   budgetHeures,
   budgetMoEuro,
+  prevuMoLignes,
   pctMo,
   achats,
   heures,
@@ -79,14 +80,13 @@ export default function BilanFinancier({
       .sort((a, b) => b.heures - a.heures);
   }, [heures, taux]);
 
-  const heuresPointees = parType.reduce((s, t) => s + t.heures, 0);
   const heuresSansTaux = parType.filter((t) => t.taux === null).reduce((s, t) => s + t.heures, 0);
   const reelMo = parType.reduce((s, t) => s + (t.cout || 0), 0);
+  const prevuBloc = (nom) => (prevuMoLignes || []).filter((l) => BLOC_MO(l.code) === nom).reduce((s, l) => s + l.euro, 0);
   const reelBloc = (nom) => parType.filter((t) => BLOC_MO(t.code) === nom).reduce((s, t) => s + (t.cout || 0), 0);
 
   const tx = tauxChiffrage ?? tauxChiffrageDefaut ?? 0;
   const budgetMo = budgetMoEuro ?? budgetHeures * tx;
-  const heuresEquiv = tx > 0 ? reelMo / tx : null;
 
   // Trois colonnes comme la FOA : prévu (minute), réel (SAP), atterrissage
   // (réel + reste à faire au budget).
@@ -119,7 +119,6 @@ export default function BilanFinancier({
   const reel = colonne(reelMo, reelFo, zoneReel, heuresMiReelles);
   const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo), zoneAtterr, heuresMiAtterr);
   const cols = [prevu, reel, atterr];
-  const alerte = (c) => c.k !== null && c.k < foa.margePreconisee;
 
   const validerPct = (cle) => {
     if (saisiePct[cle] === undefined) return;
@@ -159,9 +158,14 @@ export default function BilanFinancier({
     <input
       type="text"
       inputMode="decimal"
-      style={{ width: 120 }}
+      style={{ width: 150, textAlign: "right" }}
       disabled={!onChangerCa}
-      value={saisieCa[champ] !== undefined ? saisieCa[champ] : String(Math.round(valeur * 100) / 100).replace(".", ",")}
+      value={
+        saisieCa[champ] !== undefined
+          ? saisieCa[champ]
+          : eur(valeur)
+      }
+      onFocus={() => setSaisieCa((p) => ({ ...p, [champ]: String(Math.round(valeur * 100) / 100).replace(".", ",") }))}
       onChange={(e) => setSaisieCa((p) => ({ ...p, [champ]: e.target.value }))}
       onBlur={() => validerCa(champ)}
       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
@@ -187,7 +191,17 @@ export default function BilanFinancier({
           CA H.T. (€) {champCa("caHt", ca)}
         </label>
         <label>
-          dont non soumis à FG (€) {champCa("caNonSoumisFg", caNonSoumis || 0)}
+          Taux de chiffrage par défaut (€/h){" "}
+          <input
+            type="text"
+            inputMode="decimal"
+            style={{ width: 80 }}
+            disabled={!onTauxChiffrage}
+            value={saisie !== null ? saisie : String(tx).replace(".", ",")}
+            onChange={(e) => setSaisie(e.target.value)}
+            onBlur={validerTaux}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          />
         </label>
         <span className="simple-list-meta">
           {caSaisi == null
@@ -213,6 +227,20 @@ export default function BilanFinancier({
           </thead>
           <tbody>
             <Ligne cols={cols} nom="A – Main d'œuvre" champ="a" fort />
+            <tr>
+              <td style={{ paddingLeft: 24 }}>dont Suivi / Études / Production</td>
+              <td>
+                {eur(prevuBloc("Suivi"))} / {eur(prevuBloc("Études"))} / {eur(prevuBloc("Production"))}
+              </td>
+              <td>
+                {eur(reelBloc("Suivi"))} / {eur(reelBloc("Études"))} / {eur(reelBloc("Production"))}
+              </td>
+              <td>
+                {eur(reelBloc("Suivi") + prevuBloc("Suivi") * (1 - pctMo))} /{" "}
+                {eur(reelBloc("Études") + prevuBloc("Études") * (1 - pctMo))} /{" "}
+                {eur(reelBloc("Production") + prevuBloc("Production") * (1 - pctMo))}
+              </td>
+            </tr>
             <Ligne
               cols={cols}
               nom={
@@ -232,85 +260,26 @@ export default function BilanFinancier({
               champ="zoneEuro"
               retrait
             />
-            <tr>
-              <td style={{ paddingLeft: 24 }}>dont Suivi / Études / Production (réel)</td>
-              <td>—</td>
-              <td>
-                {eur(reelBloc("Suivi"))} / {eur(reelBloc("Études"))} / {eur(reelBloc("Production"))}
-              </td>
-              <td>—</td>
-            </tr>
             <Ligne cols={cols} nom="B – Achats (fournitures et sous-traitance)" champ="b" fort />
             <Ligne cols={cols} nom="C – Autres frais" champ="C" fort />
             <Ligne cols={cols} nom={<>Prorata {champPct("prorata")} % du CA</>} champ="C_prorata" retrait />
             <Ligne cols={cols} nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />
             <Ligne cols={cols} nom={<>Aléas {champPct("aleas")} % du CA</>} champ="C_aleas" retrait />
-            <Ligne cols={cols} nom={"Matériel interne (" + num(foa.materielInterne, 2) + " €/h)"} champ="C_mi" retrait />
             <Ligne cols={cols} nom={<>Négociation {champPct("negociation")} % du CA</>} champ="C_nego" retrait />
+            <Ligne cols={cols} nom="Matériel interne" champ="C_mi" retrait />
             <Ligne cols={cols} nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
             <Ligne cols={cols} nom="Total dépenses affaire" champ="dep" fort style={{ borderTop: "2px solid var(--border, #ccc)" }} />
-            <Ligne cols={cols} nom="Marge brute" champ="brute" fort sansReel />
             <Ligne cols={cols} nom={"Frais généraux (" + num(foa.fg * 100, 2) + " % CA)"} champ="fg" sansReel />
             <Ligne cols={cols} nom="Marge nette" champ="nette" fort sansReel />
             <Ligne cols={cols} nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
           </tbody>
         </table>
       </div>
-      {[prevu, atterr].some(alerte) && (
-        <p style={{ color: ROUGE, margin: "8px 0" }}>
-          ⚠ Marge nette sous la marge préconisée ({num(foa.margePreconisee * 100, 1)} %) :{" "}
-          {alerte(prevu) ? "au prévu" : ""}
-          {alerte(prevu) && alerte(atterr) ? " et " : ""}
-          {alerte(atterr) ? "à l'atterrissage" : ""}.
-        </p>
-      )}
       <p className="simple-list-meta" style={{ margin: "8px 0 16px" }}>
         Calcul repris de la feuille FOA : dépenses = MO + achats + autres frais + FRA ; marge brute = CA − non
         soumis − dépenses ; marge nette = marge brute − frais généraux. Atterrissage = réel + reste à faire au
         budget (budget × (1 − avancement)). Les pourcentages se règlent dans « Import SAP ».
       </p>
-
-      <h3 style={{ margin: "0 0 8px" }}>Main d'œuvre : heures et euros</h3>
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-        <label>
-          Taux de chiffrage (€/h){" "}
-          <input
-            type="text"
-            inputMode="decimal"
-            style={{ width: 90 }}
-            disabled={!onTauxChiffrage}
-            value={saisie !== null ? saisie : String(tx).replace(".", ",")}
-            onChange={(e) => setSaisie(e.target.value)}
-            onBlur={validerTaux}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          />
-        </label>
-        <span className="simple-list-meta">
-          {tauxChiffrage == null ? "par défaut (type I205)" : "propre à cette affaire"}
-        </span>
-      </div>
-      <div className="data-table-wrapper">
-        <table className="data-table">
-          <tbody>
-            <tr>
-              <td>Heures chiffrées</td>
-              <td>{num(budgetHeures)} h</td>
-            </tr>
-            <tr>
-              <td>Heures pointées</td>
-              <td>{num(heuresPointees)} h</td>
-            </tr>
-            <tr>
-              <td>Heures équivalentes chiffrées (réel € ÷ taux de chiffrage)</td>
-              <td>{heuresEquiv === null ? "—" : num(heuresEquiv) + " h"}</td>
-            </tr>
-            <tr>
-              <td>Taux moyen réel</td>
-              <td>{heuresPointees - heuresSansTaux > 0 ? eur(reelMo / (heuresPointees - heuresSansTaux)) + " /h" : "—"}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
 
       {heuresSansTaux > 0 && (
         <p style={{ color: ROUGE, margin: "8px 0" }}>

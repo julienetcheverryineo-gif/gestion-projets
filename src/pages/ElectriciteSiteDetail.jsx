@@ -2562,11 +2562,12 @@ export default function ElectriciteSiteDetail() {
               );
               const totMo = recapMoSynthese.total;
               const tauxDefautMo = totalTauxDefaut(chantier, tauxHoraire);
-              const budgetMoEuro = recapMoSynthese.parType.reduce((sm, l) => {
+              const prevuMoLignes = recapMoSynthese.parType.map((l) => {
                 const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
                 const t = profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
-                return sm + (l.budget || 0) * t;
-              }, 0);
+                return { code: profil || "I205", euro: (l.budget || 0) * t };
+              });
+              const budgetMoEuro = prevuMoLignes.reduce((sm, l) => sm + l.euro, 0);
               // Heures prévues de production (profil I3xx / E) : base des
               // indemnités de zone, comme les lignes J de la FOA.
               const heuresProductionPrevues = recapMoSynthese.parType.reduce((sm, l) => {
@@ -2585,11 +2586,12 @@ export default function ElectriciteSiteDetail() {
                   heuresZoneSap={heuresSapZone}
                   heuresProductionPrevues={heuresProductionPrevues}
                   budgetMoEuro={budgetMoEuro}
+                  prevuMoLignes={prevuMoLignes}
                   caCalcule={lignesChantier
                     .filter((l) => !estLigneSomme(l))
                     .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0)}
                   caSaisi={chantier?.caHt ?? null}
-                  caNonSoumis={chantier?.caNonSoumisFg ?? 0}
+                  caNonSoumis={0}
                   onChangerCa={
                     peutGerer
                       ? (champ, v) => updateDoc(doc(db, "sites", chantierId), { [champ]: v })
