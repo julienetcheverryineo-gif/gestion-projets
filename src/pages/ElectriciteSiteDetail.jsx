@@ -265,6 +265,9 @@ function TableauRecap({
   onChangerCodeMo,
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
+  // Pointages SAP cochés pour une affectation en masse.
+  const [selHeures, setSelHeures] = useState(new Set());
+  const [cibleLot, setCibleLot] = useState("");
   // Lignes SAP dépliées (clé d'un Type de FO, ou "__hors" / "__mo").
   const [ouverts, setOuverts] = useState(new Set());
   const basculer = (cle) =>
@@ -355,12 +358,62 @@ function TableauRecap({
 
   // Détail des heures SAP d'une tâche (ou non affectées) : chaque pointage
   // peut être réaffecté à une tâche du budget.
-  const detailSapMo = (lignes) => (
+  const detailSapMo = (lignes) => {
+    const cles = lignes.map((h) => cleLigneHeure(h));
+    const cochees = cles.filter((c) => selHeures.has(c));
+    const toutCoche = cles.length > 0 && cochees.length === cles.length;
+    const basculerTout = () =>
+      setSelHeures((prev) => {
+        const n = new Set(prev);
+        cles.forEach((c) => (toutCoche ? n.delete(c) : n.add(c)));
+        return n;
+      });
+    const basculerUne = (c) =>
+      setSelHeures((prev) => {
+        const n = new Set(prev);
+        if (n.has(c)) n.delete(c);
+        else n.add(c);
+        return n;
+      });
+    const appliquerLot = async () => {
+      if (!cochees.length || !sap?.onAffecterLot) return;
+      await sap.onAffecterLot(cochees, cibleLot);
+      setSelHeures((prev) => {
+        const n = new Set(prev);
+        cochees.forEach((c) => n.delete(c));
+        return n;
+      });
+    };
+    const optionsCible = (sap?.options || []).flatMap((g) =>
+      g.taches.map((t) => (
+        <option key={g.devisId + t.cle} value={g.devisId + SEP_AFFECTATION + t.cle}>
+          {g.nom} — {t.libelle}
+        </option>
+      ))
+    );
+    return (
     <tr className="recap-detail-sap">
       <td colSpan={nbColonnes}>
+        {sap?.onAffecterLot && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+            <span className="simple-list-meta">{cochees.length} pointage(s) coché(s)</span>
+            <select value={cibleLot} onChange={(e) => setCibleLot(e.target.value)}>
+              <option value="">Non affectée</option>
+              {optionsCible}
+            </select>
+            <button type="button" className="btn-primary" disabled={!cochees.length} onClick={appliquerLot}>
+              Affecter la sélection
+            </button>
+          </div>
+        )}
         <table className="data-table">
           <thead>
             <tr>
+              {sap?.onAffecterLot && (
+                <th>
+                  <input type="checkbox" checked={toutCoche} onChange={basculerTout} aria-label="Tout cocher" />
+                </th>
+              )}
               {COLONNES_SAP_MO.map((c) => (
                 <th key={c.champ}>{c.label}</th>
               ))}
@@ -376,6 +429,11 @@ function TableauRecap({
               const ancienne = manuel && !String(manuel).includes(SEP_AFFECTATION) && valeur === manuel;
               return (
                 <tr key={h.id || i}>
+                  {sap?.onAffecterLot && (
+                    <td>
+                      <input type="checkbox" checked={selHeures.has(cleH)} onChange={() => basculerUne(cleH)} />
+                    </td>
+                  )}
                   {COLONNES_SAP_MO.map((c) => (
                     <td key={c.champ} data-label={c.label}>
                       {c.champ === "typAct" ? libelleTypeActivite(h.typAct) : formatValeurSap(h[c.champ], c.numerique, false)}
@@ -405,7 +463,8 @@ function TableauRecap({
         </table>
       </td>
     </tr>
-  );
+    );
+  };
 
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
@@ -1960,6 +2019,15 @@ export default function ElectriciteSiteDetail() {
     await updateDoc(doc(db, "sites", chantierId), { affectationsSapHeures: maj });
   };
 
+  const affecterHeuresSapLot = async (cles, valeur) => {
+    const maj = { ...affectationsHeures };
+    cles.forEach((c) => {
+      if (valeur) maj[c] = valeur;
+      else delete maj[c];
+    });
+    await updateDoc(doc(db, "sites", chantierId), { affectationsSapHeures: maj });
+  };
+
   // Cibles possibles d'une heure SAP : (devis, tâche), pour la synthèse
   // comme pour le tableau d'un devis.
   const optionsAffectationHeures = (devisId = null) => [
@@ -1989,6 +2057,7 @@ export default function ElectriciteSiteDetail() {
           heures: rapprocherHeures(recap.parType, heuresSap, affectationsHeures, d.id),
           affectations: affectationsHeures,
           onAffecter: peutGerer ? affecterHeureSap : null,
+          onAffecterLot: peutGerer ? affecterHeuresSapLot : null,
           options: optionsAffectationHeures(d.id),
         }
       : null;
@@ -2011,6 +2080,7 @@ export default function ElectriciteSiteDetail() {
         heures: rapprocherHeures(recapSynthese.parType, heuresSap, affectationsHeures),
         affectations: affectationsHeures,
         onAffecter: peutGerer ? affecterHeureSap : null,
+          onAffecterLot: peutGerer ? affecterHeuresSapLot : null,
         options: optionsAffectationHeures(),
       };
     }
