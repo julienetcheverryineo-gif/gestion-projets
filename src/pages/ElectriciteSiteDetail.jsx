@@ -266,6 +266,8 @@ function TableauRecap({
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
+  const [triFo, setTriFo] = useState(TRI_FILTRE_VIDE);
+  const [triMo, setTriMo] = useState(TRI_FILTRE_VIDE);
   const [selHeures, setSelHeures] = useState(new Set());
   const [cibleLot, setCibleLot] = useState("");
   // Lignes SAP dépliées (clé d'un Type de FO, ou "__hors" / "__mo").
@@ -310,13 +312,13 @@ function TableauRecap({
           <thead>
             <tr>
               {COLONNES_SAP_FO.map((c) => (
-                <th key={c.champ}>{c.label}</th>
+                <EnteteSapTriable key={c.champ} colonne={c} etat={triFo} setEtat={setTriFo} />
               ))}
               <th>Affecter à</th>
             </tr>
           </thead>
           <tbody>
-            {lignes.map((a, i) => {
+            {appliquerTriFiltre(lignes, COLONNES_SAP_FO, triFo).map((a, i) => {
               const cleA = cleLigneAchat(a);
               const manuel = sap?.affectations?.[cleA];
               const valeur =
@@ -359,7 +361,8 @@ function TableauRecap({
   // Détail des heures SAP d'une tâche (ou non affectées) : chaque pointage
   // peut être réaffecté à une tâche du budget.
   const detailSapMo = (lignes) => {
-    const cles = lignes.map((h) => cleLigneHeure(h));
+    const lignesAffichees = appliquerTriFiltre(lignes, COLONNES_SAP_MO, triMo);
+    const cles = lignesAffichees.map((h) => cleLigneHeure(h));
     const cochees = cles.filter((c) => selHeures.has(c));
     const toutCoche = cles.length > 0 && cochees.length === cles.length;
     const basculerTout = () =>
@@ -415,13 +418,13 @@ function TableauRecap({
                 </th>
               )}
               {COLONNES_SAP_MO.map((c) => (
-                <th key={c.champ}>{c.label}</th>
+                <EnteteSapTriable key={c.champ} colonne={c} etat={triMo} setEtat={setTriMo} />
               ))}
               <th>Affecter à</th>
             </tr>
           </thead>
           <tbody>
-            {lignes.map((h, i) => {
+            {lignesAffichees.map((h, i) => {
               const cleH = cleLigneHeure(h);
               const manuel = sap?.affectations?.[cleH];
               const { cle: cleManuelle } = lireAffectationHeure(manuel);
@@ -1064,6 +1067,64 @@ function tsDateSap(texte) {
   return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0;
 }
 
+// Tri + filtre par colonne des tableaux de lignes SAP (en-têtes cliquables).
+function texteCelluleSap(l, c) {
+  if (c.champ === "typAct") return libelleTypeActivite(l.typAct);
+  return formatValeurSap(l[c.champ], c.numerique, c.euro);
+}
+function valeurTriSap(l, c) {
+  if (c.numerique) return Number(l[c.champ]) || 0;
+  if (c.champ === "date" || c.champ === "dateDoc") return tsDateSap(l[c.champ]);
+  return texteCelluleSap(l, c).toLowerCase();
+}
+const TRI_FILTRE_VIDE = { tri: null, filtres: {} };
+function appliquerTriFiltre(lignes, colonnes, etat) {
+  let res = lignes;
+  colonnes.forEach((c) => {
+    const f = (etat.filtres[c.champ] || "").trim().toLowerCase();
+    if (f) res = res.filter((l) => texteCelluleSap(l, c).toLowerCase().includes(f));
+  });
+  const col = etat.tri && colonnes.find((c) => c.champ === etat.tri.champ);
+  if (col) {
+    const sens = etat.tri.sens === "desc" ? -1 : 1;
+    res = [...res].sort((a, b) => {
+      const x = valeurTriSap(a, col);
+      const y = valeurTriSap(b, col);
+      return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "fr")) * sens;
+    });
+  }
+  return res;
+}
+function basculerTri(etat, setEtat, champ) {
+  const t = etat.tri;
+  const tri = !t || t.champ !== champ ? { champ, sens: "asc" } : t.sens === "asc" ? { champ, sens: "desc" } : null;
+  setEtat({ ...etat, tri });
+}
+// En-tête triable (clic) et filtrable (champ texte sous le libellé).
+function EnteteSapTriable({ colonne, etat, setEtat }) {
+  const t = etat.tri && etat.tri.champ === colonne.champ ? etat.tri.sens : null;
+  return (
+    <th>
+      <button
+        type="button"
+        className="btn-link"
+        style={{ font: "inherit", fontWeight: "inherit", padding: 0, cursor: "pointer", background: "none", border: 0, color: "inherit" }}
+        onClick={() => basculerTri(etat, setEtat, colonne.champ)}
+        title="Trier"
+      >
+        {colonne.label} {t === "asc" ? "▲" : t === "desc" ? "▼" : "↕"}
+      </button>
+      <input
+        type="text"
+        placeholder="Filtrer"
+        value={etat.filtres[colonne.champ] || ""}
+        onChange={(e) => setEtat({ ...etat, filtres: { ...etat.filtres, [colonne.champ]: e.target.value } })}
+        style={{ display: "block", width: "100%", minWidth: 60, marginTop: 4, fontSize: 12 }}
+      />
+    </th>
+  );
+}
+
 // Suivi SAP d'un chantier : achats et heures réels remontés de SAP (page
 // Import SAP, voir lib/parseSapExports.js) pour le code OTP correspondant
 // au champ "Compte" du chantier. Les données (déjà filtrées sur cet OTP)
@@ -1072,9 +1133,14 @@ function tsDateSap(texte) {
 // ElectriciteSiteDetail).
 function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
   const [onglet, setOnglet] = useState("fo");
+  const [triFo, setTriFo] = useState(TRI_FILTRE_VIDE);
+  const [triMo, setTriMo] = useState(TRI_FILTRE_VIDE);
 
   const colonnes = onglet === "fo" ? COLONNES_SAP_FO : COLONNES_SAP_MO;
-  const lignes = onglet === "fo" ? achats : heures;
+  const etatTri = onglet === "fo" ? triFo : triMo;
+  const setEtatTri = onglet === "fo" ? setTriFo : setTriMo;
+  const lignesBrutes = onglet === "fo" ? achats : heures;
+  const lignes = appliquerTriFiltre(lignesBrutes, colonnes, etatTri);
   const champValeur = onglet === "fo" ? "valNette" : "heures";
   const total = lignes.reduce((s, l) => s + (Number(l[champValeur]) || 0), 0);
 
@@ -1106,7 +1172,7 @@ function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
           </button>
         )}
       </div>
-      {lignes.length === 0 ? (
+      {lignesBrutes.length === 0 ? (
         <p className="simple-list-meta">Aucune ligne SAP de ce type pour ce chantier.</p>
       ) : (
         <>
@@ -1122,7 +1188,7 @@ function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
               <thead>
                 <tr>
                   {colonnes.map((c) => (
-                    <th key={c.champ}>{c.label}</th>
+                    <EnteteSapTriable key={c.champ} colonne={c} etat={etatTri} setEtat={setEtatTri} />
                   ))}
                 </tr>
               </thead>
