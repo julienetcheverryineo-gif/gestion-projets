@@ -278,6 +278,7 @@ function TableauRecap({
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
+  const [fiche, setFiche] = useState(null);
   const [triFo, setTriFo] = useState(TRI_FILTRE_VIDE);
   const [triMo, setTriMo] = useState(TRI_FILTRE_VIDE);
   const [selHeures, setSelHeures] = useState(new Set());
@@ -311,7 +312,7 @@ function TableauRecap({
   const codesUtilises = recap.parType.map(codeAffiche).filter(Boolean);
   const libType = uniteValeur === "h" ? "Tâche" : "Type de FO";
   const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
-  const nbColonnes = 6 + (aSap ? 3 : 0) + (avecCode ? 4 : 0);
+  const nbColonnes = 6 + (aSap ? 3 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
   // Détail des lignes d'achat SAP d'un type (ou hors budget) : chaque ligne
   // peut être réaffectée à un autre Type de FO du budget, ou laissée hors
@@ -513,22 +514,10 @@ function TableauRecap({
                     N°
                   </th>
                 )}
-                {avecCode && (
-                  <th className="col-code" title="Code à 8 caractères : tâche SAP et poste GOAT">
-                    Code tâche SAP
-                  </th>
-                )}
                 <th className="col-type" style={{ width: largeurColType }}>
                   {libType}
                 </th>
-                {avecCode && (
-                  <th className="col-petit" title="Type de personnel prévu à la base (taux horaire du bilan financier)">
-                    Profil prévu
-                  </th>
-                )}
                 {avecCode && <th className="col-num col-petit">Vendu</th>}
-                {avecCode && <th className="col-num col-petit" title="Heures ajoutées (+) ou retirées (−) par rapport au chiffrage">Écart ± h</th>}
-                {avecCode && <th className="col-num col-petit" title="Heures prises sur la ligne « Sans tâche »">Pris sur « Sans tâche »</th>}
                 <th className="col-num">{libelleValeur}</th>
                 <th className="col-num">Réalisé (avancement)</th>
                 <th className="col-avancement">% avancement</th>
@@ -569,37 +558,29 @@ function TableauRecap({
                     )}
                   </td>
                   )}
-                  {avecCode && (
-                    <td className="col-code" data-label="Code tâche SAP">
-                      {l.cle ? (
-                        <input
-                          className="elec-code-input"
-                          maxLength={8}
-                          key={codeAffiche(l)}
-                          defaultValue={codeAffiche(l)}
-                          disabled={!onChangerCodeMo}
-                          title="Code à 8 caractères (import SAP des tâches et GOAT) — modifiable"
-                          style={
-                            codesUtilises.filter((c) => c === codeAffiche(l)).length > 1
-                              ? { borderColor: "var(--danger, #c0392b)" }
-                              : undefined
-                          }
-                          onBlur={(e) => onChangerCodeMo && onChangerCodeMo(clePourCode(l), e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") e.currentTarget.blur();
-                          }}
-                        />
-                      ) : (
-                        ""
-                      )}
-                    </td>
-                  )}
                   <td
                     className="col-type"
                     data-label={libType}
                     style={{ fontFamily: "var(--font-ui)" }}
                   >
-                    {avecCode && l.cle && !l.sup ? libelleTypeFo(l.cle) : l.libelle}
+                    {avecCode && (l.cle || l.ajustable) ? (
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        style={{ padding: "0 4px", textAlign: "left", font: "inherit", textDecoration: "underline dotted" }}
+                        title="Ouvrir la fiche de la tâche (code, profil prévu, ajustements)"
+                        onClick={() => setFiche(l.tacheId || l.cle)}
+                      >
+                        {!l.sup ? libelleTypeFo(l.cle) : l.libelle}
+                      </button>
+                    ) : (
+                      l.libelle
+                    )}
+                    {avecCode && l.cle && (
+                      <span className="elec-code-badge" style={{ marginLeft: 6, fontFamily: "var(--font-mono, monospace)", fontSize: 11, opacity: 0.7 }}>
+                        {codeAffiche(l)}
+                      </span>
+                    )}
                     {l.deroge && (
                       <span className="badge-derogation" title={detailDerogation}>
                         ≠ chiffrage
@@ -613,107 +594,11 @@ function TableauRecap({
                         ⚠ +{formatNombre(reelSap - l.vendu)} h vs vendu
                       </span>
                     )}
-                    {l.ajustable && sup?.onSupprimer && (
-                      <button
-                        type="button"
-                        className="btn-ghost btn-danger"
-                        title="Supprimer cette tâche : ses heures prévues repartent en « Sans tâche »"
-                        style={{ marginLeft: 8, padding: "0 6px" }}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "Supprimer la tâche « " + l.libelle + " » ? Ses heures prévues repartent en « Sans tâche »."
-                            )
-                          )
-                            sup.onSupprimer(l.tacheId, l);
-                        }}
-                      >
-                        ×
-                      </button>
-                    )}
                   </td>
                   {avecCode && (
-                    <>
-                      <td className="col-petit" data-label="Profil prévu">
-                        {l.cle ? (
-                          <select
-                            value={profilsMo?.[clePourCode(l)] || ""}
-                            disabled={!onChangerProfilMo}
-                            onChange={(e) => onChangerProfilMo(clePourCode(l), e.target.value)}
-                            title="Type de personnel prévu à la base pour cette tâche"
-                          >
-                            <option value="">Par défaut</option>
-                            {(profilsPossibles || []).map((c) => (
-                              <option key={c} value={c}>
-                                {c} | {libelleTypeActivite(c).replace(/ \([^)]*\)$/, "")}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          ""
-                        )}
-                      </td>
-                      <td className="col-num col-petit" data-label="Vendu">
-                        {l.cle || l.vendu ? formatNombre(l.vendu || 0) : ""}
-                      </td>
-                      <td className="col-num col-petit" data-label="Écart ± h">
-                        {l.ajustable && sup?.onChangerHeures ? (
-                          <input
-                            type="number"
-                            step="0.5"
-                            className="elec-ordre-input elec-heures-input"
-                            key={"a" + l.saisie}
-                            defaultValue={l.saisie}
-                            title={l.sup ? "Heures ajoutées au budget pour cette tâche" : "Heures ajoutées (+) ou retirées (−) par rapport au chiffrage"}
-                            onBlur={(e) => sup.onChangerHeures(l.tacheId, sup.portee, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") e.currentTarget.blur();
-                            }}
-                          />
-                        ) : l.ajustable ? (
-                          formatNombre(l.ajoute || 0)
-                        ) : (
-                          ""
-                        )}
-                        {l.ajustable && l.dansDevis > 0 && (
-                          <div className="simple-list-meta" title="Heures saisies dans les devis">
-                            +{formatNombre(l.dansDevis)} devis
-                          </div>
-                        )}
-                      </td>
-                      <td className="col-num col-petit" data-label="Pris sur « Sans tâche »">
-                        {l.ajustable && sup?.onChangerPrelevement ? (
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            className="elec-ordre-input elec-heures-input"
-                            key={"p" + l.prelevePropreSaisi}
-                            defaultValue={l.prelevePropreSaisi}
-                            title={
-                              "Heures prises sur « Sans tâche » (max " +
-                              formatNombre((sup.disponible?.(sup.portee, l.tacheId) || 0) + (l.prelevePropreSaisi || 0)) +
-                              " h) : retirées de cette ligne, ajoutées à la tâche"
-                            }
-                            onBlur={(e) => sup.onChangerPrelevement(l.tacheId, sup.portee, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") e.currentTarget.blur();
-                            }}
-                          />
-                        ) : l.ajustable ? (
-                          formatNombre(l.preleve || 0)
-                        ) : l.preleveEffectif ? (
-                          "−" + formatNombre(l.preleveEffectif)
-                        ) : (
-                          ""
-                        )}
-                        {l.ajustable && l.preleve - (l.prelevePropreSaisi || 0) > 0 && (
-                          <div className="simple-list-meta" title="Heures prises dans les devis">
-                            +{formatNombre(l.preleve - (l.prelevePropreSaisi || 0))} devis
-                          </div>
-                        )}
-                      </td>
-                    </>
+                    <td className="col-num col-petit" data-label="Vendu">
+                      {l.cle || l.vendu ? formatNombre(l.vendu || 0) : ""}
+                    </td>
                   )}
                   <td className="col-num" data-label={libelleValeur}>
                     {formatMontant(l.budget, uniteValeur)}
@@ -831,7 +716,6 @@ function TableauRecap({
               {sapMo && sapMo.nonAffectees.lignes.length > 0 && (
                 <>
                   <tr>
-                    <td className="col-code"></td>
                     <td
                       className="col-type"
                       data-label={libType}
@@ -840,9 +724,6 @@ function TableauRecap({
                     >
                       Heures SAP non affectées
                     </td>
-                    <td className="col-petit"></td>
-                    <td className="col-petit"></td>
-                    <td className="col-petit"></td>
                     <td className="col-petit"></td>
                     <td className="col-num" data-label={libelleValeur}>—</td>
                     <td className="col-num" data-label="Réalisé">—</td>
@@ -865,18 +746,11 @@ function TableauRecap({
                 </>
               )}
               <tr className="table-recap-total">
-                {avecCode ? <td className="col-code"></td> : <td className="col-ordre" data-label="N°"></td>}
+                {avecCode ? null : <td className="col-ordre" data-label="N°"></td>}
                 <td className="col-type" data-label={libType}>
                   TOTAL
                 </td>
-                {avecCode && (
-                  <>
-                    <td className="col-petit"></td>
-                    <td className="col-petit"></td>
-                    <td className="col-petit"></td>
-                    <td className="col-petit"></td>
-                  </>
-                )}
+                {avecCode && <td className="col-petit"></td>}
                 <td className="col-num" data-label={libelleValeur}>
                   {formatMontant(recap.total.budget, uniteValeur)}
                 </td>
@@ -950,6 +824,135 @@ function TableauRecap({
           </table>
         </div>
       )}
+      {fiche && (() => {
+        const l = recap.parType.find((x) => (x.tacheId || x.cle) === fiche);
+        if (!l) return null;
+        const nom = l.sup ? l.libelle : l.cle ? libelleTypeFo(l.cle) : l.libelle;
+        const clePC = l.cle ? clePourCode(l) : null;
+        return (
+          <div className="modal-backdrop" onClick={() => setFiche(null)}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+              <h2 style={{ marginTop: 0 }}>{nom}</h2>
+              <p className="simple-list-meta">
+                Vendu : {formatNombre(l.vendu || 0)} h · Heures prévues : {formatNombre(l.budget)} h
+              </p>
+              <div style={{ display: "grid", gap: 12 }}>
+                {l.cle && (
+                  <label>
+                    Code tâche SAP (8 caractères)
+                    <br />
+                    <input
+                      className="elec-code-input"
+                      maxLength={8}
+                      key={codeAffiche(l)}
+                      defaultValue={codeAffiche(l)}
+                      disabled={!onChangerCodeMo}
+                      style={
+                        codesUtilises.filter((c) => c === codeAffiche(l)).length > 1
+                          ? { borderColor: "var(--danger, #c0392b)" }
+                          : undefined
+                      }
+                      onBlur={(e) => onChangerCodeMo && onChangerCodeMo(clePC, e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                    />
+                  </label>
+                )}
+                {l.cle && (
+                  <label>
+                    Profil prévu (type de personnel)
+                    <br />
+                    <select
+                      value={profilsMo?.[clePC] || ""}
+                      disabled={!onChangerProfilMo}
+                      onChange={(e) => onChangerProfilMo(clePC, e.target.value)}
+                    >
+                      <option value="">Par défaut</option>
+                      {(profilsPossibles || []).map((c) => (
+                        <option key={c} value={c}>
+                          {c} | {libelleTypeActivite(c).replace(/ \([^)]*\)$/, "")}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {l.ajustable && (
+                  <label>
+                    Écart ± h par rapport au chiffrage
+                    <br />
+                    {sup?.onChangerHeures ? (
+                      <input
+                        type="number"
+                        step="0.5"
+                        className="elec-heures-input"
+                        key={"a" + l.saisie}
+                        defaultValue={l.saisie}
+                        onBlur={(e) => sup.onChangerHeures(l.tacheId, sup.portee, e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                      />
+                    ) : (
+                      formatNombre(l.ajoute || 0)
+                    )}
+                    {l.dansDevis > 0 && (
+                      <span className="simple-list-meta"> +{formatNombre(l.dansDevis)} h dans les devis</span>
+                    )}
+                  </label>
+                )}
+                {l.ajustable && (
+                  <label>
+                    Heures prises sur « Sans tâche »
+                    <br />
+                    {sup?.onChangerPrelevement ? (
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        className="elec-heures-input"
+                        key={"p" + l.prelevePropreSaisi}
+                        defaultValue={l.prelevePropreSaisi}
+                        title={
+                          "Max " +
+                          formatNombre((sup.disponible?.(sup.portee, l.tacheId) || 0) + (l.prelevePropreSaisi || 0)) +
+                          " h"
+                        }
+                        onBlur={(e) => sup.onChangerPrelevement(l.tacheId, sup.portee, e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                      />
+                    ) : (
+                      formatNombre(l.preleve || 0)
+                    )}
+                    {l.preleve - (l.prelevePropreSaisi || 0) > 0 && (
+                      <span className="simple-list-meta"> +{formatNombre(l.preleve - (l.prelevePropreSaisi || 0))} h dans les devis</span>
+                    )}
+                  </label>
+                )}
+              </div>
+              <div className="modal-actions" style={{ marginTop: 16 }}>
+                {l.ajustable && sup?.onSupprimer && (
+                  <button
+                    type="button"
+                    className="btn-ghost btn-danger"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Supprimer la tâche « " + l.libelle + " » ? Ses heures prévues repartent en « Sans tâche »."
+                        )
+                      ) {
+                        sup.onSupprimer(l.tacheId, l);
+                        setFiche(null);
+                      }
+                    }}
+                  >
+                    Supprimer la tâche
+                  </button>
+                )}
+                <button type="button" className="btn-primary" onClick={() => setFiche(null)}>
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {sup?.masquees?.length > 0 && sup?.onRestaurer && (
         <p className="simple-list-meta" style={{ marginTop: 10 }}>
           Tâches supprimées :{" "}
