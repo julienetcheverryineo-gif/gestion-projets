@@ -18,7 +18,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
-import { libelleTypeActivite, estLigneMoIgnoree } from "../lib/typesActiviteSap";
+import { libelleTypeActivite, estLigneMoIgnoree, estActiviteIgnoree, CODES_TYPES_ACTIVITE_CONNUS } from "../lib/typesActiviteSap";
 import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
@@ -176,6 +176,11 @@ function comparerOrdreType(ordreTypes, a, b) {
 // d'avancement saisi ligne par ligne, Restant = Budget − Réalisé.
 // (Le suivi Excel regroupe aussi les heures de main d'œuvre par Type de
 // FO, pas par Type de MO — repris ici à l'identique.)
+// Taux de chiffrage par défaut d'une affaire (saisi, sinon taux I205).
+function totalTauxDefaut(chantier, tauxHoraire) {
+  return chantier?.tauxChiffrageMo ?? tauxHoraire("I205") ?? 0;
+}
+
 function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
   const groupes = new Map();
   lignes.forEach((l) => {
@@ -267,6 +272,9 @@ function TableauRecap({
   sup,
   codesMo,
   onChangerCodeMo,
+  profilsMo,
+  onChangerProfilMo,
+  profilsPossibles,
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
@@ -303,7 +311,7 @@ function TableauRecap({
   const codesUtilises = recap.parType.map(codeAffiche).filter(Boolean);
   const libType = uniteValeur === "h" ? "Tâche" : "Type de FO";
   const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
-  const nbColonnes = 6 + (aSap ? 3 : 0) + (avecCode ? 3 : 0);
+  const nbColonnes = 6 + (aSap ? 3 : 0) + (avecCode ? 4 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
   // Détail des lignes d'achat SAP d'un type (ou hors budget) : chaque ligne
   // peut être réaffectée à un autre Type de FO du budget, ou laissée hors
@@ -513,6 +521,11 @@ function TableauRecap({
                 <th className="col-type" style={{ width: largeurColType }}>
                   {libType}
                 </th>
+                {avecCode && (
+                  <th className="col-petit" title="Type de personnel prévu à la base (taux horaire du bilan financier)">
+                    Profil prévu
+                  </th>
+                )}
                 {avecCode && <th className="col-num col-petit">Vendu</th>}
                 {avecCode && <th className="col-num col-petit" title="Heures ajoutées (+) ou retirées (−) par rapport au chiffrage">Écart ± h</th>}
                 {avecCode && <th className="col-num col-petit" title="Heures prises sur la ligne « Sans tâche »">Pris sur « Sans tâche »</th>}
@@ -621,6 +634,25 @@ function TableauRecap({
                   </td>
                   {avecCode && (
                     <>
+                      <td className="col-petit" data-label="Profil prévu">
+                        {l.cle ? (
+                          <select
+                            value={profilsMo?.[clePourCode(l)] || ""}
+                            disabled={!onChangerProfilMo}
+                            onChange={(e) => onChangerProfilMo(clePourCode(l), e.target.value)}
+                            title="Type de personnel prévu à la base pour cette tâche"
+                          >
+                            <option value="">Par défaut</option>
+                            {(profilsPossibles || []).map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          ""
+                        )}
+                      </td>
                       <td className="col-num col-petit" data-label="Vendu">
                         {l.cle || l.vendu ? formatNombre(l.vendu || 0) : ""}
                       </td>
@@ -811,6 +843,7 @@ function TableauRecap({
                     <td className="col-petit"></td>
                     <td className="col-petit"></td>
                     <td className="col-petit"></td>
+                    <td className="col-petit"></td>
                     <td className="col-num" data-label={libelleValeur}>—</td>
                     <td className="col-num" data-label="Réalisé">—</td>
                     <td className="col-avancement" data-label="% avancement"></td>
@@ -838,6 +871,7 @@ function TableauRecap({
                 </td>
                 {avecCode && (
                   <>
+                    <td className="col-petit"></td>
                     <td className="col-petit"></td>
                     <td className="col-petit"></td>
                     <td className="col-petit"></td>
@@ -2016,6 +2050,14 @@ export default function ElectriciteSiteDetail() {
     else delete maj[cle];
     await updateDoc(doc(db, "sites", chantierId), { codesMo: maj });
   };
+  const profilsMoChantier = chantier?.profilsMo || {};
+  const changerProfilMo = async (cle, valeur) => {
+    const maj = { ...profilsMoChantier };
+    if (valeur) maj[cle] = valeur;
+    else delete maj[cle];
+    await updateDoc(doc(db, "sites", chantierId), { profilsMo: maj });
+  };
+  const profilsPossibles = CODES_TYPES_ACTIVITE_CONNUS.filter((c) => !estActiviteIgnoree(c));
   const ajouterTacheSup = async (libelle, portee) => {
     const taches = tachesMoChantier(chantier).map(({ id, libelle: l, portee: p }) => ({ id, libelle: l, portee: p }));
     taches.push({ id: nouvelIdTache(), libelle, portee });
@@ -2442,14 +2484,22 @@ export default function ElectriciteSiteDetail() {
           {recapActif === "finance" &&
             (() => {
               const totFo = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
-              const totMo = construireRecapMo(
+              const recapMoSynthese = construireRecapMo(
                 calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", {}),
                 chantier,
                 GENERAL,
                 devis
-              ).total;
+              );
+              const totMo = recapMoSynthese.total;
+              const tauxDefautMo = totalTauxDefaut(chantier, tauxHoraire);
+              const budgetMoEuro = recapMoSynthese.parType.reduce((sm, l) => {
+                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
+                const t = profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
+                return sm + (l.budget || 0) * t;
+              }, 0);
               return (
                 <BilanFinancier
+                  budgetMoEuro={budgetMoEuro}
                   caCalcule={lignesChantier
                     .filter((l) => !estLigneSomme(l))
                     .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0)}
@@ -2514,6 +2564,9 @@ export default function ElectriciteSiteDetail() {
                 sap={sapRecap}
                 codesMo={avecSup ? codesMoChantier : null}
                 onChangerCodeMo={avecSup && peutGerer ? changerCodeMo : null}
+                profilsMo={avecSup ? profilsMoChantier : null}
+                onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
+                profilsPossibles={profilsPossibles}
                 sup={
                   avecSup && peutGerer
                     ? {
@@ -2547,6 +2600,9 @@ export default function ElectriciteSiteDetail() {
                   sap={sapRecapDevis(d, recap)}
                   codesMo={avecSup ? codesMoChantier : null}
                   onChangerCodeMo={avecSup && peutGerer ? changerCodeMo : null}
+                profilsMo={avecSup ? profilsMoChantier : null}
+                onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
+                profilsPossibles={profilsPossibles}
                   sup={
                     avecSup && peutGerer
                       ? {

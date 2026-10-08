@@ -38,6 +38,7 @@ export default function BilanFinancier({
   budgetFo,
   pctFo,
   budgetHeures,
+  budgetMoEuro,
   pctMo,
   achats,
   heures,
@@ -78,7 +79,7 @@ export default function BilanFinancier({
   const reelBloc = (nom) => parType.filter((t) => BLOC_MO(t.code) === nom).reduce((s, t) => s + (t.cout || 0), 0);
 
   const tx = tauxChiffrage ?? tauxChiffrageDefaut ?? 0;
-  const budgetMo = budgetHeures * tx;
+  const budgetMo = budgetMoEuro ?? budgetHeures * tx;
   const heuresEquiv = tx > 0 ? reelMo / tx : null;
 
   // Trois colonnes comme la FOA : prévu (minute), réel (SAP), atterrissage
