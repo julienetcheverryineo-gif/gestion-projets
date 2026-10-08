@@ -3976,3 +3976,32 @@ textarea:focus {
   background: #dc2626;
   color: #fff;
 }
+
+/* Bilan MO : colonnes compactes (code tâche SAP, vendu, écart, pris sur Sans tâche). */
+.table-recap .col-code {
+  width: 84px;
+  padding-left: 6px;
+  padding-right: 4px;
+}
+.table-recap .col-petit {
+  width: 70px;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+.table-recap th.col-petit {
+  white-space: normal;
+  line-height: 1.15;
+}
+.elec-code-input {
+  width: 74px;
+  padding: 2px 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-family: var(--font-mono, monospace);
+}
+.elec-heures-input {
+  width: 58px;
+  padding: 2px 4px;
+  font-size: 0.82rem;
+  text-align: right;
+}

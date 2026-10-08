@@ -309,7 +309,7 @@ function TableauRecap({
   const codesUtilises = recap.parType.map(codeAffiche).filter(Boolean);
   const libType = uniteValeur === "h" ? "Tâche" : "Type de FO";
   const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
-  const nbColonnes = 6 + (aSap ? 3 : 0) + (avecCode ? 1 : 0);
+  const nbColonnes = 6 + (aSap ? 3 : 0) + (avecCode ? 3 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
   // Détail des lignes d'achat SAP d'un type (ou hors budget) : chaque ligne
   // peut être réaffectée à un autre Type de FO du budget, ou laissée hors
@@ -449,17 +449,22 @@ function TableauRecap({
           <table className="data-table table-recap">
             <thead>
               <tr>
-                <th className="col-ordre" style={{ width: LARGEUR_COL_ORDRE }}>
-                  N°
-                </th>
+                {!avecCode && (
+                  <th className="col-ordre" style={{ width: LARGEUR_COL_ORDRE }}>
+                    N°
+                  </th>
+                )}
+                {avecCode && (
+                  <th className="col-code" title="Code à 8 caractères : tâche SAP et poste GOAT">
+                    Code tâche SAP
+                  </th>
+                )}
                 <th className="col-type" style={{ width: largeurColType }}>
                   {libType}
                 </th>
-                {avecCode && (
-                  <th className="col-code" title="Code à 8 caractères : tâche SAP et poste GOAT">
-                    Code
-                  </th>
-                )}
+                {avecCode && <th className="col-num col-petit">Vendu</th>}
+                {avecCode && <th className="col-num col-petit" title="Heures ajoutées (+) ou retirées (−) par rapport au chiffrage">Écart ± h</th>}
+                {avecCode && <th className="col-num col-petit" title="Heures prises sur la ligne « Sans tâche »">Pris sur « Sans tâche »</th>}
                 <th className="col-num">{libelleValeur}</th>
                 <th className="col-num">Réalisé (avancement)</th>
                 <th className="col-avancement">% avancement</th>
@@ -481,6 +486,7 @@ function TableauRecap({
                 return (
                 <Fragment key={l.libelle}>
                 <tr className={l.deroge ? "recap-derogation" : ""}>
+                  {!avecCode && (
                   <td className="col-ordre" data-label="N°">
                     {onModifierOrdre ? (
                       <input
@@ -498,12 +504,38 @@ function TableauRecap({
                       ordreTypes?.[l.cle] ?? index + 1
                     )}
                   </td>
+                  )}
+                  {avecCode && (
+                    <td className="col-code" data-label="Code tâche SAP">
+                      {l.cle ? (
+                        <input
+                          className="elec-code-input"
+                          maxLength={8}
+                          key={codeAffiche(l)}
+                          defaultValue={codeAffiche(l)}
+                          disabled={!onChangerCodeMo}
+                          title="Code à 8 caractères (import SAP des tâches et GOAT) — modifiable"
+                          style={
+                            codesUtilises.filter((c) => c === codeAffiche(l)).length > 1
+                              ? { borderColor: "var(--danger, #c0392b)" }
+                              : undefined
+                          }
+                          onBlur={(e) => onChangerCodeMo && onChangerCodeMo(clePourCode(l), e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                        />
+                      ) : (
+                        ""
+                      )}
+                    </td>
+                  )}
                   <td
                     className="col-type"
                     data-label={libType}
                     style={{ fontFamily: "var(--font-ui)" }}
                   >
-                    {l.libelle}
+                    {avecCode && l.cle && !l.sup ? libelleTypeFo(l.cle) : l.libelle}
                     {l.deroge && (
                       <span className="badge-derogation" title={detailDerogation}>
                         ≠ chiffrage
@@ -533,58 +565,42 @@ function TableauRecap({
                     )}
                   </td>
                   {avecCode && (
-                    <td className="col-code" data-label="Code">
-                      {l.cle ? (
-                        <input
-                          className="elec-code-input"
-                          maxLength={8}
-                          key={codeAffiche(l)}
-                          defaultValue={codeAffiche(l)}
-                          disabled={!onChangerCodeMo}
-                          title="Code à 8 caractères (import SAP des tâches et GOAT) — modifiable"
-                          style={
-                            codesUtilises.filter((c) => c === codeAffiche(l)).length > 1
-                              ? { borderColor: "var(--danger, #c0392b)" }
-                              : undefined
-                          }
-                          onBlur={(e) => onChangerCodeMo && onChangerCodeMo(clePourCode(l), e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") e.currentTarget.blur();
-                          }}
-                        />
-                      ) : (
-                        ""
-                      )}
-                    </td>
-                  )}
-                  <td className="col-num" data-label={libelleValeur}>
-                    {l.ajustable && sup?.onChangerHeures ? (
-                      <>
-                        <div>
-                          +{" "}
+                    <>
+                      <td className="col-num col-petit" data-label="Vendu">
+                        {l.cle || l.vendu ? formatNombre(l.vendu || 0) : ""}
+                      </td>
+                      <td className="col-num col-petit" data-label="Écart ± h">
+                        {l.ajustable && sup?.onChangerHeures ? (
                           <input
                             type="number"
                             step="0.5"
-                            className="elec-ordre-input"
-                            style={{ width: 80 }}
+                            className="elec-ordre-input elec-heures-input"
                             key={"a" + l.saisie}
                             defaultValue={l.saisie}
-                            title="Heures ajoutées au budget pour cette tâche"
+                            title={l.sup ? "Heures ajoutées au budget pour cette tâche" : "Heures ajoutées (+) ou retirées (−) par rapport au chiffrage"}
                             onBlur={(e) => sup.onChangerHeures(l.tacheId, sup.portee, e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") e.currentTarget.blur();
                             }}
-                          />{" "}
-                          {l.sup ? "h ajoutées" : "h d'écart (± au chiffrage)"}
-                        </div>
-                        <div>
-                          ↳{" "}
+                          />
+                        ) : l.ajustable ? (
+                          formatNombre(l.ajoute || 0)
+                        ) : (
+                          ""
+                        )}
+                        {l.ajustable && l.dansDevis > 0 && (
+                          <div className="simple-list-meta" title="Heures saisies dans les devis">
+                            +{formatNombre(l.dansDevis)} devis
+                          </div>
+                        )}
+                      </td>
+                      <td className="col-num col-petit" data-label="Pris sur « Sans tâche »">
+                        {l.ajustable && sup?.onChangerPrelevement ? (
                           <input
                             type="number"
                             step="0.5"
                             min="0"
-                            className="elec-ordre-input"
-                            style={{ width: 80 }}
+                            className="elec-ordre-input elec-heures-input"
                             key={"p" + l.prelevePropreSaisi}
                             defaultValue={l.prelevePropreSaisi}
                             title={
@@ -596,25 +612,24 @@ function TableauRecap({
                             onKeyDown={(e) => {
                               if (e.key === "Enter") e.currentTarget.blur();
                             }}
-                          />{" "}
-                          h prises sur « Sans tâche »
-                        </div>
-                        <strong>= {formatNombre(l.budget)} h</strong>
-                        {!l.sup && (
-                          <span className="simple-list-meta"> (vendu {formatNombre(l.vendu)} h)</span>
+                          />
+                        ) : l.ajustable ? (
+                          formatNombre(l.preleve || 0)
+                        ) : l.preleveEffectif ? (
+                          "−" + formatNombre(l.preleveEffectif)
+                        ) : (
+                          ""
                         )}
-                        {l.dansDevis > 0 && (
-                          <span className="simple-list-meta"> (dont {formatNombre(l.dansDevis)} h saisies dans les devis)</span>
+                        {l.ajustable && l.preleve - (l.prelevePropreSaisi || 0) > 0 && (
+                          <div className="simple-list-meta" title="Heures prises dans les devis">
+                            +{formatNombre(l.preleve - (l.prelevePropreSaisi || 0))} devis
+                          </div>
                         )}
-                      </>
-                    ) : (
-                      <>
-                        {formatMontant(l.budget, uniteValeur)}
-                        {l.deroge && !l.ajustable && (
-                          <span className="simple-list-meta"> (vendu {formatNombre(l.vendu)} h)</span>
-                        )}
-                      </>
-                    )}
+                      </td>
+                    </>
+                  )}
+                  <td className="col-num" data-label={libelleValeur}>
+                    {formatMontant(l.budget, uniteValeur)}
                   </td>
                   <td className="col-num" data-label="Réalisé">
                     {formatMontant(l.realise, uniteValeur)}
@@ -729,7 +744,7 @@ function TableauRecap({
               {sapMo && sapMo.nonAffectees.lignes.length > 0 && (
                 <>
                   <tr>
-                    <td className="col-ordre" data-label="N°"></td>
+                    <td className="col-code"></td>
                     <td
                       className="col-type"
                       data-label={libType}
@@ -738,7 +753,9 @@ function TableauRecap({
                     >
                       Heures SAP non affectées
                     </td>
-                    {avecCode && <td className="col-code"></td>}
+                    <td className="col-petit"></td>
+                    <td className="col-petit"></td>
+                    <td className="col-petit"></td>
                     <td className="col-num" data-label={libelleValeur}>—</td>
                     <td className="col-num" data-label="Réalisé">—</td>
                     <td className="col-avancement" data-label="% avancement"></td>
@@ -760,11 +777,17 @@ function TableauRecap({
                 </>
               )}
               <tr className="table-recap-total">
-                <td className="col-ordre" data-label="N°"></td>
+                {avecCode ? <td className="col-code"></td> : <td className="col-ordre" data-label="N°"></td>}
                 <td className="col-type" data-label={libType}>
                   TOTAL
                 </td>
-                {avecCode && <td className="col-code"></td>}
+                {avecCode && (
+                  <>
+                    <td className="col-petit"></td>
+                    <td className="col-petit"></td>
+                    <td className="col-petit"></td>
+                  </>
+                )}
                 <td className="col-num" data-label={libelleValeur}>
                   {formatMontant(recap.total.budget, uniteValeur)}
                 </td>
