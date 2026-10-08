@@ -27,9 +27,7 @@ import EnvoyerFournituresGoatModal from "../components/EnvoyerFournituresGoatMod
 import {
   GENERAL,
   cleSup,
-  injecterSup,
-  lignesSupDevis,
-  lignesSupSynthese,
+  construireRecapMo,
   nouvelIdTache,
   tachesGenerales,
   tachesMoChantier,
@@ -438,6 +436,12 @@ function TableauRecap({
           {portee === "devis" ? ", dans ce devis." : ", dans tous les devis du chantier."}
         </p>
       )}
+      {avecCode && (
+        <p className="simple-list-meta" style={{ marginBottom: 8 }}>
+          <span className="badge-derogation">≠ chiffrage</span> budget adapté par rapport au chiffrage vendu ·{" "}
+          <span className="badge-depassement">⚠ vs vendu</span> heures SAP au-dessus des heures vendues de la tâche.
+        </p>
+      )}
       {recap.parType.length === 0 ? (
         <p className="simple-list-meta">Aucune donnée chiffrée pour ce périmètre.</p>
       ) : (
@@ -466,9 +470,17 @@ function TableauRecap({
               </tr>
             </thead>
             <tbody>
-              {recap.parType.map((l, index) => (
+              {recap.parType.map((l, index) => {
+                const reelSap = sapMo && l.cle ? sapMo.parCle.get(l.cle)?.reel || 0 : 0;
+                const depasseVendu = Boolean(sapMo && l.cle && l.vendu > 0 && reelSap > l.vendu + 0.005);
+                const detailDerogation =
+                  "Chiffrage (vendu) : " + formatNombre(l.vendu || 0) + " h" +
+                  (l.ajoute ? " · " + (l.ajoute > 0 ? "+" : "") + formatNombre(l.ajoute) + " h ajustées" : "") +
+                  (l.preleve ? " · +" + formatNombre(l.preleve) + " h prises sur « Sans tâche »" : "") +
+                  (l.preleveEffectif ? " · −" + formatNombre(l.preleveEffectif) + " h redistribuées vers des tâches" : "");
+                return (
                 <Fragment key={l.libelle}>
-                <tr>
+                <tr className={l.deroge ? "recap-derogation" : ""}>
                   <td className="col-ordre" data-label="N°">
                     {onModifierOrdre ? (
                       <input
@@ -492,6 +504,19 @@ function TableauRecap({
                     style={{ fontFamily: "var(--font-ui)" }}
                   >
                     {l.libelle}
+                    {l.deroge && (
+                      <span className="badge-derogation" title={detailDerogation}>
+                        ≠ chiffrage
+                      </span>
+                    )}
+                    {depasseVendu && (
+                      <span
+                        className="badge-depassement"
+                        title={"Heures SAP (" + formatNombre(reelSap) + " h) au-dessus des heures vendues (" + formatNombre(l.vendu) + " h)"}
+                      >
+                        ⚠ +{formatNombre(reelSap - l.vendu)} h vs vendu
+                      </span>
+                    )}
                     {l.sup && !l.fixe && sup?.onSupprimer && (
                       <button
                         type="button"
@@ -533,14 +558,13 @@ function TableauRecap({
                     </td>
                   )}
                   <td className="col-num" data-label={libelleValeur}>
-                    {l.sup && sup?.onChangerHeures ? (
+                    {l.ajustable && sup?.onChangerHeures ? (
                       <>
                         <div>
                           +{" "}
                           <input
                             type="number"
                             step="0.5"
-                            min="0"
                             className="elec-ordre-input"
                             style={{ width: 80 }}
                             key={"a" + l.saisie}
@@ -551,7 +575,7 @@ function TableauRecap({
                               if (e.key === "Enter") e.currentTarget.blur();
                             }}
                           />{" "}
-                          h ajoutées
+                          {l.sup ? "h ajoutées" : "h d'écart (± au chiffrage)"}
                         </div>
                         <div>
                           ↳{" "}
@@ -576,12 +600,20 @@ function TableauRecap({
                           h prises sur « Sans tâche »
                         </div>
                         <strong>= {formatNombre(l.budget)} h</strong>
+                        {!l.sup && (
+                          <span className="simple-list-meta"> (vendu {formatNombre(l.vendu)} h)</span>
+                        )}
                         {l.dansDevis > 0 && (
                           <span className="simple-list-meta"> (dont {formatNombre(l.dansDevis)} h saisies dans les devis)</span>
                         )}
                       </>
                     ) : (
-                      formatMontant(l.budget, uniteValeur)
+                      <>
+                        {formatMontant(l.budget, uniteValeur)}
+                        {l.deroge && !l.ajustable && (
+                          <span className="simple-list-meta"> (vendu {formatNombre(l.vendu)} h)</span>
+                        )}
+                      </>
                     )}
                   </td>
                   <td className="col-num" data-label="Réalisé">
@@ -660,7 +692,8 @@ function TableauRecap({
                 {sapFo && ouverts.has(l.cle) && detailSapFo(sapFo.parCle.get(l.cle).lignes)}
                 {sapMo && ouverts.has(l.cle) && detailSapMo(sapMo.parCle.get(l.cle).lignes)}
                 </Fragment>
-              ))}
+                );
+              })}
               {sapFo && sapFo.horsBudget.lignes.length > 0 && (
                 <>
                   <tr>
@@ -1761,7 +1794,7 @@ export default function ElectriciteSiteDetail() {
       ? (() => {
           const base = calculerRecap(lignesChantier, champRecap, champAvancementRecap, ordreTypesChantier);
           sansTacheBase[GENERAL] = base.parType.find((l) => !l.cle)?.budget || 0;
-          return avecSup ? injecterSup(base, lignesSupSynthese(chantier, devis)) : base;
+          return avecSup ? construireRecapMo(base, chantier, GENERAL, devis) : base;
         })()
       : null;
   const recapParDevis =
@@ -1774,13 +1807,13 @@ export default function ElectriciteSiteDetail() {
             ordreTypesChantier
           );
           sansTacheBase[d.id] = base.parType.find((l) => !l.cle)?.budget || 0;
-          return { devis: d, recap: avecSup ? injecterSup(base, lignesSupDevis(chantier, d.id)) : base };
+          return { devis: d, recap: avecSup ? construireRecapMo(base, chantier, d.id, devis) : base };
         })
       : [];
   // Saisie des heures d'une tâche complémentaire ("" ou 0 retire la valeur).
   const changerHeuresSup = async (tacheId, portee, valeur) => {
     const v = valeur === "" ? 0 : Number(String(valeur).replace(",", "."));
-    if (Number.isNaN(v) || v < 0) return;
+    if (Number.isNaN(v)) return;
     const maj = { ...(chantier?.heuresMoSup || {}) };
     const cle = portee + "||" + tacheId;
     if (v === 0) delete maj[cle];
@@ -2554,7 +2587,7 @@ export default function ElectriciteSiteDetail() {
           chantierId={chantierId}
           chantier={chantier}
           mode={afficherEnvoiGoat}
-          lignes={afficherEnvoiGoat === "mo" ? lignesMainOeuvreGoat(lignesChantier, lignesSupSynthese(chantier, devis), chantier?.codesMo || {}) : lignesFournitureGoat(lignesChantier)}
+          lignes={afficherEnvoiGoat === "mo" ? lignesMainOeuvreGoat(construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", ordreTypesChantier), chantier, GENERAL, devis), chantier?.codesMo || {}) : lignesFournitureGoat(lignesChantier)}
           onClose={() => setAfficherEnvoiGoat(null)}
         />
       )}

@@ -3952,3 +3952,27 @@ textarea:focus {
   font-family: var(--font-mono, monospace);
   font-size: 0.85rem;
 }
+
+/* Bilan MO : dérogation au chiffrage (orange) et dépassement du vendu (rouge). */
+.recap-derogation > td {
+  background: rgba(245, 158, 11, 0.12);
+}
+.badge-derogation,
+.badge-depassement {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.badge-derogation {
+  background: #f59e0b;
+  color: #3b2300;
+}
+.badge-depassement {
+  background: #dc2626;
+  color: #fff;
+}

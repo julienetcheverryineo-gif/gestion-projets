@@ -1,37 +1,4 @@
-import * as XLSX from "xlsx";
 import { CORRESPONDANCE_SAP_QDV } from "./correspondanceSapQdv";
-
-// En-têtes EXACTS du classeur modèle fourni par Julien (voir
-// Modele_pour_goat.xlsx) — l'outil GOAT attend ces intitulés précis, espaces
-// compris ("Poste " et "Avct réel " se terminent par une espace dans le
-// modèle).
-const ENTETES_FOURNITURE = [
-  "Type",
-  "Besoin / GO",
-  "Libellé",
-  "Budget €",
-  "Devis",
-  "Réalisé",
-  "Gain potentiel",
-  "RAE",
-  "EAT",
-  "Boni Mali",
-  "Achat prévu",
-  "Commentaires",
-];
-const ENTETES_MO = [
-  "Poste ",
-  "Libellé",
-  "Budget H",
-  "Réalisé",
-  "RAE",
-  "EAT",
-  "Ecart Eat / Budget",
-  "Avct réel ",
-  "Avct théo",
-  "RAE / % Avt réel",
-  "Ecart / Budget",
-];
 
 // Table de correspondance Code QDV -> {codeSap, libelleSap}, indexée une
 // fois pour toutes (voir lib/correspondanceSapQdv.js).
@@ -141,88 +108,19 @@ export function codeMo(saisi, defaut) {
   return net || String(defaut || "");
 }
 
-// Lignes Main d'œuvre à écrire dans GOAT (fichier d'import ou table
-// MainOeuvre de la base) : une par Type de FO, Poste = résumé 8 caractères du
-// libellé, heures = somme des heures prévues.
-export function lignesMainOeuvreGoat(lignesChiffrables, lignesSup = [], codesMo = {}) {
+// Lignes Main d'œuvre à écrire dans GOAT (table MainOeuvre) à partir du
+// Récap MO final de la synthèse (heures adaptées comprises) : une ligne par
+// tâche ayant des heures, code à 8 caractères (modifiable, voir codeMo).
+export function lignesMainOeuvreGoat(recapMo, codesMo = {}) {
   const parCode = new Map();
-  sommeParTypeFo(lignesChiffrables, "tempsTotalHeures").forEach((t) => {
-    const code = codeMo(codesMo[t.code], resumerPoste(t.libelle) || String(t.code).slice(0, 8));
-    if (parCode.has(code)) parCode.get(code).heures += t.valeur;
-    else parCode.set(code, { code, libelle: String(t.libelle || t.code).trim().slice(0, 255), heures: t.valeur });
-  });
-  // Tâches complémentaires (suivi, étude…) ayant des heures budgétées.
-  lignesSup
-    .filter((t) => t.budget > 0)
-    .forEach((t) => {
-      const code = codeMo(codesMo[t.cle], resumerPoste(t.libelle) || "TACHE");
-      if (parCode.has(code)) parCode.get(code).heures += t.budget;
-      else parCode.set(code, { code, libelle: String(t.libelle).trim().slice(0, 255), heures: t.budget });
+  recapMo.parType
+    .filter((l) => l.cle && l.budget > 0)
+    .forEach((l) => {
+      const libelle = l.sup ? l.libelle : libelleTypeFo(l.cle) || l.libelle;
+      const cleCode = l.sup ? l.cle : codeTypeFo(l.cle);
+      const code = codeMo(codesMo[cleCode], resumerPoste(libelle) || (l.sup ? "TACHE" : String(cleCode).slice(0, 8)));
+      if (parCode.has(code)) parCode.get(code).heures += l.budget;
+      else parCode.set(code, { code, libelle: String(libelle).trim().slice(0, 255), heures: l.budget });
     });
   return [...parCode.values()].map((m) => ({ ...m, heures: Math.round(m.heures * 100) / 100 }));
-}
-
-function feuilleAvecEntetes(lignes, entetes) {
-  if (lignes.length === 0) return XLSX.utils.aoa_to_sheet([entetes]);
-  return XLSX.utils.json_to_sheet(lignes, { header: entetes });
-}
-
-// Construit et télécharge le fichier d'import GOAT d'un chantier
-// Électricité : deux onglets (Fourniture, Main d'œuvre), sur la trame
-// exacte du modèle, à partir du Récap "synthèse tous devis" du chantier
-// (même donnée que les onglets Bilan Fournitures / Bilan Main d'œuvre).
-//
-// - Fourniture : une ligne par Type de FO présent dans le Bilan
-//   Fournitures, Besoin/GO et Libellé via la correspondance Code SAP (voir
-//   lib/correspondanceSapQdv.js) — les sous-codes à 3 chiffres d'un code
-//   parent connu (ex: 151/152/153 → 15 "Eclairage") sont sommés sur la
-//   ligne du parent (voir codeParentFourniture) ; à défaut de
-//   correspondance connue, on reprend tel quel le code/libellé du Type de
-//   FO plutôt que de perdre le budget. Budget € = somme du coût total FO.
-//   Tout le reste à 0.
-// - Main d'œuvre : une ligne par Type de FO présent dans le Bilan Main
-//   d'œuvre, Poste = résumé 8 caractères du libellé, Budget H = somme des
-//   heures prévues. Tout le reste à 0.
-export function exporterGoat({ chantier, lignesChantier }) {
-  const lignesChiffrables = lignesChantier.filter((l) => !l.estPoste);
-
-  const fournitures = lignesFournitureGoat(lignesChiffrables).map((f) => ({
-    Type: f.typeId === 2 ? "Sous-Traitance" : "Fourniture",
-    "Besoin / GO": f.code,
-    Libellé: f.libelle,
-    "Budget €": f.budget,
-    Devis: 0,
-    Réalisé: 0,
-    "Gain potentiel": 0,
-    RAE: 0,
-    EAT: 0,
-    "Boni Mali": 0,
-    "Achat prévu": 0,
-    Commentaires: 0,
-  }));
-
-  const mainOeuvre = lignesMainOeuvreGoat(lignesChiffrables).map((m) => ({
-    "Poste ": m.code,
-    Libellé: m.libelle,
-    "Budget H": m.heures,
-    Réalisé: 0,
-    RAE: 0,
-    EAT: 0,
-    "Ecart Eat / Budget": 0,
-    "Avct réel ": 0,
-    "Avct théo": 0,
-    "RAE / % Avt réel": 0,
-    "Ecart / Budget": 0,
-  }));
-
-  const classeur = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(
-    classeur,
-    feuilleAvecEntetes(fournitures, ENTETES_FOURNITURE),
-    "Fourniture"
-  );
-  XLSX.utils.book_append_sheet(classeur, feuilleAvecEntetes(mainOeuvre, ENTETES_MO), "Main d'oeuvre");
-
-  const nomChantier = (chantier?.nom || "chantier").replace(/[\\/:*?"<>|]/g, "-");
-  XLSX.writeFile(classeur, `GOAT - ${nomChantier}.xlsx`);
 }

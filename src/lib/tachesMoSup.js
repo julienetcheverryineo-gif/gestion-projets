@@ -13,6 +13,8 @@
 //     PRISES sur la ligne « Sans tâche » (le total ne change pas : elles sont
 //     retirées de « Sans tâche » et ajoutées à la tâche)
 
+import { codeTypeFo } from "./exportGoat";
+
 export const GENERAL = "__general";
 export const PORTEE_TOUS = "tous";
 export const PREFIXE_CLE = "sup:";
@@ -40,76 +42,103 @@ export function tachesMoChantier(chantier) {
 const heuresDe = (chantier, scope, id) => Number(chantier?.heuresMoSup?.[scope + "||" + id]) || 0;
 const prelevDe = (chantier, scope, id) => Number(chantier?.prelevementsMoSup?.[scope + "||" + id]) || 0;
 
-function ligneRecap(t, extra) {
-  const budget = extra.saisie + extra.prelevePropre + (extra.dansDevis || 0);
-  return {
-    cle: cleSup(t.id),
-    libelle: t.libelle,
-    numero: null,
-    budget,
-    realise: 0,
-    restant: budget,
-    pctAvancement: 0,
-    sup: true,
-    tacheId: t.id,
-    fixe: Boolean(t.fixe),
-    ...extra,
+// Identifiant d'ajustement d'une tâche issue de la minute (par code de type).
+export const idTacheMinute = (cle) => "t:" + codeTypeFo(cle);
+
+// Construit le Récap MO complet d'un périmètre à partir du récap « minute » :
+//  - toutes les tâches (de la minute ET complémentaires) peuvent être
+//    ajustées : heures ajoutées / retirées, heures prises sur « Sans tâche » ;
+//  - chaque ligne garde `vendu` (le chiffrage de la minute) pour repérer les
+//    dérogations (`deroge`) et, plus tard, les dépassements du vendu ;
+//  - la ligne « Sans tâche » est diminuée des heures redistribuées.
+// `scope` : GENERAL (synthèse tous devis) ou l'id d'un devis.
+export function construireRecapMo(base, chantier, scope, devis) {
+  const estSynthese = scope === GENERAL;
+  const valeurs = (id) => {
+    const ajoutePropre = heuresDe(chantier, scope, id);
+    const prelevePropre = prelevDe(chantier, scope, id);
+    let ajouteDevis = 0;
+    let prelDevis = 0;
+    if (estSynthese) {
+      devis.forEach((d) => {
+        ajouteDevis += heuresDe(chantier, d.id, id);
+        prelDevis += prelevDe(chantier, d.id, id);
+      });
+    }
+    return {
+      ajoutePropre,
+      prelevePropre,
+      dansDevis: ajouteDevis + prelDevis,
+      ajoute: ajoutePropre + ajouteDevis,
+      preleve: prelevePropre + prelDevis,
+    };
   };
-}
+  const habiller = (l, id, venduBase, estSup, t) => {
+    const v = valeurs(id);
+    const budget = venduBase + v.ajoute + v.preleve;
+    const pct = estSup ? 0 : l.pctAvancement || 0;
+    return {
+      ...l,
+      cle: estSup ? cleSup(t.id) : l.cle,
+      libelle: estSup ? t.libelle : l.libelle,
+      sup: Boolean(estSup),
+      ajustable: true,
+      tacheId: id,
+      fixe: Boolean(t?.fixe),
+      budget,
+      realise: pct * budget,
+      restant: budget - pct * budget,
+      pctAvancement: pct,
+      saisie: v.ajoutePropre,
+      prelevePropreSaisi: v.prelevePropre,
+      dansDevis: v.dansDevis,
+      ajoute: v.ajoute,
+      preleve: v.preleve,
+      // Référence « vendu » : chiffrage de la tâche (minute) ou heures
+      // reprises sur « Sans tâche » (tâche complémentaire).
+      vendu: estSup ? v.preleve : venduBase,
+      deroge: estSup ? v.ajoute !== 0 : v.ajoute !== 0 || v.preleve !== 0,
+    };
+  };
 
-// Lignes à ajouter au Récap MO d'un devis : socle fixe + tâches ajoutées dans ce devis.
-export function lignesSupDevis(chantier, devisId) {
-  return tachesMoChantier(chantier)
-    .filter((t) => t.portee === PORTEE_TOUS || t.portee === devisId)
-    .map((t) => {
-      const saisie = heuresDe(chantier, devisId, t.id);
-      const preleve = prelevDe(chantier, devisId, t.id);
-      return ligneRecap(t, { saisie, prelevePropre: preleve, preleve, prelevePropreSaisi: preleve, dansDevis: 0 });
-    });
-}
+  const lignesMinute = base.parType.filter((l) => l.cle).map((l) => habiller(l, idTacheMinute(l.cle), l.budget, false, null));
+  const lignesSup = tachesMoChantier(chantier)
+    .filter((t) => estSynthese || t.portee === PORTEE_TOUS || t.portee === scope)
+    .map((t) =>
+      habiller(
+        { cle: "", libelle: t.libelle, budget: 0, realise: 0, restant: 0, pctAvancement: 0 },
+        t.id,
+        0,
+        true,
+        t
+      )
+    );
 
-// Lignes de la synthèse tous devis : toutes les tâches, budget = heures du
-// général + heures de chaque devis. `saisie`/`prelevePropre` = parts du général.
-export function lignesSupSynthese(chantier, devis) {
-  return tachesMoChantier(chantier).map((t) => {
-    const saisie = heuresDe(chantier, GENERAL, t.id);
-    const prelG = prelevDe(chantier, GENERAL, t.id);
-    const dansDevis = devis.reduce((s, d) => s + heuresDe(chantier, d.id, t.id) + prelevDe(chantier, d.id, t.id), 0);
-    const prelD = devis.reduce((s, d) => s + prelevDe(chantier, d.id, t.id), 0);
-    return ligneRecap(t, {
-      saisie,
-      prelevePropre: prelG,
-      prelevePropreSaisi: prelG,
-      preleve: prelG + prelD,
-      dansDevis,
-    });
-  });
-}
-
-// Recap (parType + total) augmenté des lignes complémentaires. Les heures
-// « prises sur Sans tâche » sont retirées de cette ligne (au prorata du
-// réalisé) : le total n'est augmenté que des heures réellement ajoutées.
-export function injecterSup(recap, lignesSup) {
-  const supBudget = lignesSup.reduce((s, l) => s + l.budget, 0);
-  const demande = lignesSup.reduce((s, l) => s + (l.preleve || 0), 0);
+  const demande = [...lignesMinute, ...lignesSup].reduce((s, l) => s + l.preleve, 0);
   let preleveEffectif = 0;
-  let deltaRealise = 0;
-  const parType = recap.parType.map((l) => {
-    if (l.cle || demande <= 0) return l;
-    preleveEffectif = Math.min(demande, l.budget);
+  const parType = base.parType.map((l) => {
+    if (l.cle) return lignesMinute.find((m) => m.cle === l.cle);
+    preleveEffectif = Math.min(Math.max(demande, 0), l.budget);
     const budget = l.budget - preleveEffectif;
     const realise = l.budget > 0 ? l.realise * (budget / l.budget) : 0;
-    deltaRealise = realise - l.realise;
-    return { ...l, budget, realise, restant: budget - realise, pctAvancement: budget > 0 ? realise / budget : 0 };
+    return {
+      ...l,
+      budget,
+      realise,
+      restant: budget - realise,
+      pctAvancement: budget > 0 ? realise / budget : 0,
+      vendu: l.budget,
+      deroge: preleveEffectif > 0,
+      preleveEffectif,
+    };
   });
-  const total = {
-    ...recap.total,
-    budget: recap.total.budget + supBudget - preleveEffectif - (demande - preleveEffectif),
-    realise: recap.total.realise + deltaRealise,
+  const toutes = [...parType, ...lignesSup];
+  const budget = toutes.reduce((s, l) => s + l.budget, 0);
+  const realise = toutes.reduce((s, l) => s + l.realise, 0);
+  return {
+    parType: toutes,
+    total: { budget, realise, restant: budget - realise, pctAvancement: budget > 0 ? realise / budget : 0 },
   };
-  total.restant = total.budget - total.realise;
-  total.pctAvancement = total.budget > 0 ? total.realise / total.budget : 0;
-  return { parType: [...parType, ...lignesSup], total };
 }
 
 // Tâches proposées comme cible d'une heure SAP « au général ».
