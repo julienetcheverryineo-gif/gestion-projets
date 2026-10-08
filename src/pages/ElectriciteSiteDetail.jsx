@@ -609,7 +609,9 @@ function TableauRecap({
                         {formatMontant(l.montantPr ?? l.budget, uniteValeur)}
                       </td>
                       <td className="col-num col-petit" data-label="k achat">
-                        {l.cle ? (
+                        {!l.cle ? (
+                          ""
+                        ) : portee === "devis" ? (
                           <input
                             type="text"
                             inputMode="decimal"
@@ -622,6 +624,10 @@ function TableauRecap({
                             onBlur={(e) => onChangerK && onChangerK(l.cle, e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                           />
+                        ) : l.montantPr > 0 ? (
+                          <span title="Moyenne pondérée des k des devis (modifiable dans chaque devis)">
+                            {(Math.round((l.budget / l.montantPr) * 10000) / 10000).toString().replace(".", ",")}
+                          </span>
                         ) : (
                           ""
                         )}
@@ -1981,7 +1987,7 @@ export default function ElectriciteSiteDetail() {
       (acc, l) => {
         const pctFo = (l.avancementFo ?? l.avancement ?? 0) / 100;
         const pctMo = (l.avancementMo ?? l.avancement ?? 0) / 100;
-        const kl = chantier?.kAchatFo?.[(l.typeFo || "").trim()];
+        const kl = kAchatsDevis(l.devisId)[(l.typeFo || "").trim()];
         const coutK = (l.coutTotalFo || 0) * (typeof kl === "number" && kl > 0 ? kl : 1);
         acc.budgetMateriel += coutK;
         acc.realiseMateriel += coutK * pctFo;
@@ -1996,22 +2002,28 @@ export default function ElectriciteSiteDetail() {
   // confondus — pour les récapitulatifs par Type de FO.
   // Le « k achat » d'un Type de FO (ex. 0,9 = 10 % de remise) transforme le
   // montant PR du chiffrage en budget matériel : tous les bilans en partent.
-  const kAchats = chantier?.kAchatFo || {};
+  // Le k achat se gère par devis (chantier.kAchatDevis[devisId][typeFo]).
+  // Tant qu'un devis n'a pas son propre réglage, on reprend l'ancien k
+  // unique du chantier (chantier.kAchatFo).
+  const kAchatsDevis = (devisId) =>
+    chantier?.kAchatDevis?.[devisId] || chantier?.kAchatFo || {};
   const lignesChantier = toutesLignes
     .filter((l) => l.chantierId === chantierId && !l.estPoste)
     .map((l) => {
-      const k = kAchats[(l.typeFo || "").trim()];
+      const k = kAchatsDevis(l.devisId)[(l.typeFo || "").trim()];
       return typeof k === "number" && k > 0 && k !== 1
         ? { ...l, coutTotalFoPr: l.coutTotalFo || 0, coutTotalFo: (l.coutTotalFo || 0) * k }
         : l;
     });
-  const changerKAchat = async (cle, valeur) => {
+  const changerKAchat = async (devisId, cle, valeur) => {
     const t = String(valeur).replace(",", ".").trim();
     const n = t === "" ? NaN : Number(t);
-    const maj = { ...kAchats };
+    const maj = { ...kAchatsDevis(devisId) };
     if (!Number.isFinite(n) || n <= 0 || n === 1) delete maj[cle];
     else maj[cle] = Math.round(n * 10000) / 10000;
-    await updateDoc(doc(db, "sites", chantierId), { kAchatFo: maj });
+    await updateDoc(doc(db, "sites", chantierId), {
+      kAchatDevis: { ...(chantier?.kAchatDevis || {}), [devisId]: maj },
+    });
   };
   // Tâches (types de FO) réellement utilisées dans les devis du chantier :
   // code + libellé, pour l'envoi vers SAP.
@@ -2660,8 +2672,8 @@ export default function ElectriciteSiteDetail() {
                 profilsMo={avecSup ? profilsMoChantier : null}
                 onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
                 profilsPossibles={profilsPossibles}
-                kAchats={!avecSup ? kAchats : null}
-                onChangerK={!avecSup && peutGerer ? changerKAchat : null}
+                kAchats={null}
+                onChangerK={null}
                 sup={
                   avecSup && peutGerer
                     ? {
@@ -2698,8 +2710,8 @@ export default function ElectriciteSiteDetail() {
                 profilsMo={avecSup ? profilsMoChantier : null}
                 onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
                 profilsPossibles={profilsPossibles}
-                kAchats={!avecSup ? kAchats : null}
-                onChangerK={!avecSup && peutGerer ? changerKAchat : null}
+                kAchats={!avecSup ? kAchatsDevis(d.id) : null}
+                onChangerK={!avecSup && peutGerer ? (cle, v) => changerKAchat(d.id, cle, v) : null}
                   sup={
                     avecSup && peutGerer
                       ? {
