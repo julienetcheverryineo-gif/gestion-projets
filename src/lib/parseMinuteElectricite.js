@@ -19,6 +19,7 @@ const LABELS = {
   tempsTotalHeures: ["temps total (heure)"],
   pvUnitaire: ["pv unitaire"],
   pvTotal: ["pv total"],
+  pvLigne: ["pv ligne (eur)", "pv ligne"],
 };
 
 // Lit une minute de devis (même modèle que l'Automatisme : colonnes n°,
@@ -93,6 +94,7 @@ export function analyserMinuteElectricite(arrayBuffer) {
     tempsTotalHeures: col(LABELS.tempsTotalHeures),
     pvUnitaire: col(LABELS.pvUnitaire),
     pvTotal: col(LABELS.pvTotal),
+    pvLigne: col(LABELS.pvLigne),
   };
 
   const ligneDepart = XLSX.utils.decode_range(feuille["!ref"] || "A1").s.r;
@@ -191,6 +193,9 @@ export function analyserMinuteElectricite(arrayBuffer) {
         (c.tempsTotalHeures >= 0 ? nombre(ligne, c.tempsTotalHeures) : tempsUnitaire * quantite) * facteurPoste,
       pvUnitaire,
       pvTotal: (c.pvTotal >= 0 ? nombre(ligne, c.pvTotal) : pvUnitaire * quantite) * facteurPoste,
+      // Prix de vente réel de la ligne dans la minute (colonne « PV ligne ») :
+      // c'est lui qui donne le CA de l'affaire.
+      pvLigne: (c.pvLigne >= 0 ? nombre(ligne, c.pvLigne) : 0) * facteurPoste,
       informative,
       sansDesignation,
       gris: grisDeLigne(i),

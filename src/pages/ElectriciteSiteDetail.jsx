@@ -2452,7 +2452,7 @@ export default function ElectriciteSiteDetail() {
                 <BilanFinancier
                   caCalcule={lignesChantier
                     .filter((l) => !estLigneSomme(l))
-                    .reduce((s, l) => s + (l.pvTotal || 0), 0)}
+                    .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0)}
                   caSaisi={chantier?.caHt ?? null}
                   caNonSoumis={chantier?.caNonSoumisFg ?? 0}
                   onChangerCa={
@@ -2461,6 +2461,15 @@ export default function ElectriciteSiteDetail() {
                       : null
                   }
                   foa={paramsFoa}
+                  pctSaisis={chantier?.foaPct || {}}
+                  onChangerPct={
+                    peutGerer
+                      ? (cle, v) =>
+                          updateDoc(doc(db, "sites", chantierId), {
+                            foaPct: { ...(chantier?.foaPct || {}), [cle]: v },
+                          })
+                      : null
+                  }
                   budgetFo={totFo.budget}
                   pctFo={totFo.pctAvancement}
                   budgetHeures={totMo.budget}

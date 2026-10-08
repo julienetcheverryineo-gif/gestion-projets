@@ -12,12 +12,29 @@ const ROUGE = "#c0392b";
 // pointées valorisées au taux de leur type d'activité (voir Import SAP).
 const BLOC_MO = (code) => (/^I1/.test(code) ? "Suivi" : /^I2/.test(code) ? "Études" : "Production");
 
+const classeNeg = (v) => (v < -0.005 ? { color: ROUGE, fontWeight: 600 } : {});
+
+function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) {
+  return (
+    <tr style={{ fontWeight: fort ? 700 : undefined, ...style }}>
+      <td data-label="" style={retrait ? { paddingLeft: 24 } : undefined}>{nom}</td>
+      {cols.map((c, i) => (
+        <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]} style={classeNeg(c[champ])}>
+          {sansReel && i === 1 ? "—" : c[champ] === null ? "—" : fmt(c[champ])}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
 export default function BilanFinancier({
   caCalcule,
   caSaisi,
   caNonSoumis,
   onChangerCa,
-  foa,
+  foa: foaDefaut,
+  pctSaisis,
+  onChangerPct,
   budgetFo,
   pctFo,
   budgetHeures,
@@ -31,6 +48,12 @@ export default function BilanFinancier({
 }) {
   const [saisie, setSaisie] = useState(null);
   const [saisieCa, setSaisieCa] = useState({});
+  const [saisiePct, setSaisiePct] = useState({});
+  // % de la rubrique C : valeur propre à l'affaire, sinon paramètre FOA.
+  const foa = { ...foaDefaut };
+  ["prorata", "fraisDivers", "aleas", "negociation"].forEach((k) => {
+    if (typeof pctSaisis?.[k] === "number") foa[k] = pctSaisis[k];
+  });
 
   const reelFo = achats.reduce((s, a) => s + (Number(a.valNette) || 0), 0);
 
@@ -79,18 +102,30 @@ export default function BilanFinancier({
   const reel = colonne(reelMo, reelFo);
   const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo));
   const cols = [prevu, reel, atterr];
-  const classeNeg = (v) => (v < -0.005 ? { color: ROUGE, fontWeight: 600 } : {});
   const alerte = (c) => c.k !== null && c.k < foa.margePreconisee;
 
-  const Ligne = ({ nom, champ, fort, retrait, sansReel, fmt = eur, style }) => (
-    <tr style={{ fontWeight: fort ? 700 : undefined, ...style }}>
-      <td data-label="" style={retrait ? { paddingLeft: 24 } : undefined}>{nom}</td>
-      {cols.map((c, i) => (
-        <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]} style={classeNeg(c[champ])}>
-          {sansReel && i === 1 ? "—" : c[champ] === null ? "—" : fmt(c[champ])}
-        </td>
-      ))}
-    </tr>
+  const validerPct = (cle) => {
+    if (saisiePct[cle] === undefined) return;
+    const t = String(saisiePct[cle]).replace(",", ".").trim();
+    const n = t === "" ? null : Number(t);
+    setSaisiePct((p) => {
+      const { [cle]: _omis, ...reste } = p;
+      return reste;
+    });
+    if (n === null || n >= 0) onChangerPct?.(cle, n === null ? null : n / 100);
+  };
+  const champPct = (cle) => (
+    <input
+      type="text"
+      inputMode="decimal"
+      style={{ width: 64 }}
+      disabled={!onChangerPct}
+      title={typeof pctSaisis?.[cle] === "number" ? "Valeur propre à cette affaire (vider pour revenir au paramètre)" : "Paramètre par défaut"}
+      value={saisiePct[cle] !== undefined ? saisiePct[cle] : String(Math.round(foa[cle] * 100000) / 1000).replace(".", ",")}
+      onChange={(e) => setSaisiePct((p) => ({ ...p, [cle]: e.target.value }))}
+      onBlur={() => validerPct(cle)}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+    />
   );
 
   const validerCa = (champ) => {
@@ -139,7 +174,7 @@ export default function BilanFinancier({
         </label>
         <span className="simple-list-meta">
           {caSaisi == null
-            ? "CA = somme des prix de vente de la minute (" + eur(caCalcule) + ")"
+            ? "CA = somme des « PV ligne » de la minute (" + eur(caCalcule) + ")"
             : "CA saisi à la main (minute : " + eur(caCalcule) + ")"}
         </span>
         {caSaisi != null && onChangerCa && (
@@ -160,7 +195,7 @@ export default function BilanFinancier({
             </tr>
           </thead>
           <tbody>
-            <Ligne nom="A – Main d'œuvre" champ="a" fort />
+            <Ligne cols={cols} nom="A – Main d'œuvre" champ="a" fort />
             <tr>
               <td style={{ paddingLeft: 24 }}>dont Suivi / Études / Production (réel)</td>
               <td>—</td>
@@ -169,18 +204,18 @@ export default function BilanFinancier({
               </td>
               <td>—</td>
             </tr>
-            <Ligne nom="B – Achats (fournitures et sous-traitance)" champ="b" fort />
-            <Ligne nom="C – Autres frais" champ="C" fort />
-            <Ligne nom={"Prorata (" + num(foa.prorata * 100, 2) + " % CA)"} champ="C_prorata" retrait />
-            <Ligne nom={"Frais divers (" + num(foa.fraisDivers * 100, 2) + " % MO)"} champ="C_divers" retrait />
-            <Ligne nom={"Aléas (" + num(foa.aleas * 100, 2) + " %)"} champ="C_aleas" retrait />
-            <Ligne nom={"Négociation (" + num(foa.negociation * 100, 2) + " %)"} champ="C_nego" retrait />
-            <Ligne nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
-            <Ligne nom="Total dépenses affaire" champ="dep" fort style={{ borderTop: "2px solid var(--border, #ccc)" }} />
-            <Ligne nom="Marge brute" champ="brute" fort sansReel />
-            <Ligne nom={"Frais généraux (" + num(foa.fg * 100, 2) + " % CA)"} champ="fg" sansReel />
-            <Ligne nom="Marge nette" champ="nette" fort sansReel />
-            <Ligne nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
+            <Ligne cols={cols} nom="B – Achats (fournitures et sous-traitance)" champ="b" fort />
+            <Ligne cols={cols} nom="C – Autres frais" champ="C" fort />
+            <Ligne cols={cols} nom={<>Prorata {champPct("prorata")} % du CA</>} champ="C_prorata" retrait />
+            <Ligne cols={cols} nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />
+            <Ligne cols={cols} nom={<>Aléas {champPct("aleas")} % du CA</>} champ="C_aleas" retrait />
+            <Ligne cols={cols} nom={<>Négociation {champPct("negociation")} % du CA</>} champ="C_nego" retrait />
+            <Ligne cols={cols} nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
+            <Ligne cols={cols} nom="Total dépenses affaire" champ="dep" fort style={{ borderTop: "2px solid var(--border, #ccc)" }} />
+            <Ligne cols={cols} nom="Marge brute" champ="brute" fort sansReel />
+            <Ligne cols={cols} nom={"Frais généraux (" + num(foa.fg * 100, 2) + " % CA)"} champ="fg" sansReel />
+            <Ligne cols={cols} nom="Marge nette" champ="nette" fort sansReel />
+            <Ligne cols={cols} nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
           </tbody>
         </table>
       </div>

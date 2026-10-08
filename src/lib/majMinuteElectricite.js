@@ -23,6 +23,7 @@ const CHAMPS = [
   { champ: "tempsTotalHeures", label: "Temps total", type: "nombre" },
   { champ: "pvUnitaire", label: "PV unitaire", type: "nombre" },
   { champ: "pvTotal", label: "PV total", type: "nombre" },
+  { champ: "pvLigne", label: "PV ligne", type: "nombre" },
   { champ: "informative", label: "Ligne informative", type: "booleen" },
 ];
 
@@ -57,6 +58,7 @@ export function champsDocumentLigne(ligne) {
     tempsTotalHeures: ligne.tempsTotalHeures || 0,
     pvUnitaire: ligne.pvUnitaire || 0,
     pvTotal: ligne.pvTotal || 0,
+    pvLigne: ligne.pvLigne || 0,
     facteurPoste: ligne.facteurPoste || 1,
     informative: ligne.informative || false,
     avancementFo: 0,
