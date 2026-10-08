@@ -1665,7 +1665,7 @@ export default function ElectriciteSiteDetail() {
   // devis) est affiché à la place du devis ouvert. null = vue normale.
   // Par défaut "fo" : à l'ouverture d'un chantier, on arrive directement
   // sur la synthèse Fournitures plutôt que sur un devis.
-  const [recapActif, setRecapActif] = useState("fo");
+  const [recapActif, setRecapActif] = useState(null);
 
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
