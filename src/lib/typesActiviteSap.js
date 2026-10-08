@@ -23,7 +23,10 @@ const LIBELLES = {
   E302: "PRODUCTION EXTERNE",
 };
 
+export const normaliserTypeActivite = (code) => String(code ?? "").trim().toUpperCase();
 const normaliser = (code) => String(code ?? "").trim().toUpperCase();
+
+export const CODES_TYPES_ACTIVITE_CONNUS = Object.keys(LIBELLES);
 
 // Libellé + code (« CADRE (I107) ») ; le code seul s'il est inconnu.
 export function libelleTypeActivite(code) {

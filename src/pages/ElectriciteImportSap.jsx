@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { libelleTypeActivite, estLigneMoIgnoree } from "../lib/typesActiviteSap";
+import {
+  libelleTypeActivite,
+  estLigneMoIgnoree,
+  estActiviteIgnoree,
+  normaliserTypeActivite,
+  CODES_TYPES_ACTIVITE_CONNUS,
+} from "../lib/typesActiviteSap";
+import { useTauxHoraires, enregistrerTaux, TAUX_DEFAUT } from "../lib/tauxHoraires";
 import { lireTexteSap } from "../lib/lireTexteSap";
 import {
   addDoc,
@@ -418,6 +425,93 @@ function VueConsultation() {
   );
 }
 
+// Taux horaires par type d'activité SAP (€/h) : servent au bilan financier
+// des chantiers. Modifiables par un admin ; un type sans taux est en rouge.
+function TauxHorairesPanel({ peutModifier }) {
+  const { taux, chargement } = useTauxHoraires();
+  const { documents: lignesMo } = useCollection("sapLignesMo");
+  const [saisies, setSaisies] = useState({});
+  const codes = useMemo(() => {
+    const ens = new Set([...CODES_TYPES_ACTIVITE_CONNUS, ...Object.keys(TAUX_DEFAUT)]);
+    lignesMo.forEach((l) => {
+      const c = normaliserTypeActivite(l.typAct);
+      if (c && !estActiviteIgnoree(c)) ens.add(c);
+    });
+    return [...ens].sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
+  }, [lignesMo]);
+
+  const valider = async (code) => {
+    if (saisies[code] === undefined) return;
+    const t = String(saisies[code]).replace(",", ".").trim();
+    const n = t === "" ? null : Number(t);
+    if (n !== null && !(n >= 0)) return;
+    await enregistrerTaux(code, n);
+    setSaisies((p) => {
+      const { [code]: _omis, ...reste } = p;
+      return reste;
+    });
+  };
+
+  return (
+    <div className="panel">
+      <h2 style={{ marginTop: 0 }}>Taux horaires par type d'activité</h2>
+      <p className="simple-list-meta" style={{ marginBottom: 10 }}>
+        Coût horaire (€/h) de chaque type d'activité SAP, utilisé pour valoriser les heures pointées
+        dans le bilan financier des chantiers.{" "}
+        {peutModifier ? "Modifiable par un administrateur." : "Modification réservée aux administrateurs."}
+      </p>
+      {chargement ? (
+        <p className="simple-list-meta">Chargement…</p>
+      ) : (
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Libellé</th>
+                <th>Famille</th>
+                <th>Taux (€/h)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {codes.map((c) => {
+                const t = taux(c);
+                const manquant = t === null;
+                const valeur = saisies[c] !== undefined ? saisies[c] : t === null ? "" : String(t).replace(".", ",");
+                return (
+                  <tr key={c}>
+                    <td data-label="Type">{c}</td>
+                    <td data-label="Libellé">{LIBELLE_SEUL(c)}</td>
+                    <td data-label="Famille">{TAUX_DEFAUT[c]?.famille || ""}</td>
+                    <td data-label="Taux (€/h)">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={valeur}
+                        disabled={!peutModifier}
+                        placeholder={manquant ? "À renseigner" : ""}
+                        onChange={(e) => setSaisies((p) => ({ ...p, [c]: e.target.value }))}
+                        onBlur={() => valider(c)}
+                        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                        style={{
+                          width: 110,
+                          ...(manquant ? { borderColor: "#c0392b", background: "rgba(192,57,43,0.08)" } : {}),
+                        }}
+                      />
+                      {manquant && <span style={{ color: "#c0392b", marginLeft: 8, fontSize: 12 }}>manquant</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+const LIBELLE_SEUL = (c) => libelleTypeActivite(c).replace(/ \([^)]*\)$/, "").replace(c, "");
+
 export default function ElectriciteImportSap() {
   const { isAdmin, profile } = useAuth();
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
@@ -457,6 +551,7 @@ export default function ElectriciteImportSap() {
           }
           historique={<HistoriqueImports />}
         />
+        <TauxHorairesPanel peutModifier={Boolean(isAdmin)} />
         <VueConsultation />
       </div>
     </div>

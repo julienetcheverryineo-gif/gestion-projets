@@ -1,4 +1,6 @@
 import { estLigneSomme } from "../lib/ligneSomme";
+import BilanFinancier from "../components/BilanFinancier";
+import { useTauxHoraires } from "../lib/tauxHoraires";
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -1745,6 +1747,7 @@ export default function ElectriciteSiteDetail() {
         : [],
     [sapLignesFo, otpSap]
   );
+  const { taux: tauxHoraire } = useTauxHoraires();
   const heuresSap = useMemo(
     () =>
       otpSap
@@ -2378,6 +2381,13 @@ export default function ElectriciteSiteDetail() {
             >
               💰 Bilan Achats
             </button>
+            <button
+              className={recapActif === "finance" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif("finance")}
+              title="Budget, réel et atterrissage en euros (taux horaires par type d'activité)"
+            >
+              💶 Bilan financier
+            </button>
             {(achatsSap.length > 0 || heuresSap.length > 0) && (
               <button
                 className={recapActif === "sap" ? "btn-primary" : "btn-ghost"}
@@ -2427,6 +2437,35 @@ export default function ElectriciteSiteDetail() {
               ))}
             </>
           )}
+
+          {recapActif === "finance" &&
+            (() => {
+              const totFo = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
+              const totMo = construireRecapMo(
+                calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", {}),
+                chantier,
+                GENERAL,
+                devis
+              ).total;
+              return (
+                <BilanFinancier
+                  budgetFo={totFo.budget}
+                  pctFo={totFo.pctAvancement}
+                  budgetHeures={totMo.budget}
+                  pctMo={totMo.pctAvancement}
+                  achats={achatsSap}
+                  heures={heuresSap}
+                  taux={tauxHoraire}
+                  tauxChiffrage={chantier?.tauxChiffrageMo ?? null}
+                  tauxChiffrageDefaut={tauxHoraire("I205")}
+                  onTauxChiffrage={
+                    peutGerer
+                      ? (v) => updateDoc(doc(db, "sites", chantierId), { tauxChiffrageMo: v })
+                      : null
+                  }
+                />
+              );
+            })()}
 
           {recapActif === "sap" && (
             <PanneauSap
