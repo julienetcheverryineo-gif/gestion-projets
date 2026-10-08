@@ -502,12 +502,6 @@ function TableauRecap({
           {portee === "devis" ? ", dans ce devis." : ", dans tous les devis du chantier."}
         </p>
       )}
-      {avecCode && (
-        <p className="simple-list-meta" style={{ marginBottom: 8 }}>
-          <span className="badge-derogation">≠ chiffrage</span> budget adapté par rapport au chiffrage vendu ·{" "}
-          <span className="badge-depassement">⚠ vs vendu</span> heures SAP au-dessus des heures vendues de la tâche.
-        </p>
-      )}
       {recap.parType.length === 0 ? (
         <p className="simple-list-meta">Aucune donnée chiffrée pour ce périmètre.</p>
       ) : (
@@ -2730,6 +2724,12 @@ export default function ElectriciteSiteDetail() {
                   }
                 />
               ))}
+              {avecSup && (
+                <p className="simple-list-meta" style={{ marginTop: 8 }}>
+                  <span className="badge-derogation">≠ chiffrage</span> budget adapté par rapport au chiffrage vendu ·{" "}
+                  <span className="badge-depassement">⚠ vs vendu</span> heures SAP au-dessus des heures vendues de la tâche.
+                </p>
+              )}
             </>
           )}
 
