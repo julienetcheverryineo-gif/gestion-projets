@@ -4005,3 +4005,58 @@ textarea:focus {
   font-size: 0.82rem;
   text-align: right;
 }
+
+/* Bilan financier de l'affaire : sections colorées, détails en retrait */
+.bf-table th:not(:first-child),
+.bf-table td:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bf-table thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.bf-mo { --bf-c: var(--tache); }
+.bf-ach { --bf-c: var(--accent); }
+.bf-autres { --bf-c: var(--warn); }
+.bf-fra { --bf-c: var(--text-muted); }
+.bf-section td {
+  font-weight: 700;
+  background: color-mix(in srgb, var(--bf-c) 13%, transparent);
+}
+.bf-section td:first-child {
+  border-left: 4px solid var(--bf-c);
+  color: color-mix(in srgb, var(--bf-c) 70%, var(--text));
+}
+.bf-detail td {
+  font-size: 13px;
+  color: var(--text);
+}
+.bf-detail td:first-child {
+  border-left: 4px solid color-mix(in srgb, var(--bf-c) 30%, transparent);
+}
+.bf-total td {
+  background: var(--panel-raised);
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+}
+.bf-fg td {
+  color: var(--text-muted);
+}
+.bf-resultat td {
+  font-size: 15px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+.bf-resultat td:first-child {
+  border-left: 4px solid var(--ok);
+}
+.bf-resultat.bf-perte td {
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+}
+.bf-resultat.bf-perte td:first-child {
+  border-left-color: var(--danger);
+}

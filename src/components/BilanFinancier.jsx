@@ -13,12 +13,12 @@ const ROUGE = "#c0392b";
 // pointées valorisées au taux de leur type d'activité (voir Import SAP).
 const classeNeg = (v) => (v < -1e-9 ? { color: ROUGE, fontWeight: 600 } : {});
 
-function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) {
+function Ligne({ cols, classe, tonePos, nom, champ, fort, retrait, sansReel, fmt = eur, style }) {
   return (
-    <tr style={{ fontWeight: fort ? 700 : undefined, ...style }}>
+    <tr className={classe} style={{ fontWeight: fort ? 700 : undefined, ...style }}>
       <td data-label="" style={retrait ? { paddingLeft: 24 } : undefined}>{nom}</td>
       {cols.map((c, i) => (
-        <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]} style={classeNeg(c[champ])}>
+        <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]} style={{ ...(tonePos && c[champ] !== null && c[champ] >= 0 ? { color: "var(--ok)", fontWeight: 700 } : {}), ...classeNeg(c[champ]) }}>
           {sansReel && i === 1 ? "—" : c[champ] === null ? "—" : fmt(c[champ])}
         </td>
       ))}
@@ -26,9 +26,9 @@ function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) 
   );
 }
 
-function LigneVals({ nom, vals }) {
+function LigneVals({ nom, vals, classe }) {
   return (
-    <tr>
+    <tr className={classe}>
       <td data-label="" style={{ paddingLeft: 24 }}>{nom}</td>
       {vals.map((v, i) => (
         <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]}>
@@ -238,7 +238,7 @@ export default function BilanFinancier({
       </div>
 
       <div className="data-table-wrapper">
-        <table className="data-table">
+        <table className="data-table bf-table">
           <thead>
             <tr>
               <th></th>
@@ -248,15 +248,16 @@ export default function BilanFinancier({
             </tr>
           </thead>
           <tbody>
-            <Ligne cols={cols} nom="A – Main d'œuvre" champ="a" fort />
+            <Ligne cols={cols} classe="bf-section bf-mo" nom="A – Main d'œuvre" champ="a" fort />
 {detailMo.map((t) => (
-              <LigneVals key={t.code} nom={t.nom} vals={[t.prevu, t.reel, t.atterr]} />
+              <LigneVals key={t.code} classe="bf-detail bf-mo" nom={t.nom} vals={[t.prevu, t.reel, t.atterr]} />
             ))}
             <Ligne
               cols={cols}
+              classe="bf-detail bf-mo"
               nom={
                 <>
-                  dont indemnités de zone (J et F){" "}
+                  dont indemnités de zone{" "}
                   {zone && montantZone ? (
                     <span className="simple-list-meta">
                       {zone} : {eur(montantZone)}/j ÷ 7,2 h
@@ -271,25 +272,26 @@ export default function BilanFinancier({
               champ="zoneEuro"
               retrait
             />
-            <Ligne cols={cols} nom="B – Achats (fournitures et sous-traitance)" champ="b" fort />
+            <Ligne cols={cols} classe="bf-section bf-ach" nom="B – Achats (fournitures et sous-traitance)" champ="b" fort />
             {(detailFo || []).map((t) => (
               <LigneVals
                 key={t.libelle}
+                classe="bf-detail bf-ach"
                 nom={t.libelle}
                 vals={[t.prevu, t.reel, t.reel + t.prevu * (1 - t.av)]}
               />
             ))}
-            <Ligne cols={cols} nom="C – Autres frais" champ="C" fort />
-            <Ligne cols={cols} nom={<>Prorata {champPct("prorata")} % du CA</>} champ="C_prorata" retrait />
-            <Ligne cols={cols} nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />
-            <Ligne cols={cols} nom={<>Aléas {champPct("aleas")} % du CA</>} champ="C_aleas" retrait />
-            <Ligne cols={cols} nom={<>Négociation {champPct("negociation")} % du CA</>} champ="C_nego" retrait />
-            <Ligne cols={cols} nom="Matériel interne" champ="C_mi" retrait />
-            <Ligne cols={cols} nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
-            <Ligne cols={cols} nom="Total dépenses affaire" champ="dep" fort style={{ borderTop: "2px solid var(--border, #ccc)" }} />
-            <Ligne cols={cols} nom={"Frais généraux (" + num(foa.fg * 100, 2) + " % CA)"} champ="fg" sansReel />
-            <Ligne cols={cols} nom="Marge nette" champ="nette" fort sansReel />
-            <Ligne cols={cols} nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
+            <Ligne cols={cols} classe="bf-section bf-autres" nom="C – Autres frais" champ="C" fort />
+            <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Prorata {champPct("prorata")} % du CA</>} champ="C_prorata" retrait />
+            <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />
+            <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Aléas {champPct("aleas")} % du CA</>} champ="C_aleas" retrait />
+            <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Négociation {champPct("negociation")} % du CA</>} champ="C_nego" retrait />
+            <Ligne cols={cols} classe="bf-detail bf-autres" nom="Matériel interne" champ="C_mi" retrait />
+            <Ligne cols={cols} classe="bf-section bf-fra" nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
+            <Ligne cols={cols} classe="bf-total" nom="Total dépenses affaire" champ="dep" fort />
+            <Ligne cols={cols} classe="bf-fg" nom={"Frais généraux (" + num(foa.fg * 100, 2) + " % CA)"} champ="fg" sansReel />
+            <Ligne cols={cols} classe={"bf-resultat" + (atterr.nette < 0 ? " bf-perte" : "")} tonePos nom="Marge nette" champ="nette" fort sansReel />
+            <Ligne cols={cols} classe={"bf-resultat" + (atterr.nette < 0 ? " bf-perte" : "")} tonePos nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
           </tbody>
         </table>
       </div>
