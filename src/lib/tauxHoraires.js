@@ -62,3 +62,40 @@ export async function enregistrerTaux(code, valeur) {
     { merge: true }
   );
 }
+
+// Paramètres de la feuille d'ouverture d'affaire (FOA) pour le bilan
+// financier : pourcentages applicables au centre de profit (valeurs IAQ5).
+export const PARAMS_FOA_DEFAUT = {
+  fg: { label: "Frais généraux (% du CA H.T.)", valeur: 0.16 },
+  fra: { label: "FRA (% des dépenses)", valeur: 0.03346 },
+  prorata: { label: "Prorata (% du CA H.T.)", valeur: 0.02 },
+  fraisDivers: { label: "Frais divers / provision (% de la MO)", valeur: 0.02 },
+  aleas: { label: "Aléas (% du CA H.T.)", valeur: 0.02 },
+  negociation: { label: "Négociation (% du CA H.T.)", valeur: 0.02 },
+  margePreconisee: { label: "Marge nette préconisée (% du CA)", valeur: 0.07 },
+};
+export const DOC_FOA = ["parametresElec", "foa"];
+
+export function useParametresFoa() {
+  const [enregistres, setEnregistres] = useState({});
+  useEffect(
+    () =>
+      onSnapshot(
+        doc(db, ...DOC_FOA),
+        (snap) => setEnregistres(snap.exists() ? snap.data().valeurs || {} : {}),
+        () => {}
+      ),
+    []
+  );
+  return useMemo(() => {
+    const r = {};
+    Object.keys(PARAMS_FOA_DEFAUT).forEach((k) => {
+      r[k] = typeof enregistres[k] === "number" ? enregistres[k] : PARAMS_FOA_DEFAUT[k].valeur;
+    });
+    return r;
+  }, [enregistres]);
+}
+
+export async function enregistrerParametreFoa(cle, valeur) {
+  await setDoc(doc(db, ...DOC_FOA), { valeurs: { [cle]: valeur }, majLe: new Date() }, { merge: true });
+}

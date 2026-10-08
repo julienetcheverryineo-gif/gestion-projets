@@ -5,13 +5,19 @@ const eur = (v) =>
   (Number(v) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 const num = (v, d = 1) =>
   (Number(v) || 0).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
-const pct = (v) => num((Number(v) || 0) * 100, 0) + " %";
 const ROUGE = "#c0392b";
 
 // Bilan financier d'une affaire : matériel et main d'œuvre en euros.
 // Budget MO = heures chiffrées × taux de chiffrage ; réel MO = heures
 // pointées valorisées au taux de leur type d'activité (voir Import SAP).
+const BLOC_MO = (code) => (/^I1/.test(code) ? "Suivi" : /^I2/.test(code) ? "Études" : "Production");
+
 export default function BilanFinancier({
+  caCalcule,
+  caSaisi,
+  caNonSoumis,
+  onChangerCa,
+  foa,
   budgetFo,
   pctFo,
   budgetHeures,
@@ -24,6 +30,7 @@ export default function BilanFinancier({
   onTauxChiffrage,
 }) {
   const [saisie, setSaisie] = useState(null);
+  const [saisieCa, setSaisieCa] = useState({});
 
   const reelFo = achats.reduce((s, a) => s + (Number(a.valNette) || 0), 0);
 
@@ -45,21 +52,69 @@ export default function BilanFinancier({
   const heuresPointees = parType.reduce((s, t) => s + t.heures, 0);
   const heuresSansTaux = parType.filter((t) => t.taux === null).reduce((s, t) => s + t.heures, 0);
   const reelMo = parType.reduce((s, t) => s + (t.cout || 0), 0);
+  const reelBloc = (nom) => parType.filter((t) => BLOC_MO(t.code) === nom).reduce((s, t) => s + (t.cout || 0), 0);
 
   const tx = tauxChiffrage ?? tauxChiffrageDefaut ?? 0;
   const budgetMo = budgetHeures * tx;
   const heuresEquiv = tx > 0 ? reelMo / tx : null;
 
-  const atterrissage = (budget, reel, avancement) => reel + budget * (1 - avancement);
-  const lignes = [
-    { nom: "📦 Fournitures", budget: budgetFo, reel: reelFo, av: pctFo },
-    { nom: "👷 Main d'œuvre", budget: budgetMo, reel: reelMo, av: pctMo },
-  ].map((l) => ({ ...l, atterr: atterrissage(l.budget, l.reel, l.av) }));
-  const total = lignes.reduce(
-    (t, l) => ({ budget: t.budget + l.budget, reel: t.reel + l.reel, atterr: t.atterr + l.atterr }),
-    { budget: 0, reel: 0, atterr: 0 }
+  // Trois colonnes comme la FOA : prévu (minute), réel (SAP), atterrissage
+  // (réel + reste à faire au budget).
+  const ca = caSaisi ?? caCalcule;
+  const base = ca - (caNonSoumis || 0);
+  const colonne = (a, b) => {
+    const C_prorata = foa.prorata * ca;
+    const C_divers = foa.fraisDivers * a;
+    const C_aleas = foa.aleas * base;
+    const C_nego = foa.negociation * base;
+    const C = C_prorata + C_divers + C_aleas + C_nego;
+    const D = foa.fra * (a + b + C);
+    const dep = a + b + C + D;
+    const brute = base - dep;
+    const fg = foa.fg * base;
+    const nette = brute - fg;
+    return { a, b, C, C_prorata, C_divers, C_aleas, C_nego, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
+  };
+  const prevu = colonne(budgetMo, budgetFo);
+  const reel = colonne(reelMo, reelFo);
+  const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo));
+  const cols = [prevu, reel, atterr];
+  const classeNeg = (v) => (v < -0.005 ? { color: ROUGE, fontWeight: 600 } : {});
+  const alerte = (c) => c.k !== null && c.k < foa.margePreconisee;
+
+  const Ligne = ({ nom, champ, fort, retrait, sansReel, fmt = eur, style }) => (
+    <tr style={{ fontWeight: fort ? 700 : undefined, ...style }}>
+      <td data-label="" style={retrait ? { paddingLeft: 24 } : undefined}>{nom}</td>
+      {cols.map((c, i) => (
+        <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]} style={classeNeg(c[champ])}>
+          {sansReel && i === 1 ? "—" : c[champ] === null ? "—" : fmt(c[champ])}
+        </td>
+      ))}
+    </tr>
   );
-  const classeEcart = (v) => (v < -0.005 ? { color: ROUGE, fontWeight: 600 } : {});
+
+  const validerCa = (champ) => {
+    if (saisieCa[champ] === undefined) return;
+    const t = String(saisieCa[champ]).replace(",", ".").replace(/\s/g, "").trim();
+    const n = t === "" ? null : Number(t);
+    setSaisieCa((p) => {
+      const { [champ]: _omis, ...reste } = p;
+      return reste;
+    });
+    if (n === null || n >= 0) onChangerCa?.(champ, n);
+  };
+  const champCa = (champ, valeur) => (
+    <input
+      type="text"
+      inputMode="decimal"
+      style={{ width: 120 }}
+      disabled={!onChangerCa}
+      value={saisieCa[champ] !== undefined ? saisieCa[champ] : String(Math.round(valeur * 100) / 100).replace(".", ",")}
+      onChange={(e) => setSaisieCa((p) => ({ ...p, [champ]: e.target.value }))}
+      onBlur={() => validerCa(champ)}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+    />
+  );
 
   const validerTaux = () => {
     if (saisie === null) return;
@@ -75,47 +130,72 @@ export default function BilanFinancier({
         <h2>💶 Bilan financier de l'affaire</h2>
       </div>
 
+      <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+        <label>
+          CA H.T. (€) {champCa("caHt", ca)}
+        </label>
+        <label>
+          dont non soumis à FG (€) {champCa("caNonSoumisFg", caNonSoumis || 0)}
+        </label>
+        <span className="simple-list-meta">
+          {caSaisi == null
+            ? "CA = somme des prix de vente de la minute (" + eur(caCalcule) + ")"
+            : "CA saisi à la main (minute : " + eur(caCalcule) + ")"}
+        </span>
+        {caSaisi != null && onChangerCa && (
+          <button type="button" className="btn-ghost" onClick={() => onChangerCa("caHt", null)}>
+            Revenir au CA de la minute
+          </button>
+        )}
+      </div>
+
       <div className="data-table-wrapper">
         <table className="data-table">
           <thead>
             <tr>
               <th></th>
-              <th>Budget</th>
+              <th>Prévu (minute)</th>
               <th>Réel (SAP)</th>
-              <th>Avancement</th>
-              <th>Atterrissage estimé</th>
-              <th>Écart prévisionnel</th>
+              <th>Atterrissage</th>
             </tr>
           </thead>
           <tbody>
-            {lignes.map((l) => (
-              <tr key={l.nom}>
-                <td data-label="">{l.nom}</td>
-                <td data-label="Budget">{eur(l.budget)}</td>
-                <td data-label="Réel (SAP)">{eur(l.reel)}</td>
-                <td data-label="Avancement">{pct(l.av)}</td>
-                <td data-label="Atterrissage estimé">{eur(l.atterr)}</td>
-                <td data-label="Écart prévisionnel" style={classeEcart(l.budget - l.atterr)}>
-                  {eur(l.budget - l.atterr)}
-                </td>
-              </tr>
-            ))}
-            <tr style={{ fontWeight: 700 }}>
-              <td data-label="">Total affaire</td>
-              <td data-label="Budget">{eur(total.budget)}</td>
-              <td data-label="Réel (SAP)">{eur(total.reel)}</td>
-              <td data-label="Avancement">{total.budget > 0 ? pct((total.budget - (total.atterr - total.reel)) / total.budget) : "—"}</td>
-              <td data-label="Atterrissage estimé">{eur(total.atterr)}</td>
-              <td data-label="Écart prévisionnel" style={classeEcart(total.budget - total.atterr)}>
-                {eur(total.budget - total.atterr)}
+            <Ligne nom="A – Main d'œuvre" champ="a" fort />
+            <tr>
+              <td style={{ paddingLeft: 24 }}>dont Suivi / Études / Production (réel)</td>
+              <td>—</td>
+              <td>
+                {eur(reelBloc("Suivi"))} / {eur(reelBloc("Études"))} / {eur(reelBloc("Production"))}
               </td>
+              <td>—</td>
             </tr>
+            <Ligne nom="B – Achats (fournitures et sous-traitance)" champ="b" fort />
+            <Ligne nom="C – Autres frais" champ="C" fort />
+            <Ligne nom={"Prorata (" + num(foa.prorata * 100, 2) + " % CA)"} champ="C_prorata" retrait />
+            <Ligne nom={"Frais divers (" + num(foa.fraisDivers * 100, 2) + " % MO)"} champ="C_divers" retrait />
+            <Ligne nom={"Aléas (" + num(foa.aleas * 100, 2) + " %)"} champ="C_aleas" retrait />
+            <Ligne nom={"Négociation (" + num(foa.negociation * 100, 2) + " %)"} champ="C_nego" retrait />
+            <Ligne nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
+            <Ligne nom="Total dépenses affaire" champ="dep" fort style={{ borderTop: "2px solid var(--border, #ccc)" }} />
+            <Ligne nom="Marge brute" champ="brute" fort sansReel />
+            <Ligne nom={"Frais généraux (" + num(foa.fg * 100, 2) + " % CA)"} champ="fg" sansReel />
+            <Ligne nom="Marge nette" champ="nette" fort sansReel />
+            <Ligne nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
           </tbody>
         </table>
       </div>
+      {[prevu, atterr].some(alerte) && (
+        <p style={{ color: ROUGE, margin: "8px 0" }}>
+          ⚠ Marge nette sous la marge préconisée ({num(foa.margePreconisee * 100, 1)} %) :{" "}
+          {alerte(prevu) ? "au prévu" : ""}
+          {alerte(prevu) && alerte(atterr) ? " et " : ""}
+          {alerte(atterr) ? "à l'atterrissage" : ""}.
+        </p>
+      )}
       <p className="simple-list-meta" style={{ margin: "8px 0 16px" }}>
-        Atterrissage estimé = réel + reste à faire valorisé au budget (budget × (1 − avancement)). Écart
-        prévisionnel négatif (rouge) = dépassement attendu.
+        Calcul repris de la feuille FOA : dépenses = MO + achats + autres frais + FRA ; marge brute = CA − non
+        soumis − dépenses ; marge nette = marge brute − frais généraux. Atterrissage = réel + reste à faire au
+        budget (budget × (1 − avancement)). Les pourcentages se règlent dans « Import SAP ».
       </p>
 
       <h3 style={{ margin: "0 0 8px" }}>Main d'œuvre : heures et euros</h3>

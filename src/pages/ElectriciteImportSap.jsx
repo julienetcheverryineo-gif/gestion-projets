@@ -5,7 +5,13 @@ import {
   estActiviteIgnoree,
   normaliserTypeActivite,
 } from "../lib/typesActiviteSap";
-import { useTauxHoraires, enregistrerTaux } from "../lib/tauxHoraires";
+import {
+  useTauxHoraires,
+  enregistrerTaux,
+  useParametresFoa,
+  enregistrerParametreFoa,
+  PARAMS_FOA_DEFAUT,
+} from "../lib/tauxHoraires";
 import { lireTexteSap } from "../lib/lireTexteSap";
 import {
   addDoc,
@@ -507,6 +513,57 @@ function TauxHorairesPanel({ peutModifier }) {
     </div>
   );
 }
+// Paramètres FOA (pourcentages) du bilan financier des chantiers.
+function ParametresFoaPanel({ peutModifier }) {
+  const params = useParametresFoa();
+  const [saisies, setSaisies] = useState({});
+  const valider = async (cle) => {
+    if (saisies[cle] === undefined) return;
+    const n = Number(String(saisies[cle]).replace(",", ".").trim());
+    setSaisies((p) => {
+      const { [cle]: _omis, ...reste } = p;
+      return reste;
+    });
+    if (Number.isFinite(n) && n >= 0) await enregistrerParametreFoa(cle, n / 100);
+  };
+  return (
+    <div className="panel">
+      <h2 style={{ marginTop: 0 }}>Paramètres du bilan financier (FOA)</h2>
+      <p className="simple-list-meta" style={{ marginBottom: 10 }}>
+        Pourcentages de la feuille d'ouverture d'affaire, utilisés pour le calcul de la marge nette.{" "}
+        {peutModifier ? "Modifiable par un administrateur." : "Modification réservée aux administrateurs."}
+      </p>
+      <div className="data-table-wrapper">
+        <table className="data-table">
+          <tbody>
+            {Object.entries(PARAMS_FOA_DEFAUT).map(([cle, def]) => {
+              const affiche = saisies[cle] !== undefined ? saisies[cle] : String(Math.round(params[cle] * 100000) / 1000).replace(".", ",");
+              return (
+                <tr key={cle}>
+                  <td data-label="Paramètre">{def.label}</td>
+                  <td data-label="Valeur (%)">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      style={{ width: 90 }}
+                      disabled={!peutModifier}
+                      value={affiche}
+                      onChange={(e) => setSaisies((p) => ({ ...p, [cle]: e.target.value }))}
+                      onBlur={() => valider(cle)}
+                      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                    />{" "}
+                    %
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 const LIBELLE_SEUL = (c) => libelleTypeActivite(c).replace(/ \([^)]*\)$/, "").replace(c, "");
 
 export default function ElectriciteImportSap() {
@@ -549,6 +606,7 @@ export default function ElectriciteImportSap() {
           historique={<HistoriqueImports />}
         />
         <TauxHorairesPanel peutModifier={Boolean(isAdmin)} />
+        <ParametresFoaPanel peutModifier={Boolean(isAdmin)} />
         <VueConsultation />
       </div>
     </div>

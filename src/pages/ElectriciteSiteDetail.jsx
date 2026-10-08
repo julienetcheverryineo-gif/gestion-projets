@@ -1,6 +1,6 @@
 import { estLigneSomme } from "../lib/ligneSomme";
 import BilanFinancier from "../components/BilanFinancier";
-import { useTauxHoraires } from "../lib/tauxHoraires";
+import { useTauxHoraires, useParametresFoa } from "../lib/tauxHoraires";
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -1748,6 +1748,7 @@ export default function ElectriciteSiteDetail() {
     [sapLignesFo, otpSap]
   );
   const { taux: tauxHoraire } = useTauxHoraires();
+  const paramsFoa = useParametresFoa();
   const heuresSap = useMemo(
     () =>
       otpSap
@@ -2449,6 +2450,17 @@ export default function ElectriciteSiteDetail() {
               ).total;
               return (
                 <BilanFinancier
+                  caCalcule={lignesChantier
+                    .filter((l) => !estLigneSomme(l))
+                    .reduce((s, l) => s + (l.pvTotal || 0), 0)}
+                  caSaisi={chantier?.caHt ?? null}
+                  caNonSoumis={chantier?.caNonSoumisFg ?? 0}
+                  onChangerCa={
+                    peutGerer
+                      ? (champ, v) => updateDoc(doc(db, "sites", chantierId), { [champ]: v })
+                      : null
+                  }
+                  foa={paramsFoa}
                   budgetFo={totFo.budget}
                   pctFo={totFo.pctAvancement}
                   budgetHeures={totMo.budget}
