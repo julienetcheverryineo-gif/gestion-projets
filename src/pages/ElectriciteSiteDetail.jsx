@@ -27,6 +27,7 @@ import EnvoyerFournituresGoatModal from "../components/EnvoyerFournituresGoatMod
 import {
   GENERAL,
   cleSup,
+  estCleSup,
   construireRecapMo,
   nouvelIdTache,
   tachesGenerales,
@@ -282,23 +283,7 @@ function TableauRecap({
   const sapMo = sap?.type === "mo" ? sap.heures : null;
   const aSap = Boolean(sapFo || sapMo);
   const avecCode = uniteValeur === "h";
-  // Tâches complémentaires : réalisé = heures SAP réaffectées, % = réel / budget.
-  const recap = (() => {
-    if (!sapMo) return recapBrut;
-    let supReel = 0;
-    const parType = recapBrut.parType.map((l) => {
-      if (!l.sup) return l;
-      const reel = sapMo.parCle.get(l.cle)?.reel || 0;
-      supReel += reel;
-      return { ...l, realise: reel, restant: l.budget - reel, pctAvancement: l.budget > 0 ? reel / l.budget : 0 };
-    });
-    const t = recapBrut.total;
-    const realise = t.realise + supReel;
-    return {
-      parType,
-      total: { ...t, realise, restant: t.restant - supReel, pctAvancement: t.budget > 0 ? realise / t.budget : 0 },
-    };
-  })();
+  const recap = recapBrut;
   const codeAffiche = (l) =>
     l.sup
       ? codeMo(codesMo?.[l.cle], resumerPoste(l.libelle) || "TACHE")
@@ -549,15 +534,19 @@ function TableauRecap({
                         ⚠ +{formatNombre(reelSap - l.vendu)} h vs vendu
                       </span>
                     )}
-                    {l.sup && !l.fixe && sup?.onSupprimer && (
+                    {l.ajustable && sup?.onSupprimer && (
                       <button
                         type="button"
                         className="btn-ghost btn-danger"
-                        title="Supprimer cette tâche"
+                        title="Supprimer cette tâche : ses heures prévues repartent en « Sans tâche »"
                         style={{ marginLeft: 8, padding: "0 6px" }}
                         onClick={() => {
-                          if (window.confirm("Supprimer la tâche « " + l.libelle + " » et ses heures ?"))
-                            sup.onSupprimer(l.tacheId);
+                          if (
+                            window.confirm(
+                              "Supprimer la tâche « " + l.libelle + " » ? Ses heures prévues repartent en « Sans tâche »."
+                            )
+                          )
+                            sup.onSupprimer(l.tacheId, l);
                         }}
                       >
                         ×
@@ -635,7 +624,7 @@ function TableauRecap({
                     {formatMontant(l.realise, uniteValeur)}
                   </td>
                   <td className="col-avancement" data-label="% avancement">
-                    {modifiable && !l.sup ? (
+                    {modifiable ? (
                       <LigneAvancementModifiable
                         pct={l.pctAvancement}
                         onValider={(v) => onModifierGroupe(l.cle, l.libelle, v, devisId)}
@@ -860,6 +849,23 @@ function TableauRecap({
             </tbody>
           </table>
         </div>
+      )}
+      {sup?.masquees?.length > 0 && sup?.onRestaurer && (
+        <p className="simple-list-meta" style={{ marginTop: 10 }}>
+          Tâches supprimées :{" "}
+          {sup.masquees.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="btn-ghost"
+              style={{ marginRight: 6 }}
+              title="Remettre cette tâche dans le bilan"
+              onClick={() => sup.onRestaurer(t.id)}
+            >
+              ↺ {t.libelle}
+            </button>
+          ))}
+        </p>
       )}
       {sup?.onAjouter && (
         <form
@@ -1780,17 +1786,18 @@ export default function ElectriciteSiteDetail() {
       if (!code || parCode.has(code)) return;
       parCode.set(code, { code, libelle: String(libelle || code).trim() });
     };
+    const masqueesIds = new Set((chantier?.tachesMoMasquees || []).map((t) => t.id));
     const vusType = new Set();
     lignesChantier.forEach((l) => {
       const cleType = codeTypeFo(l.typeFo);
-      if (!cleType || vusType.has(cleType)) return;
+      if (!cleType || vusType.has(cleType) || masqueesIds.has("t:" + cleType)) return;
       vusType.add(cleType);
       const connue = tachesFo.find((t) => t.code === cleType);
       const lib = (connue?.label || libelleTypeFo(l.typeFo) || cleType).trim();
       ajoute(codeMo(chantier?.codesMo?.[cleType], resumerPoste(libelleTypeFo(l.typeFo)) || cleType.slice(0, 8)), lib);
     });
     // Tâches complémentaires (suivi, étude, levée de réserve + ajoutées).
-    tachesMoChantier(chantier).forEach((t) =>
+    tachesMoChantier(chantier).filter((t) => !masqueesIds.has(t.id)).forEach((t) =>
       ajoute(codeMo(chantier?.codesMo?.[cleSup(t.id)], resumerPoste(t.libelle) || "TACHE"), t.libelle)
     );
     return [...parCode.values()].sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
@@ -1816,8 +1823,10 @@ export default function ElectriciteSiteDetail() {
     recapActif === "fo" || recapActif === "mo"
       ? (() => {
           const base = calculerRecap(lignesChantier, champRecap, champAvancementRecap, ordreTypesChantier);
-          sansTacheBase[GENERAL] = base.parType.find((l) => !l.cle)?.budget || 0;
-          return avecSup ? construireRecapMo(base, chantier, GENERAL, devis) : base;
+          if (!avecSup) return base;
+          const r = construireRecapMo(base, chantier, GENERAL, devis);
+          sansTacheBase[GENERAL] = r.sansTacheBrut;
+          return r;
         })()
       : null;
   const recapParDevis =
@@ -1829,8 +1838,10 @@ export default function ElectriciteSiteDetail() {
             champAvancementRecap,
             ordreTypesChantier
           );
-          sansTacheBase[d.id] = base.parType.find((l) => !l.cle)?.budget || 0;
-          return { devis: d, recap: avecSup ? construireRecapMo(base, chantier, d.id, devis) : base };
+          if (!avecSup) return { devis: d, recap: base };
+          const r = construireRecapMo(base, chantier, d.id, devis);
+          sansTacheBase[d.id] = r.sansTacheBrut;
+          return { devis: d, recap: r };
         })
       : [];
   // Saisie des heures d'une tâche complémentaire ("" ou 0 retire la valeur).
@@ -1879,19 +1890,39 @@ export default function ElectriciteSiteDetail() {
     taches.push({ id: nouvelIdTache(), libelle, portee });
     await updateDoc(doc(db, "sites", chantierId), { tachesMoSup: taches });
   };
-  const supprimerTacheSup = async (tacheId) => {
-    const taches = tachesMoChantier(chantier)
-      .filter((t) => t.id !== tacheId)
-      .map(({ id, libelle: l, portee: p }) => ({ id, libelle: l, portee: p }));
-    const heures = { ...(chantier?.heuresMoSup || {}) };
-    Object.keys(heures).forEach((k) => {
-      if (k.endsWith("||" + tacheId)) delete heures[k];
+  // Supprime une tâche du Bilan MO : ses heures prévues repartent en
+  // « Sans tâche ». Tâche complémentaire non fixe : retirée de la liste ;
+  // tâche de la minute ou du socle fixe : masquée (restaurable).
+  const supprimerTacheMo = async (tacheId, ligne) => {
+    const nettoyer = (obj) => {
+      const out = { ...(obj || {}) };
+      Object.keys(out).forEach((k) => {
+        if (k.endsWith("||" + tacheId)) delete out[k];
+      });
+      return out;
+    };
+    const maj = {
+      heuresMoSup: nettoyer(chantier?.heuresMoSup),
+      prelevementsMoSup: nettoyer(chantier?.prelevementsMoSup),
+      avancementsMoSup: nettoyer(chantier?.avancementsMoSup),
+    };
+    if (ligne?.sup && !ligne.fixe) {
+      maj.tachesMoSup = tachesMoChantier(chantier)
+        .filter((t) => t.id !== tacheId)
+        .map(({ id, libelle: l, portee: p }) => ({ id, libelle: l, portee: p }));
+    } else {
+      const libelle = ligne?.sup ? ligne.libelle : libelleTypeFo(ligne?.cle) || ligne?.libelle || tacheId;
+      maj.tachesMoMasquees = [
+        ...(chantier?.tachesMoMasquees || []).filter((t) => t.id !== tacheId),
+        { id: tacheId, libelle },
+      ];
+    }
+    await updateDoc(doc(db, "sites", chantierId), maj);
+  };
+  const restaurerTacheMo = async (tacheId) => {
+    await updateDoc(doc(db, "sites", chantierId), {
+      tachesMoMasquees: (chantier?.tachesMoMasquees || []).filter((t) => t.id !== tacheId),
     });
-    const prelev = { ...(chantier?.prelevementsMoSup || {}) };
-    Object.keys(prelev).forEach((k) => {
-      if (k.endsWith("||" + tacheId)) delete prelev[k];
-    });
-    await updateDoc(doc(db, "sites", chantierId), { tachesMoSup: taches, heuresMoSup: heures, prelevementsMoSup: prelev });
   };
   // Bilan Achats : toujours basé sur le Type de FO (pas de distinction
   // FO/MO ici), avec le même ordre personnalisé que le Récap FO.
@@ -2005,6 +2036,19 @@ export default function ElectriciteSiteDetail() {
   // chiffrées, même Type de FO).
   const appliquerAvancementGroupe = async (cle, libelle, valeur, devisId) => {
     const v = Math.max(0, Math.min(100, Number(valeur) || 0));
+    // Tâche complémentaire (suivi, étude…) : % saisi par devis, ou partout
+    // depuis la synthèse.
+    if (estCleSup(cle)) {
+      const id = cle.slice(4);
+      const maj = { ...(chantier?.avancementsMoSup || {}) };
+      if (devisId) maj[devisId + "||" + id] = v;
+      else {
+        maj[GENERAL + "||" + id] = v;
+        devis.forEach((d) => (maj[d.id + "||" + id] = v));
+      }
+      await updateDoc(doc(db, "sites", chantierId), { avancementsMoSup: maj });
+      return;
+    }
     const champ = champAvancementRecap;
     const lignesCible = lignesChantier.filter(
       (l) =>
@@ -2280,7 +2324,9 @@ export default function ElectriciteSiteDetail() {
                         onChangerPrelevement: changerPrelevementSup,
                         disponible: disponibleSansTache,
                         onAjouter: ajouterTacheSup,
-                        onSupprimer: supprimerTacheSup,
+                        onSupprimer: supprimerTacheMo,
+                        masquees: chantier?.tachesMoMasquees || [],
+                        onRestaurer: restaurerTacheMo,
                       }
                     : null
                 }
@@ -2311,7 +2357,9 @@ export default function ElectriciteSiteDetail() {
                           onChangerPrelevement: changerPrelevementSup,
                           disponible: disponibleSansTache,
                           onAjouter: ajouterTacheSup,
-                          onSupprimer: supprimerTacheSup,
+                          onSupprimer: supprimerTacheMo,
+                        masquees: chantier?.tachesMoMasquees || [],
+                        onRestaurer: restaurerTacheMo,
                         }
                       : null
                   }
