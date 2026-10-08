@@ -188,9 +188,10 @@ function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
     const valeur = l[champValeur] || 0;
     if (!valeur) return;
     const cle = (l.typeFo || "").trim();
-    if (!groupes.has(cle)) groupes.set(cle, { cle, budget: 0, realise: 0 });
+    if (!groupes.has(cle)) groupes.set(cle, { cle, budget: 0, realise: 0, pr: 0 });
     const g = groupes.get(cle);
     g.budget += valeur;
+    g.pr += champValeur === "coutTotalFo" ? l.coutTotalFoPr ?? valeur : valeur;
     g.realise += (valeur * (l[champAvancementPct] || 0)) / 100;
   });
   const parType = Array.from(groupes.values())
@@ -199,6 +200,7 @@ function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
       libelle: g.cle ? formatTypeFo(g.cle) : champValeur === "tempsTotalHeures" ? "Sans tâche" : "Sans type de FO",
       numero: g.cle ? Number(g.cle.match(/^\s*(\d+)/)?.[1]) : null,
       budget: g.budget,
+      montantPr: g.pr,
       realise: g.realise,
       restant: g.budget - g.realise,
       pctAvancement: g.budget > 0 ? g.realise / g.budget : 0,
@@ -207,11 +209,12 @@ function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
   const total = parType.reduce(
     (acc, l) => {
       acc.budget += l.budget;
+      acc.montantPr += l.montantPr;
       acc.realise += l.realise;
       acc.restant += l.restant;
       return acc;
     },
-    { budget: 0, realise: 0, restant: 0 }
+    { budget: 0, montantPr: 0, realise: 0, restant: 0 }
   );
   total.pctAvancement = total.budget > 0 ? total.realise / total.budget : 0;
   return { parType, total };
@@ -275,6 +278,8 @@ function TableauRecap({
   profilsMo,
   onChangerProfilMo,
   profilsPossibles,
+  kAchats,
+  onChangerK,
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
@@ -312,7 +317,8 @@ function TableauRecap({
   const codesUtilises = recap.parType.map(codeAffiche).filter(Boolean);
   const libType = uniteValeur === "h" ? "Tâche" : "Type de FO";
   const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
-  const nbColonnes = 6 + (aSap ? 3 : 0);
+  const avecK = !avecCode;
+  const nbColonnes = 6 + (aSap ? 3 : 0) + (avecK ? 2 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
   // Détail des lignes d'achat SAP d'un type (ou hors budget) : chaque ligne
   // peut être réaffectée à un autre Type de FO du budget, ou laissée hors
@@ -517,6 +523,8 @@ function TableauRecap({
                 <th className="col-type" style={{ width: largeurColType }}>
                   {libType}
                 </th>
+                {avecK && <th className="col-num col-petit" title="Montant du chiffrage avant coefficient d'achat">Montant PR</th>}
+                {avecK && <th className="col-num col-petit" title="Coefficient d'achat : 0,9 = 10 % de remise. Adapte le budget matériel et tous les bilans.">k achat</th>}
                 {avecCode && <th className="col-num col-petit">Vendu</th>}
                 <th className="col-num">{libelleValeur}</th>
                 <th className="col-num">Réalisé (avancement)</th>
@@ -595,6 +603,31 @@ function TableauRecap({
                       </span>
                     )}
                   </td>
+                  {avecK && (
+                    <>
+                      <td className="col-num col-petit" data-label="Montant PR">
+                        {formatMontant(l.montantPr ?? l.budget, uniteValeur)}
+                      </td>
+                      <td className="col-num col-petit" data-label="k achat">
+                        {l.cle ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className="elec-ordre-input elec-heures-input"
+                            key={"k" + (kAchats?.[l.cle] ?? 1)}
+                            defaultValue={String(kAchats?.[l.cle] ?? 1).replace(".", ",")}
+                            disabled={!onChangerK}
+                            title="0,9 = 10 % de remise"
+                            style={kAchats?.[l.cle] ? { borderColor: "var(--warning, #e69500)" } : undefined}
+                            onBlur={(e) => onChangerK && onChangerK(l.cle, e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                          />
+                        ) : (
+                          ""
+                        )}
+                      </td>
+                    </>
+                  )}
                   {avecCode && (
                     <td className="col-num col-petit" data-label="Vendu">
                       {l.cle || l.vendu ? formatNombre(l.vendu || 0) : ""}
@@ -693,6 +726,8 @@ function TableauRecap({
                     >
                       Achats SAP hors budget
                     </td>
+                    <td className="col-petit"></td>
+                    <td className="col-petit"></td>
                     <td className="col-num" data-label={libelleValeur}>—</td>
                     <td className="col-num" data-label="Réalisé">—</td>
                     <td className="col-avancement" data-label="% avancement"></td>
@@ -750,6 +785,12 @@ function TableauRecap({
                 <td className="col-type" data-label={libType}>
                   TOTAL
                 </td>
+                {avecK && (
+                  <>
+                    <td className="col-num col-petit">{formatMontant(recap.total.montantPr ?? recap.total.budget, uniteValeur)}</td>
+                    <td className="col-petit"></td>
+                  </>
+                )}
                 {avecCode && <td className="col-petit"></td>}
                 <td className="col-num" data-label={libelleValeur}>
                   {formatMontant(recap.total.budget, uniteValeur)}
@@ -1940,8 +1981,10 @@ export default function ElectriciteSiteDetail() {
       (acc, l) => {
         const pctFo = (l.avancementFo ?? l.avancement ?? 0) / 100;
         const pctMo = (l.avancementMo ?? l.avancement ?? 0) / 100;
-        acc.budgetMateriel += l.coutTotalFo || 0;
-        acc.realiseMateriel += (l.coutTotalFo || 0) * pctFo;
+        const kl = chantier?.kAchatFo?.[(l.typeFo || "").trim()];
+        const coutK = (l.coutTotalFo || 0) * (typeof kl === "number" && kl > 0 ? kl : 1);
+        acc.budgetMateriel += coutK;
+        acc.realiseMateriel += coutK * pctFo;
         acc.heuresPrevues += l.tempsTotalHeures || 0;
         acc.heuresRealisees += (l.tempsTotalHeures || 0) * pctMo;
         return acc;
@@ -1951,9 +1994,25 @@ export default function ElectriciteSiteDetail() {
 
   // Lignes chiffrables (hors postes) de tout le chantier, tous devis
   // confondus — pour les récapitulatifs par Type de FO.
-  const lignesChantier = toutesLignes.filter(
-    (l) => l.chantierId === chantierId && !l.estPoste
-  );
+  // Le « k achat » d'un Type de FO (ex. 0,9 = 10 % de remise) transforme le
+  // montant PR du chiffrage en budget matériel : tous les bilans en partent.
+  const kAchats = chantier?.kAchatFo || {};
+  const lignesChantier = toutesLignes
+    .filter((l) => l.chantierId === chantierId && !l.estPoste)
+    .map((l) => {
+      const k = kAchats[(l.typeFo || "").trim()];
+      return typeof k === "number" && k > 0 && k !== 1
+        ? { ...l, coutTotalFoPr: l.coutTotalFo || 0, coutTotalFo: (l.coutTotalFo || 0) * k }
+        : l;
+    });
+  const changerKAchat = async (cle, valeur) => {
+    const t = String(valeur).replace(",", ".").trim();
+    const n = t === "" ? NaN : Number(t);
+    const maj = { ...kAchats };
+    if (!Number.isFinite(n) || n <= 0 || n === 1) delete maj[cle];
+    else maj[cle] = Math.round(n * 10000) / 10000;
+    await updateDoc(doc(db, "sites", chantierId), { kAchatFo: maj });
+  };
   // Tâches (types de FO) réellement utilisées dans les devis du chantier :
   // code + libellé, pour l'envoi vers SAP.
   const tachesUtilisees = (() => {
@@ -2588,6 +2647,8 @@ export default function ElectriciteSiteDetail() {
                 profilsMo={avecSup ? profilsMoChantier : null}
                 onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
                 profilsPossibles={profilsPossibles}
+                kAchats={!avecSup ? kAchats : null}
+                onChangerK={!avecSup && peutGerer ? changerKAchat : null}
                 sup={
                   avecSup && peutGerer
                     ? {
@@ -2624,6 +2685,8 @@ export default function ElectriciteSiteDetail() {
                 profilsMo={avecSup ? profilsMoChantier : null}
                 onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
                 profilsPossibles={profilsPossibles}
+                kAchats={!avecSup ? kAchats : null}
+                onChangerK={!avecSup && peutGerer ? changerKAchat : null}
                   sup={
                     avecSup && peutGerer
                       ? {
