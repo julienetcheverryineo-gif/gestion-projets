@@ -11,8 +11,6 @@ const ROUGE = "#c0392b";
 // Bilan financier d'une affaire : matériel et main d'œuvre en euros.
 // Budget MO = heures chiffrées × taux de chiffrage ; réel MO = heures
 // pointées valorisées au taux de leur type d'activité (voir Import SAP).
-const BLOC_MO = (code) => (/^I1/.test(code) ? "Suivi" : /^I2/.test(code) ? "Études" : "Production");
-
 const classeNeg = (v) => (v < -1e-9 ? { color: ROUGE, fontWeight: 600 } : {});
 
 function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) {
@@ -22,6 +20,19 @@ function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) 
       {cols.map((c, i) => (
         <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]} style={classeNeg(c[champ])}>
           {sansReel && i === 1 ? "—" : c[champ] === null ? "—" : fmt(c[champ])}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function LigneVals({ nom, vals }) {
+  return (
+    <tr>
+      <td data-label="" style={{ paddingLeft: 24 }}>{nom}</td>
+      {vals.map((v, i) => (
+        <td key={i} data-label={["Prévu", "Réel (SAP)", "Atterrissage"][i]}>
+          {eur(v)}
         </td>
       ))}
     </tr>
@@ -46,15 +57,14 @@ export default function BilanFinancier({
   budgetHeures,
   budgetMoEuro,
   prevuMoLignes,
+  detailFo,
   pctMo,
   achats,
   heures,
   taux,
   tauxChiffrage,
   tauxChiffrageDefaut,
-  onTauxChiffrage,
 }) {
-  const [saisie, setSaisie] = useState(null);
   const [saisieCa, setSaisieCa] = useState({});
   const [saisiePct, setSaisiePct] = useState({});
   // % de la rubrique C : valeur propre à l'affaire, sinon paramètre FOA.
@@ -82,8 +92,6 @@ export default function BilanFinancier({
 
   const heuresSansTaux = parType.filter((t) => t.taux === null).reduce((s, t) => s + t.heures, 0);
   const reelMo = parType.reduce((s, t) => s + (t.cout || 0), 0);
-  const prevuBloc = (nom) => (prevuMoLignes || []).filter((l) => BLOC_MO(l.code) === nom).reduce((s, l) => s + l.euro, 0);
-  const reelBloc = (nom) => parType.filter((t) => BLOC_MO(t.code) === nom).reduce((s, t) => s + (t.cout || 0), 0);
 
   const tx = tauxChiffrage ?? tauxChiffrageDefaut ?? 0;
   const budgetMo = budgetMoEuro ?? budgetHeures * tx;
@@ -119,6 +127,28 @@ export default function BilanFinancier({
   const reel = colonne(reelMo, reelFo, zoneReel, heuresMiReelles);
   const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo), zoneAtterr, heuresMiAtterr);
   const cols = [prevu, reel, atterr];
+  // Détail de la MO par type de personnel : prévu (profils des tâches),
+  // réel (pointages SAP) et atterrissage.
+  const detailMo = (() => {
+    const m = new Map();
+    const ligne = (code) => {
+      if (!m.has(code)) m.set(code, { code, prevu: 0, reel: 0 });
+      return m.get(code);
+    };
+    (prevuMoLignes || []).forEach((l) => {
+      if (l.euro) ligne(l.code).prevu += l.euro;
+    });
+    parType.forEach((t) => {
+      if (t.cout) ligne(t.code).reel += t.cout;
+    });
+    return [...m.values()]
+      .map((t) => ({
+        ...t,
+        nom: libelleTypeActivite(t.code),
+        atterr: t.reel + t.prevu * (1 - pctMo),
+      }))
+      .sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
+  })();
 
   const validerPct = (cle) => {
     if (saisiePct[cle] === undefined) return;
@@ -134,13 +164,26 @@ export default function BilanFinancier({
     <input
       type="text"
       inputMode="decimal"
-      style={{ width: 64 }}
       disabled={!onChangerPct}
-      title={typeof pctSaisis?.[cle] === "number" ? "Valeur propre à cette affaire (vider pour revenir au paramètre)" : "Paramètre par défaut"}
+      title={typeof pctSaisis?.[cle] === "number" ? "Valeur propre à cette affaire (vider pour revenir au paramètre)" : "Paramètre par défaut — cliquer pour modifier"}
       value={saisiePct[cle] !== undefined ? saisiePct[cle] : String(Math.round(foa[cle] * 100000) / 1000).replace(".", ",")}
       onChange={(e) => setSaisiePct((p) => ({ ...p, [cle]: e.target.value }))}
       onBlur={() => validerPct(cle)}
       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      style={{
+        width: "3.4em",
+        padding: 0,
+        margin: 0,
+        height: "auto",
+        border: "none",
+        borderBottom: "1px dotted currentColor",
+        borderRadius: 0,
+        background: "transparent",
+        boxShadow: "none",
+        font: "inherit",
+        textAlign: "right",
+        color: typeof pctSaisis?.[cle] === "number" ? "var(--accent, inherit)" : "inherit",
+      }}
     />
   );
 
@@ -172,14 +215,6 @@ export default function BilanFinancier({
     />
   );
 
-  const validerTaux = () => {
-    if (saisie === null) return;
-    const t = String(saisie).replace(",", ".").trim();
-    const n = t === "" ? null : Number(t);
-    if (n === null || n >= 0) onTauxChiffrage?.(n);
-    setSaisie(null);
-  };
-
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
       <div className="panel-header">
@@ -189,19 +224,6 @@ export default function BilanFinancier({
       <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
         <label>
           CA H.T. (€) {champCa("caHt", ca)}
-        </label>
-        <label>
-          Taux de chiffrage par défaut (€/h){" "}
-          <input
-            type="text"
-            inputMode="decimal"
-            style={{ width: 80 }}
-            disabled={!onTauxChiffrage}
-            value={saisie !== null ? saisie : String(tx).replace(".", ",")}
-            onChange={(e) => setSaisie(e.target.value)}
-            onBlur={validerTaux}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          />
         </label>
         <span className="simple-list-meta">
           {caSaisi == null
@@ -227,20 +249,9 @@ export default function BilanFinancier({
           </thead>
           <tbody>
             <Ligne cols={cols} nom="A – Main d'œuvre" champ="a" fort />
-            <tr>
-              <td style={{ paddingLeft: 24 }}>dont Suivi / Études / Production</td>
-              <td>
-                {eur(prevuBloc("Suivi"))} / {eur(prevuBloc("Études"))} / {eur(prevuBloc("Production"))}
-              </td>
-              <td>
-                {eur(reelBloc("Suivi"))} / {eur(reelBloc("Études"))} / {eur(reelBloc("Production"))}
-              </td>
-              <td>
-                {eur(reelBloc("Suivi") + prevuBloc("Suivi") * (1 - pctMo))} /{" "}
-                {eur(reelBloc("Études") + prevuBloc("Études") * (1 - pctMo))} /{" "}
-                {eur(reelBloc("Production") + prevuBloc("Production") * (1 - pctMo))}
-              </td>
-            </tr>
+{detailMo.map((t) => (
+              <LigneVals key={t.code} nom={t.nom} vals={[t.prevu, t.reel, t.atterr]} />
+            ))}
             <Ligne
               cols={cols}
               nom={
@@ -261,6 +272,13 @@ export default function BilanFinancier({
               retrait
             />
             <Ligne cols={cols} nom="B – Achats (fournitures et sous-traitance)" champ="b" fort />
+            {(detailFo || []).map((t) => (
+              <LigneVals
+                key={t.libelle}
+                nom={t.libelle}
+                vals={[t.prevu, t.reel, t.reel + t.prevu * (1 - t.av)]}
+              />
+            ))}
             <Ligne cols={cols} nom="C – Autres frais" champ="C" fort />
             <Ligne cols={cols} nom={<>Prorata {champPct("prorata")} % du CA</>} champ="C_prorata" retrait />
             <Ligne cols={cols} nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />

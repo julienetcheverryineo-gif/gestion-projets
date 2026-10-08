@@ -2578,8 +2578,19 @@ export default function ElectriciteSiteDetail() {
                 const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
                 return inclutMaterielInterne(profil) ? sm + (l.budget || 0) : sm;
               }, 0);
+              const recapFoFin = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", ordreTypesFoChantier);
+              const rapproFo = rapprocherAchats(recapFoFin.parType, achatsSap, chantier?.affectationsSapLignes || {});
+              const detailFo = recapFoFin.parType.map((l) => ({
+                libelle: l.libelle,
+                prevu: l.budget,
+                reel: rapproFo.parCle.get(l.cle)?.reel || 0,
+                av: l.pctAvancement,
+              }));
+              if (rapproFo.horsBudget.reel > 0.005)
+                detailFo.push({ libelle: "Achats hors budget", prevu: 0, reel: rapproFo.horsBudget.reel, av: 0 });
               return (
                 <BilanFinancier
+                  detailFo={detailFo}
                   heuresMatInternePrevues={heuresMatInternePrevues}
                   zone={chantier?.zone || ""}
                   montantZone={montantZone(chantier?.zone || "")}
@@ -2616,11 +2627,6 @@ export default function ElectriciteSiteDetail() {
                   taux={tauxHoraire}
                   tauxChiffrage={chantier?.tauxChiffrageMo ?? null}
                   tauxChiffrageDefaut={tauxHoraire("I205")}
-                  onTauxChiffrage={
-                    peutGerer
-                      ? (v) => updateDoc(doc(db, "sites", chantierId), { tauxChiffrageMo: v })
-                      : null
-                  }
                 />
               );
             })()}
