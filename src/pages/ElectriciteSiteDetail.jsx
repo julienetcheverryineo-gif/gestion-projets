@@ -540,7 +540,7 @@ function TableauRecap({
                   (l.preleveEffectif ? " · −" + formatNombre(l.preleveEffectif) + " h redistribuées vers des tâches" : "");
                 return (
                 <Fragment key={l.libelle}>
-                <tr className={l.deroge ? "recap-derogation" : ""}>
+                <tr>
                   {!avecCode && (
                   <td className="col-ordre" data-label="N°">
                     {onModifierOrdre ? (
