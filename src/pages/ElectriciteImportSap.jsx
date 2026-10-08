@@ -4,7 +4,6 @@ import {
   estLigneMoIgnoree,
   estActiviteIgnoree,
   normaliserTypeActivite,
-  CODES_TYPES_ACTIVITE_CONNUS,
 } from "../lib/typesActiviteSap";
 import { useTauxHoraires, enregistrerTaux, TAUX_DEFAUT } from "../lib/tauxHoraires";
 import { lireTexteSap } from "../lib/lireTexteSap";
@@ -432,7 +431,7 @@ function TauxHorairesPanel({ peutModifier }) {
   const { documents: lignesMo } = useCollection("sapLignesMo");
   const [saisies, setSaisies] = useState({});
   const codes = useMemo(() => {
-    const ens = new Set([...CODES_TYPES_ACTIVITE_CONNUS, ...Object.keys(TAUX_DEFAUT)]);
+    const ens = new Set();
     lignesMo.forEach((l) => {
       const c = normaliserTypeActivite(l.typAct);
       if (c && !estActiviteIgnoree(c)) ens.add(c);
