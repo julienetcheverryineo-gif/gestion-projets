@@ -73,6 +73,7 @@ export const PARAMS_FOA_DEFAUT = {
   aleas: { label: "Aléas (% du CA H.T.)", valeur: 0.02 },
   negociation: { label: "Négociation (% du CA H.T.)", valeur: 0.02 },
   margePreconisee: { label: "Marge nette préconisée (% du CA)", valeur: 0.07 },
+  materielInterne: { label: "Matériel interne (€ par heure)", valeur: 6.76, unite: "€/h" },
 };
 export const DOC_FOA = ["parametresElec", "foa"];
 

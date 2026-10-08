@@ -45,3 +45,14 @@ export function estActiviteIgnoree(code) {
 export function estLigneMoIgnoree(ligne) {
   return estActiviteIgnoree(ligne?.typAct);
 }
+
+// Heures qui portent du matériel interne dans la FOA : suivi (I1xx),
+// production (I3xx, E2xx/E3xx) et études I205 / I209 — hors monteurs qualifiés
+// (I314) et production externe (E302), déduits dans la FOA. Un code vide
+// (profil non renseigné) vaut I205.
+export function inclutMaterielInterne(code) {
+  const c = normaliser(code) || "I205";
+  if (c === "I314" || c === "E302") return false;
+  if (/^I1/.test(c) || /^I3/.test(c) || /^E/.test(c)) return true;
+  return c === "I205" || c === "I209";
+}

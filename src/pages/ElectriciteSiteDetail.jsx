@@ -18,7 +18,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
-import { libelleTypeActivite, estLigneMoIgnoree, estActiviteIgnoree, CODES_TYPES_ACTIVITE_CONNUS } from "../lib/typesActiviteSap";
+import { libelleTypeActivite, estLigneMoIgnoree, estActiviteIgnoree, CODES_TYPES_ACTIVITE_CONNUS, inclutMaterielInterne } from "../lib/typesActiviteSap";
 import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
@@ -2573,8 +2573,13 @@ export default function ElectriciteSiteDetail() {
                 const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
                 return /^(I3|E)/.test(profil || "") ? sm + (l.budget || 0) : sm;
               }, 0);
+              const heuresMatInternePrevues = recapMoSynthese.parType.reduce((sm, l) => {
+                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
+                return inclutMaterielInterne(profil) ? sm + (l.budget || 0) : sm;
+              }, 0);
               return (
                 <BilanFinancier
+                  heuresMatInternePrevues={heuresMatInternePrevues}
                   zone={chantier?.zone || ""}
                   montantZone={montantZone(chantier?.zone || "")}
                   heuresZoneSap={heuresSapZone}

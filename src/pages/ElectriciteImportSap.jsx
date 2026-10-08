@@ -527,7 +527,7 @@ function ParametresFoaPanel({ peutModifier }) {
       const { [cle]: _omis, ...reste } = p;
       return reste;
     });
-    if (Number.isFinite(n) && n >= 0) await enregistrerParametreFoa(cle, n / 100);
+    if (Number.isFinite(n) && n >= 0) await enregistrerParametreFoa(cle, PARAMS_FOA_DEFAUT[cle].unite ? n : n / 100);
   };
   return (
     <div className="panel">
@@ -540,7 +540,7 @@ function ParametresFoaPanel({ peutModifier }) {
         <table className="data-table">
           <tbody>
             {Object.entries(PARAMS_FOA_DEFAUT).map(([cle, def]) => {
-              const affiche = saisies[cle] !== undefined ? saisies[cle] : String(Math.round(params[cle] * 100000) / 1000).replace(".", ",");
+              const affiche = saisies[cle] !== undefined ? saisies[cle] : String(def.unite ? params[cle] : Math.round(params[cle] * 100000) / 1000).replace(".", ",");
               return (
                 <tr key={cle}>
                   <td data-label="Paramètre">{def.label}</td>
@@ -555,7 +555,7 @@ function ParametresFoaPanel({ peutModifier }) {
                       onBlur={() => valider(cle)}
                       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                     />{" "}
-                    %
+                    {def.unite || "%"}
                   </td>
                 </tr>
               );

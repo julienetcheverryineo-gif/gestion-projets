@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { libelleTypeActivite, normaliserTypeActivite } from "../lib/typesActiviteSap";
+import { libelleTypeActivite, normaliserTypeActivite, inclutMaterielInterne } from "../lib/typesActiviteSap";
 import { HEURES_PAR_JOUR_ZONE } from "../lib/tauxHoraires";
 
 const eur = (v) =>
@@ -29,6 +29,7 @@ function Ligne({ cols, nom, champ, fort, retrait, sansReel, fmt = eur, style }) 
 }
 
 export default function BilanFinancier({
+  heuresMatInternePrevues,
   zone,
   montantZone,
   heuresZoneSap,
@@ -91,19 +92,20 @@ export default function BilanFinancier({
   // (réel + reste à faire au budget).
   const ca = caSaisi ?? caCalcule;
   const base = ca - (caNonSoumis || 0);
-  const colonne = (aBrut, b, zoneEuro) => {
+  const colonne = (aBrut, b, zoneEuro, heuresMi) => {
     const a = aBrut; // MO hors zone : base des frais divers
     const C_prorata = foa.prorata * ca;
     const C_divers = foa.fraisDivers * a;
     const C_aleas = foa.aleas * base;
     const C_nego = foa.negociation * base;
-    const C = C_prorata + C_divers + C_aleas + C_nego;
+    const C_mi = foa.materielInterne * heuresMi;
+    const C = C_prorata + C_divers + C_aleas + C_nego + C_mi;
     const D = foa.fra * (a + zoneEuro + b + C);
     const dep = a + zoneEuro + b + C + D;
     const brute = base - dep;
     const fg = foa.fg * base;
     const nette = brute - fg;
-    return { a: a + zoneEuro, aHorsZone: a, zoneEuro, b, C, C_prorata, C_divers, C_aleas, C_nego, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
+    return { a: a + zoneEuro, aHorsZone: a, zoneEuro, b, C, C_prorata, C_divers, C_aleas, C_nego, C_mi, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
   };
   // Indemnités de zone (pointages J et F) : heures × montant de la zone ÷ 7,2 h.
   const tauxZone = montantZone ? montantZone / HEURES_PAR_JOUR_ZONE : 0;
@@ -111,9 +113,11 @@ export default function BilanFinancier({
   const zonePrevu = heuresProductionPrevues * tauxZone;
   const zoneReel = heuresZoneReelles * tauxZone;
   const zoneAtterr = zoneReel + zonePrevu * (1 - pctMo);
-  const prevu = colonne(budgetMo, budgetFo, zonePrevu);
-  const reel = colonne(reelMo, reelFo, zoneReel);
-  const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo), zoneAtterr);
+  const heuresMiReelles = parType.filter((t) => inclutMaterielInterne(t.code === "—" ? "I205" : t.code)).reduce((s, t) => s + t.heures, 0);
+  const heuresMiAtterr = heuresMiReelles + heuresMatInternePrevues * (1 - pctMo);
+  const prevu = colonne(budgetMo, budgetFo, zonePrevu, heuresMatInternePrevues);
+  const reel = colonne(reelMo, reelFo, zoneReel, heuresMiReelles);
+  const atterr = colonne(reelMo + budgetMo * (1 - pctMo), reelFo + budgetFo * (1 - pctFo), zoneAtterr, heuresMiAtterr);
   const cols = [prevu, reel, atterr];
   const alerte = (c) => c.k !== null && c.k < foa.margePreconisee;
 
@@ -241,6 +245,7 @@ export default function BilanFinancier({
             <Ligne cols={cols} nom={<>Prorata {champPct("prorata")} % du CA</>} champ="C_prorata" retrait />
             <Ligne cols={cols} nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />
             <Ligne cols={cols} nom={<>Aléas {champPct("aleas")} % du CA</>} champ="C_aleas" retrait />
+            <Ligne cols={cols} nom={"Matériel interne (" + num(foa.materielInterne, 2) + " €/h)"} champ="C_mi" retrait />
             <Ligne cols={cols} nom={<>Négociation {champPct("negociation")} % du CA</>} champ="C_nego" retrait />
             <Ligne cols={cols} nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
             <Ligne cols={cols} nom="Total dépenses affaire" champ="dep" fort style={{ borderTop: "2px solid var(--border, #ccc)" }} />
