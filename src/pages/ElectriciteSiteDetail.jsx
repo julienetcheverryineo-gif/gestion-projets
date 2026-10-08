@@ -1978,6 +1978,10 @@ export default function ElectriciteSiteDetail() {
     if (devisOuvertId === d.id) setDevisOuvertId(null);
   };
 
+  // k achat par devis (repli : ancien k unique du chantier).
+  const kAchatsDevis = (devisId) =>
+    chantier?.kAchatDevis?.[devisId] || chantier?.kAchatFo || {};
+
   // Synthèse du devis ouvert : budget matériel / réalisé et heures
   // prévues / réalisées, sur le même principe que le fichier de suivi
   // (Réalisé = valeur de la ligne × son % d'avancement).
@@ -2005,8 +2009,6 @@ export default function ElectriciteSiteDetail() {
   // Le k achat se gère par devis (chantier.kAchatDevis[devisId][typeFo]).
   // Tant qu'un devis n'a pas son propre réglage, on reprend l'ancien k
   // unique du chantier (chantier.kAchatFo).
-  const kAchatsDevis = (devisId) =>
-    chantier?.kAchatDevis?.[devisId] || chantier?.kAchatFo || {};
   const lignesChantier = toutesLignes
     .filter((l) => l.chantierId === chantierId && !l.estPoste)
     .map((l) => {
