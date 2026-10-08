@@ -645,7 +645,7 @@ function TableauRecap({
                             <option value="">Par défaut</option>
                             {(profilsPossibles || []).map((c) => (
                               <option key={c} value={c}>
-                                {c}
+                                {c} | {libelleTypeActivite(c).replace(/ \([^)]*\)$/, "")}
                               </option>
                             ))}
                           </select>
