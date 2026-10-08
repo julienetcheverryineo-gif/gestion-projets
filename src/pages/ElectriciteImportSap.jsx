@@ -469,7 +469,6 @@ function TauxHorairesPanel({ peutModifier }) {
               <tr>
                 <th>Type</th>
                 <th>Libellé</th>
-                <th>Famille</th>
                 <th>Taux (€/h)</th>
               </tr>
             </thead>
@@ -482,7 +481,6 @@ function TauxHorairesPanel({ peutModifier }) {
                   <tr key={c}>
                     <td data-label="Type">{c}</td>
                     <td data-label="Libellé">{LIBELLE_SEUL(c)}</td>
-                    <td data-label="Famille">{TAUX_DEFAUT[c]?.famille || ""}</td>
                     <td data-label="Taux (€/h)">
                       <input
                         type="text"
