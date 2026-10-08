@@ -1,3 +1,4 @@
+import { estLigneSomme } from "../lib/ligneSomme";
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -176,6 +177,7 @@ function comparerOrdreType(ordreTypes, a, b) {
 function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
   const groupes = new Map();
   lignes.forEach((l) => {
+    if (estLigneSomme(l)) return;
     const valeur = l[champValeur] || 0;
     if (!valeur) return;
     const cle = (l.typeFo || "").trim();
@@ -1884,7 +1886,7 @@ export default function ElectriciteSiteDetail() {
   // prévues / réalisées, sur le même principe que le fichier de suivi
   // (Réalisé = valeur de la ligne × son % d'avancement).
   const synthese = lignes
-    .filter((l) => !l.estPoste)
+    .filter((l) => !l.estPoste && !estLigneSomme(l))
     .reduce(
       (acc, l) => {
         const pctFo = (l.avancementFo ?? l.avancement ?? 0) / 100;

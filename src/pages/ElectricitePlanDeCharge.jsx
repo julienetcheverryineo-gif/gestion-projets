@@ -1,3 +1,4 @@
+import { estLigneSomme } from "../lib/ligneSomme";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
@@ -76,7 +77,7 @@ function arrondi1(n) {
 // repli sur le champ « Heures MO prévues » saisi à la main sur la fiche
 // chantier (chantier déclaré sans devis importé).
 function resteAFaireChantier(chantier, toutesLignes) {
-  const lignesChantier = toutesLignes.filter((l) => l.chantierId === chantier.id && !l.estPoste);
+  const lignesChantier = toutesLignes.filter((l) => l.chantierId === chantier.id && !l.estPoste && !estLigneSomme(l));
   if (lignesChantier.length > 0) {
     return lignesChantier.reduce((acc, l) => {
       const pctMo = (l.avancementMo ?? l.avancement ?? 0) / 100;

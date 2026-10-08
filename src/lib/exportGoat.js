@@ -1,3 +1,4 @@
+import { estLigneSomme } from "./ligneSomme";
 import { CORRESPONDANCE_SAP_QDV } from "./correspondanceSapQdv";
 
 // Table de correspondance Code QDV -> {codeSap, libelleSap}, indexée une
@@ -62,6 +63,7 @@ function codeParentFourniture(code) {
 function sommeParTypeFo(lignes, champValeur, normaliserCode) {
   const parType = new Map();
   lignes.forEach((l) => {
+    if (estLigneSomme(l)) return;
     const valeur = l[champValeur] || 0;
     if (!valeur) return;
     const codeBrut = codeTypeFo(l.typeFo);
