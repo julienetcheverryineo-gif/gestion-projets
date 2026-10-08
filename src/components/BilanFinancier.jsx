@@ -306,35 +306,6 @@ export default function BilanFinancier({
         </p>
       )}
 
-      <h3 style={{ margin: "16px 0 8px" }}>Heures pointées par type d'activité</h3>
-      {parType.length === 0 ? (
-        <p className="simple-list-meta">Aucun pointage SAP pour ce chantier.</p>
-      ) : (
-        <div className="data-table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Type d'activité</th>
-                <th>Heures</th>
-                <th>Taux (€/h)</th>
-                <th>Coût</th>
-              </tr>
-            </thead>
-            <tbody>
-              {parType.map((t) => (
-                <tr key={t.code}>
-                  <td data-label="Type d'activité">{libelleTypeActivite(t.code)}</td>
-                  <td data-label="Heures">{num(t.heures)} h</td>
-                  <td data-label="Taux (€/h)" style={t.taux === null ? { color: ROUGE } : {}}>
-                    {t.taux === null ? "manquant" : eur(t.taux)}
-                  </td>
-                  <td data-label="Coût">{t.cout === null ? "—" : eur(t.cout)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
