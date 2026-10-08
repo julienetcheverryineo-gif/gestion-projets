@@ -316,7 +316,7 @@ function TableauRecap({
   const clePourCode = (l) => (l.sup ? l.cle : codeTypeFo(l.cle));
   const codesUtilises = recap.parType.map(codeAffiche).filter(Boolean);
   const libType = uniteValeur === "h" ? "Tâche" : "Type de FO";
-  const libelleReel = sapMo ? "Heures réelles (SAP)" : "Achat réel (SAP)";
+  const libelleReel = sapMo ? "Heures SAP" : "Achat réel (SAP)";
   const avecK = !avecCode;
   const nbColonnes = 6 + (aSap ? 3 : 0) + (avecK ? 2 : 0);
   const classeReste = (v) => (v < 0 ? "recap-reste-negatif" : "");
@@ -519,9 +519,9 @@ function TableauRecap({
                 </th>
                 {avecK && <th className="col-num col-petit" title="Montant du chiffrage avant coefficient d'achat">Montant PR</th>}
                 {avecK && <th className="col-num col-petit" title="Coefficient d'achat : 0,9 = 10 % de remise. Adapte le budget matériel et tous les bilans.">k achat</th>}
-                {avecCode && <th className="col-num col-petit">Vendu</th>}
+                {avecCode && <th className="col-num col-petit">Heures vendues</th>}
                 <th className="col-num">{libelleValeur}</th>
-                <th className="col-num">Réalisé (avancement)</th>
+                <th className="col-num">{avecCode ? "Avancement réel" : "Réalisé (avancement)"}</th>
                 <th className="col-avancement">% avancement</th>
                 <th className="col-num">Restant</th>
                 {aSap && <th className="col-num">{libelleReel}</th>}
