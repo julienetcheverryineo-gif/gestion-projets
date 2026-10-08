@@ -5,7 +5,7 @@ import {
   estActiviteIgnoree,
   normaliserTypeActivite,
 } from "../lib/typesActiviteSap";
-import { useTauxHoraires, enregistrerTaux, TAUX_DEFAUT } from "../lib/tauxHoraires";
+import { useTauxHoraires, enregistrerTaux } from "../lib/tauxHoraires";
 import { lireTexteSap } from "../lib/lireTexteSap";
 import {
   addDoc,
