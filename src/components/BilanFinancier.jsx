@@ -310,9 +310,9 @@ export default function BilanFinancier({
         </table>
       </div>
       <p className="simple-list-meta" style={{ margin: "8px 0 16px" }}>
-        Calcul repris de la feuille FOA : dépenses = MO + achats + autres frais + FRA ; marge brute = CA − non
-        soumis − dépenses ; marge nette = marge brute − frais généraux. Atterrissage = réel + reste à faire au
-        budget (budget × (1 − avancement)). Les pourcentages se règlent dans « Import SAP ».
+        Atterrissage = réel + reste à faire au budget (budget × (1 − avancement)).
+        <br />
+        Réglage des taux dans « Import SAP » (commun à toutes les affaires).
       </p>
 
       {heuresSansTaux > 0 && (
