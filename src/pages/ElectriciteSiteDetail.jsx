@@ -535,23 +535,49 @@ function TableauRecap({
                   <td className="col-num" data-label={libelleValeur}>
                     {l.sup && sup?.onChangerHeures ? (
                       <>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          className="elec-ordre-input"
-                          style={{ width: 80 }}
-                          key={l.saisie}
-                          defaultValue={l.saisie}
-                          title="Heures budgétées sur cette tâche"
-                          onBlur={(e) => sup.onChangerHeures(l.tacheId, sup.portee, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") e.currentTarget.blur();
-                          }}
-                        />{" "}
-                        h
+                        <div>
+                          +{" "}
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="elec-ordre-input"
+                            style={{ width: 80 }}
+                            key={"a" + l.saisie}
+                            defaultValue={l.saisie}
+                            title="Heures ajoutées au budget pour cette tâche"
+                            onBlur={(e) => sup.onChangerHeures(l.tacheId, sup.portee, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                            }}
+                          />{" "}
+                          h ajoutées
+                        </div>
+                        <div>
+                          ↳{" "}
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="elec-ordre-input"
+                            style={{ width: 80 }}
+                            key={"p" + l.prelevePropreSaisi}
+                            defaultValue={l.prelevePropreSaisi}
+                            title={
+                              "Heures prises sur « Sans tâche » (max " +
+                              formatNombre((sup.disponible?.(sup.portee, l.tacheId) || 0) + (l.prelevePropreSaisi || 0)) +
+                              " h) : retirées de cette ligne, ajoutées à la tâche"
+                            }
+                            onBlur={(e) => sup.onChangerPrelevement(l.tacheId, sup.portee, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                            }}
+                          />{" "}
+                          h prises sur « Sans tâche »
+                        </div>
+                        <strong>= {formatNombre(l.budget)} h</strong>
                         {l.dansDevis > 0 && (
-                          <span className="simple-list-meta"> + {formatNombre(l.dansDevis)} h dans les devis</span>
+                          <span className="simple-list-meta"> (dont {formatNombre(l.dansDevis)} h saisies dans les devis)</span>
                         )}
                       </>
                     ) : (
@@ -1727,10 +1753,14 @@ export default function ElectriciteSiteDetail() {
   // Bilan MO : on y ajoute les tâches complémentaires (socle fixe Suivi /
   // Étude / Levée de réserve + tâches ajoutées), avec leurs heures saisies.
   const avecSup = recapActif === "mo";
+  // Heures « Sans tâche » (lignes de devis sans tâche) avant tout prélèvement :
+  // base du plafond des heures qu'on peut en retirer vers une tâche.
+  const sansTacheBase = {};
   const recapSynthese =
     recapActif === "fo" || recapActif === "mo"
       ? (() => {
           const base = calculerRecap(lignesChantier, champRecap, champAvancementRecap, ordreTypesChantier);
+          sansTacheBase[GENERAL] = base.parType.find((l) => !l.cle)?.budget || 0;
           return avecSup ? injecterSup(base, lignesSupSynthese(chantier, devis)) : base;
         })()
       : null;
@@ -1743,6 +1773,7 @@ export default function ElectriciteSiteDetail() {
             champAvancementRecap,
             ordreTypesChantier
           );
+          sansTacheBase[d.id] = base.parType.find((l) => !l.cle)?.budget || 0;
           return { devis: d, recap: avecSup ? injecterSup(base, lignesSupDevis(chantier, d.id)) : base };
         })
       : [];
@@ -1755,6 +1786,29 @@ export default function ElectriciteSiteDetail() {
     if (v === 0) delete maj[cle];
     else maj[cle] = v;
     await updateDoc(doc(db, "sites", chantierId), { heuresMoSup: maj });
+  };
+  // Heures prises sur « Sans tâche » et versées à une tâche (le total ne
+  // change pas). Plafond : ce qui reste de « Sans tâche » dans ce périmètre
+  // (un devis, ou la synthèse = tout ce qui n'est pas déjà pris dans les devis).
+  const prelevementsChantier = chantier?.prelevementsMoSup || {};
+  const disponibleSansTache = (portee, tacheId) => {
+    const pris = Object.entries(prelevementsChantier).reduce((s, [k, v]) => {
+      const [scope, id] = k.split("||");
+      if (id === tacheId) return s;
+      if (portee === GENERAL ? true : scope === portee) return s + (Number(v) || 0);
+      return s;
+    }, 0);
+    return Math.max(0, (sansTacheBase[portee] || 0) - pris);
+  };
+  const changerPrelevementSup = async (tacheId, portee, valeur) => {
+    let v = valeur === "" ? 0 : Number(String(valeur).replace(",", "."));
+    if (Number.isNaN(v) || v < 0) return;
+    v = Math.min(v, disponibleSansTache(portee, tacheId));
+    const maj = { ...prelevementsChantier };
+    const cle = portee + "||" + tacheId;
+    if (v === 0) delete maj[cle];
+    else maj[cle] = Math.round(v * 100) / 100;
+    await updateDoc(doc(db, "sites", chantierId), { prelevementsMoSup: maj });
   };
   const codesMoChantier = chantier?.codesMo || {};
   const changerCodeMo = async (cle, valeur) => {
@@ -1777,7 +1831,11 @@ export default function ElectriciteSiteDetail() {
     Object.keys(heures).forEach((k) => {
       if (k.endsWith("||" + tacheId)) delete heures[k];
     });
-    await updateDoc(doc(db, "sites", chantierId), { tachesMoSup: taches, heuresMoSup: heures });
+    const prelev = { ...(chantier?.prelevementsMoSup || {}) };
+    Object.keys(prelev).forEach((k) => {
+      if (k.endsWith("||" + tacheId)) delete prelev[k];
+    });
+    await updateDoc(doc(db, "sites", chantierId), { tachesMoSup: taches, heuresMoSup: heures, prelevementsMoSup: prelev });
   };
   // Bilan Achats : toujours basé sur le Type de FO (pas de distinction
   // FO/MO ici), avec le même ordre personnalisé que le Récap FO.
@@ -2058,33 +2116,41 @@ export default function ElectriciteSiteDetail() {
               récapitulatifs restent faciles à retrouver. */}
           <div className="chantier-actions-bar chantier-actions-bar-recap">
             <button
+              className={!recapActif ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif(null)}
+              title="Avancement ligne par ligne, devis par devis"
+            >
+              📈 Suivi d'avancement
+            </button>
+            <button
               className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif(recapActif === "fo" ? null : "fo")}
+              onClick={() => setRecapActif("fo")}
             >
               📦 Bilan Fournitures
             </button>
             <button
               className={recapActif === "mo" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif(recapActif === "mo" ? null : "mo")}
+              onClick={() => setRecapActif("mo")}
             >
               👷 Bilan Main d'œuvre
             </button>
             <button
               className={recapActif === "achats" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif(recapActif === "achats" ? null : "achats")}
+              onClick={() => setRecapActif("achats")}
             >
               💰 Bilan Achats
             </button>
             {(achatsSap.length > 0 || heuresSap.length > 0) && (
               <button
                 className={recapActif === "sap" ? "btn-primary" : "btn-ghost"}
-                onClick={() => setRecapActif(recapActif === "sap" ? null : "sap")}
+                onClick={() => setRecapActif("sap")}
               >
                 <IconeSap /> SAP
               </button>
             )}
           </div>
 
+          {!recapActif && (
           <div className="chantier-actions-bar">
             {devis.map((d) => (
               <button
@@ -2103,6 +2169,7 @@ export default function ElectriciteSiteDetail() {
               </button>
             ))}
           </div>
+          )}
         </div>
 
           {recapActif === "achats" && (
@@ -2154,6 +2221,8 @@ export default function ElectriciteSiteDetail() {
                     ? {
                         portee: GENERAL,
                         onChangerHeures: changerHeuresSup,
+                        onChangerPrelevement: changerPrelevementSup,
+                        disponible: disponibleSansTache,
                         onAjouter: ajouterTacheSup,
                         onSupprimer: supprimerTacheSup,
                       }
@@ -2183,6 +2252,8 @@ export default function ElectriciteSiteDetail() {
                       ? {
                           portee: d.id,
                           onChangerHeures: changerHeuresSup,
+                          onChangerPrelevement: changerPrelevementSup,
+                          disponible: disponibleSansTache,
                           onAjouter: ajouterTacheSup,
                           onSupprimer: supprimerTacheSup,
                         }
