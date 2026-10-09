@@ -552,6 +552,9 @@ a {
 .status-en_pause {
   background: var(--warn);
 }
+.status-suspendu {
+  background: var(--text-muted);
+}
 .status-termine {
   background: var(--ok);
 }

@@ -32,7 +32,7 @@ export function estEnRetardParDates(dateDebut, echeance, pourcentage) {
 
 // Même règle appliquée directement à une tâche (voir Gantt).
 export function estEnRetardTache(t) {
-  if (t.statut === "termine") return false;
+  if (t.statut === "termine" || t.statut === "suspendu") return false;
   return estEnRetardParDates(t.dateDebut, t.echeance, pourcentageAvancementTache(t));
 }
 

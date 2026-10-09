@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { normaliserAssignes } from "./assignes";
 import { libelleChantier } from "./usePlanningData";
 
-const STATUT_LABEL = { a_faire: "À faire", en_cours: "En cours", termine: "Terminé" };
+const STATUT_LABEL = { a_faire: "À faire", en_cours: "En cours", termine: "Terminé", suspendu: "Suspendu" };
 const LABEL_STATUT = Object.fromEntries(
   Object.entries(STATUT_LABEL).map(([code, label]) => [label.toLowerCase(), code])
 );

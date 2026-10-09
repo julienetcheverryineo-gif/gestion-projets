@@ -379,6 +379,8 @@ function formatStatutTache(statut) {
       return "En cours";
     case "termine":
       return "Terminé";
+    case "suspendu":
+      return "Suspendu";
     default:
       return "À faire";
   }

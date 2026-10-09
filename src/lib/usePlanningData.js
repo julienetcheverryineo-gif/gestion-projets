@@ -229,7 +229,10 @@ export function usePlanningData() {
       // consommé une partie de son volume, le reste à faire est ce qui
       // reflète la charge réelle à venir sur ce chantier.
       const heuresTotal = tachesDuChantier.reduce(
-        (s, t) => s + Number(t.heuresPrevues || 0) * (1 - pourcentageAvancementTache(t) / 100),
+        (s, t) =>
+          t.statut === "suspendu"
+            ? s
+            : s + Number(t.heuresPrevues || 0) * (1 - pourcentageAvancementTache(t) / 100),
         0
       );
       // Tâches qui portent encore du travail (pas à 100 %) — c'est ce
@@ -242,7 +245,7 @@ export function usePlanningData() {
       // limiter au statut "en cours" oubliait tous les responsables de
       // tâches pas encore démarrées.
       const tachesRestantes = tachesDuChantier.filter(
-        (t) => Number(t.heuresPrevues || 0) > 0 && pourcentageAvancementTache(t) < 100
+        (t) => t.statut !== "suspendu" && Number(t.heuresPrevues || 0) > 0 && pourcentageAvancementTache(t) < 100
       );
       const personnesEnCours = [
         ...new Set(tachesRestantes.flatMap((t) => normaliserAssignes(t.assigneA))),
@@ -317,6 +320,8 @@ export function usePlanningData() {
     for (const t of tachesVisibles) {
       const heuresPrevues = Number(t.heuresPrevues || 0);
       if (heuresPrevues <= 0) continue;
+      // Tâche suspendue : ne pèse plus dans le plan de charge.
+      if (t.statut === "suspendu") continue;
       // La charge du service doit refléter le travail RESTANT, pas le
       // volume d'origine de la tâche : une tâche de 16h à 50% ne pèse plus
       // que 8h sur les mois à venir (le reste a déjà été fait). Une tâche

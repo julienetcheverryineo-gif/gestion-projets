@@ -76,6 +76,7 @@ export default function TacheGanttModal({ tache, onClose }) {
                 <option value="a_faire">À faire</option>
                 <option value="en_cours">En cours</option>
                 <option value="termine">Terminé</option>
+                <option value="suspendu">Suspendu</option>
               </select>
             </label>
           </div>

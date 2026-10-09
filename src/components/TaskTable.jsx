@@ -12,6 +12,7 @@ const STATUTS_TASK = [
   { value: "a_faire", label: "À faire" },
   { value: "en_cours", label: "En cours" },
   { value: "termine", label: "Terminé" },
+  { value: "suspendu", label: "Suspendu" },
 ];
 
 const STATUTS_REGITEM = [
