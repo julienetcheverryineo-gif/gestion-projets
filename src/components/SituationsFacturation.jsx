@@ -191,6 +191,21 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
             {mode === "devis" ? "Devis" : "Marché"} : <strong>{euro(marche)} € HT</strong>
           </div>
         </div>
+        {peutGerer && devis.length > 1 && (
+          <button
+            type="button"
+            className="btn-ghost"
+            title="Les situations déjà saisies dans l'autre mode sont conservées et réapparaissent si vous revenez"
+            onClick={() => {
+              const cible = mode === "devis" ? "ensemble" : "devis";
+              const msg =
+                "Passer en mode « " + (cible === "devis" ? "par devis" : "ensemble de l'affaire") + " » ?\n\nLes situations du mode actuel ne sont pas supprimées : elles sont simplement masquées et réapparaissent si vous revenez dans ce mode.";
+              if (window.confirm(msg)) choisirMode(cible);
+            }}
+          >
+            ⇄ {mode === "devis" ? "Passer à l'ensemble de l'affaire" : "Passer en mode par devis"}
+          </button>
+        )}
         {mode === "devis" && (
           <div className="sit-chips">
             {devis.map((d) => (
