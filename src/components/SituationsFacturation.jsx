@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
-import { construireLignesSituation, montantADeduire, montantAvancement, montantMarche, pctCumule, totalCumule, TVA_DEFAUT } from "../lib/situations";
+import { construireLignesSituation, montantADeduire, montantAvancement, montantMarche, pctCumule, pctLogique, totalCumule, TVA_DEFAUT } from "../lib/situations";
 import { genererFichierSituation } from "../lib/exportSituation";
 
 const euro = (n) => Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -28,7 +28,7 @@ function telecharger(blob, nom) {
 // ligne de la minute (prix de vente de la minute), puis export Excel.
 // Stockage : chantier.situationsMode ("ensemble" | "devis") et
 // chantier.situationsData = { "_all" | <devisId>: [situations] }.
-export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer }) {
+export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer, tauxHoraire }) {
   const { profile } = useAuth();
   const mode = chantier?.situationsMode || null; // null = pas encore choisi
   const [devisChoisi, setDevisChoisi] = useState(null);
@@ -178,6 +178,18 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
     );
   }
   const lignesFact = rows.filter((r) => r.type === "ligne");
+  const tauxMo = tauxHoraire ? tauxHoraire("I205") ?? 0 : 0;
+  const logiqueDe = (r) => Math.round(Math.min(100, pctLogique(r.suivi, tauxMo)) * 10) / 10;
+  // Facturation « logique » : ce qu'il faudrait avoir facturé d'après l'avancement suivi.
+  const logiqueHt = sit ? Math.round(lignesFact.reduce((t, r) => t + montantAvancement(r, logiqueDe(r)), 0) * 100) / 100 : 0;
+  const retardHt = Math.round((logiqueHt - cumulHt) * 100) / 100;
+  const appliquerLogique = (ids) => {
+    const av = { ...sit.avancements };
+    lignesFact.filter((r) => ids.includes(r.id)).forEach((r) => {
+      av[r.id] = Math.max(Number(av[r.id]) || 0, logiqueDe(r));
+    });
+    return majSituation({ avancements: av });
+  };
   const cumulPrec = indexOuvert > 0 ? totalCumule(rows, situations, indexOuvert - 1) : 0;
   const travauxPeriode = Math.round((cumulHt - cumulPrec) * 100) / 100;
   const pctGlobal = marche > 0 ? (cumulHt / marche) * 100 : 0;
@@ -271,6 +283,25 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                 </div>
               </div>
 
+              <div className={"sit-retard" + (retardHt > 0.5 ? " en-retard" : "")}>
+                <span>
+                  Avancement suivi : <strong>{euro(logiqueHt)} €</strong> à facturer au cumul ({pctTexte(marche > 0 ? (logiqueHt / marche) * 100 : 0)} % du marché)
+                  {retardHt > 0.5 ? (
+                    <>
+                      {" "}
+                      · <strong>retard de facturation : {euro(retardHt)} € HT</strong>
+                    </>
+                  ) : (
+                    " · facturation à jour"
+                  )}
+                </span>
+                {modifiable && retardHt > 0.5 && (
+                  <button type="button" className="btn-ghost" onClick={() => appliquerLogique(lignesFact.map((r) => r.id))}>
+                    Aligner toutes les lignes sur l'avancement
+                  </button>
+                )}
+              </div>
+
               <div className="sit-barre-outils">
                 <label>
                   Date
@@ -328,6 +359,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                 <span>Description</span>
                 <span>Total HT</span>
                 <span>Précédent</span>
+                <span>Avanc. suivi</span>
                 <span>% cumulé</span>
                 <span>Période</span>
               </div>
@@ -353,6 +385,11 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                           </span>
                         </div>
                         {ids.length > 0 && modifiable && (
+                          <button type="button" className="sit-cent" style={{ padding: "5px 9px" }} title="Applique l'avancement suivi (là où il dépasse le % cumulé)" onClick={() => appliquerLogique(ids)}>
+                            Aligner sur le suivi
+                          </button>
+                        )}
+                        {ids.length > 0 && modifiable && (
                           <label className="sit-chap-tout" title="Applique ce % cumulé à toutes les lignes du chapitre">
                             Tout le chapitre {champ("ch" + ci, ids, "")}
                           </label>
@@ -375,6 +412,22 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                           </div>
                           <div className="sit-num">{euro(r.total)}</div>
                           <div className="sit-num sit-muet">{pctTexte(indexOuvert > 0 ? pctCumule(situations, indexOuvert - 1, r.id) : 0)} %</div>
+                          {(() => {
+                            const lg = logiqueDe(r);
+                            const cu = pctCumule(situations, indexOuvert, r.id);
+                            const retard = lg - cu > 0.05;
+                            return (
+                              <button
+                                type="button"
+                                className={"sit-logique" + (retard ? " retard" : "")}
+                                disabled={!modifiable || !retard}
+                                title={retard ? "Avancement suivi : " + pctTexte(lg) + " % — cliquer pour l'appliquer au % cumulé" : "Avancement suivi : " + pctTexte(lg) + " %"}
+                                onClick={() => fixerPct([r.id], lg)}
+                              >
+                                {pctTexte(lg)} %
+                              </button>
+                            );
+                          })()}
                           <div className="sit-saisie">
                             {champ(r.id, [r.id], pctTexte(pctCumule(situations, indexOuvert, r.id)))}
                             {modifiable && (

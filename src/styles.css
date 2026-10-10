@@ -4094,7 +4094,7 @@ textarea:focus {
 .sit-barre-outils label { display: flex; flex-direction: column; gap: 3px; font-size: 0.74rem; color: var(--text-muted); }
 .sit-actions { margin-left: auto; display: flex; gap: 8px; }
 .sit-entete-colonnes, .sit-ligne {
-  display: grid; grid-template-columns: minmax(260px, 1fr) 110px 84px 128px 110px; gap: 10px; align-items: center;
+  display: grid; grid-template-columns: minmax(260px, 1fr) 110px 84px 84px 128px 110px; gap: 10px; align-items: center;
 }
 .sit-entete-colonnes {
   padding: 4px 14px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
@@ -4140,3 +4140,15 @@ textarea:focus {
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, transparent);
   color: inherit; text-overflow: ellipsis;
 }
+
+.sit-logique {
+  text-align: right; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-size: 0.86rem;
+  font-variant-numeric: tabular-nums; padding: 2px 6px; border-radius: 6px; cursor: default;
+}
+.sit-logique.retard { color: #b45309; font-weight: 700; background: color-mix(in srgb, #f59e0b 16%, transparent); cursor: pointer; }
+.sit-retard {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+  padding: 9px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 0.86rem;
+  border: 1px solid var(--border); background: color-mix(in srgb, #16a34a 8%, transparent);
+}
+.sit-retard.en-retard { background: color-mix(in srgb, #f59e0b 14%, transparent); border-color: color-mix(in srgb, #f59e0b 50%, var(--border)); }

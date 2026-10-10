@@ -2566,6 +2566,7 @@ export default function ElectriciteSiteDetail() {
               toutesLignes={toutesLignes}
               tousGroupes={tousGroupes}
               peutGerer={peutGerer}
+              tauxHoraire={tauxHoraire}
             />
           )}
 

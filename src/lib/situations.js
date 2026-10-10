@@ -10,6 +10,36 @@ export const TVA_DEFAUT = 20;
 
 const arrondi2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+// Avancement réel suivi (Suivi d'avancement) d'un ensemble de lignes :
+// coûts FO et heures pondérés par leur % FO / % MO.
+function agregerSuivi(lignes) {
+  const a = { fo: 0, foFait: 0, h: 0, hFait: 0, brut: 0, brutN: 0 };
+  lignes.forEach((m) => {
+    if (m.estPoste || estLigneSomme(m)) return;
+    const pFo = Number(m.avancementFo ?? m.avancement ?? 0) / 100;
+    const pMo = Number(m.avancementMo ?? m.avancement ?? 0) / 100;
+    const fo = Number(m.coutTotalFo) || 0;
+    const h = Number(m.tempsTotalHeures) || 0;
+    a.fo += fo;
+    a.foFait += fo * pFo;
+    a.h += h;
+    a.hFait += h * pMo;
+    a.brut += Math.max(pFo, pMo);
+    a.brutN += 1;
+  });
+  return a;
+}
+
+// % d'avancement logique (0-100) d'une ligne de situation à partir de son
+// suivi : FO en euros et MO en heures valorisées au taux donné (€/h).
+export function pctLogique(suivi, tauxMo = 0) {
+  if (!suivi) return 0;
+  const poidsMo = suivi.h * (tauxMo || 0);
+  const total = suivi.fo + poidsMo;
+  if (total > 0) return ((suivi.foFait + suivi.hFait * (tauxMo || 0)) / total) * 100;
+  return suivi.brutN > 0 ? (suivi.brut / suivi.brutN) * 100 : 0;
+}
+
 const RE_CHAPITRE = /^\d+\s*[-–.]\s*\S/;
 
 // Lignes de la minute, dans l'ordre de lecture, prêtes pour la situation :
@@ -60,6 +90,7 @@ export function construireLignesSituation(devisList, toutesLignes, chantierId, g
         }
         const quantite = Number(l.quantite) > 0 ? Number(l.quantite) : 1;
         const rowTete = {
+          suivi: agregerSuivi(membres.length > 1 ? membres.filter((m) => m.id !== l.id || !estLigneSomme(l)) : membres),
           type: "ligne",
           id: l.id,
           code: l.code || "",
@@ -92,6 +123,7 @@ export function construireLignesSituation(devisList, toutesLignes, chantierId, g
       if (pv === 0) return;
       const quantite = Number(l.quantite) > 0 ? Number(l.quantite) : 1;
       const rowLigne = {
+        suivi: agregerSuivi([l]),
         type: "ligne",
         id: l.id,
         code: l.code || "",
