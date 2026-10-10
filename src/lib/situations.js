@@ -17,8 +17,11 @@ const RE_CHAPITRE = /^\d+\s*[-–.]\s*\S/;
 //  - "titre"    : sous-titre en gras ("Etudes d'exécution :") ;
 //  - "ligne"    : ligne facturable (quantité × prix de vente unitaire).
 // Les lignes « somme » (têtes de regroupement) ne sont jamais facturables.
-export function construireLignesSituation(devisList, toutesLignes, chantierId) {
+export function construireLignesSituation(devisList, toutesLignes, chantierId, groupes = []) {
   const lignes = toutesLignes.filter((l) => l.chantierId === chantierId);
+  // Regroupements (gris foncé qui somme des gris clair) : seule la ligne de
+  // tête est facturée, ses lignes membres n'apparaissent pas.
+  const groupeParId = new Map(groupes.map((g) => [g.id, g]));
   const rows = [];
   devisList.forEach((d) => {
     const duDevis = lignes
@@ -28,6 +31,30 @@ export function construireLignesSituation(devisList, toutesLignes, chantierId) {
     if (devisList.length > 1) rows.push({ type: "chapitre", id: "devis-" + d.id, texte: d.nom || "Devis" });
     duDevis.forEach((l) => {
       const texte = String(l.designation || "").trim();
+      const groupe = !l.estPoste && l.groupeId ? groupeParId.get(l.groupeId) : null;
+      if (groupe) {
+        if (groupe.ligneRepresentativeId !== l.id) return; // ligne gris clair : masquée
+        const membres = duDevis.filter((m) => m.groupeId === l.groupeId);
+        const somme = membres.reduce((t, m) => t + (m.id === l.id ? 0 : Number(m.pvLigne) || 0), 0);
+        const pvTete = Number(l.pvLigne) || 0;
+        const pv = pvTete !== 0 ? pvTete : somme;
+        if (pv === 0) {
+          if (texte) rows.push({ type: "titre", id: l.id, texte });
+          return;
+        }
+        const quantite = Number(l.quantite) > 0 ? Number(l.quantite) : 1;
+        rows.push({
+          type: "ligne",
+          id: l.id,
+          code: l.code || "",
+          texte: l.detail ? texte + "\n" + l.detail : texte,
+          unite: l.unite || "Ens",
+          quantite,
+          pu: pv / quantite,
+          total: arrondi2(pv),
+        });
+        return;
+      }
       if (l.estPoste) {
         if (texte) rows.push({ type: "titre", id: l.id, texte });
         return;

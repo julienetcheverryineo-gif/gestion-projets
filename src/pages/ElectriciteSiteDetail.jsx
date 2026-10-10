@@ -1865,7 +1865,6 @@ export default function ElectriciteSiteDetail() {
   const [afficherTaches, setAfficherTaches] = useState(false);
   const [afficherEnvoiSap, setAfficherEnvoiSap] = useState(false);
   const [afficherEnvoiGoat, setAfficherEnvoiGoat] = useState(null);
-  const [afficherSituations, setAfficherSituations] = useState(false);
   const tachesFo = chantier?.tachesFo || LISTE_TYPES_FO;
   const [groupesOuverts, setGroupesOuverts] = useState(new Set());
   const groupesDuDevis = devisOuvert
@@ -2442,15 +2441,6 @@ export default function ElectriciteSiteDetail() {
               <IconeAccess /> Synchro vers GOAT
             </button>
           )}
-          {devis.length > 0 && peutGerer && (
-            <button
-              className="btn-ghost"
-              onClick={() => setAfficherSituations(true)}
-              title="Situations de travaux : avancement cumulé par ligne de la minute et export Excel pour la facturation"
-            >
-              🧾 Situations
-            </button>
-          )}
           {peutGerer && (
             <>
               <button className="btn-ghost" onClick={() => setAfficherFormulaire(true)}>
@@ -2485,6 +2475,13 @@ export default function ElectriciteSiteDetail() {
               title="Avancement ligne par ligne, devis par devis"
             >
               📈 Suivi d'avancement
+            </button>
+            <button
+              className={recapActif === "situations" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif("situations")}
+              title="Situations de travaux : avancement cumulé par ligne de la minute et export Excel pour la facturation"
+            >
+              🧾 Situations
             </button>
             <button
               className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
@@ -2542,6 +2539,17 @@ export default function ElectriciteSiteDetail() {
           </div>
           )}
         </div>
+
+          {recapActif === "situations" && (
+            <SituationsFacturation
+              chantierId={chantierId}
+              chantier={chantier}
+              devis={devis}
+              toutesLignes={toutesLignes}
+              tousGroupes={tousGroupes}
+              peutGerer={peutGerer}
+            />
+          )}
 
           {recapActif === "achats" && (
             <>
@@ -3017,17 +3025,6 @@ export default function ElectriciteSiteDetail() {
           devisExistants={devis}
           toutesLignes={toutesLignes}
           onClose={() => setAfficherImport(false)}
-        />
-      )}
-
-      {afficherSituations && (
-        <SituationsFacturation
-          chantierId={chantierId}
-          chantier={chantier}
-          devis={devis}
-          toutesLignes={toutesLignes}
-          peutGerer={peutGerer}
-          onClose={() => setAfficherSituations(false)}
         />
       )}
 
