@@ -21,11 +21,10 @@ function cheminMemorise() {
 // Envoi des lignes Fourniture du chantier (une par type de FO) vers la table
 // Fourniture de la base GOAT, via le gestionnaire installé sur le poste.
 // Une ligne existante (même AffaireID + Code) est mise à jour, sinon ajoutée.
-export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lignes, mode = "fourniture", onClose }) {
-  const estMo = mode === "mo";
+export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lignesFo, lignesMo, onClose }) {
   const [affaireId, setAffaireId] = useState(String(chantier?.affaireIdGoat ?? ""));
   const [chemin, setChemin] = useState(cheminMemorise);
-  const [cochees, setCochees] = useState(() => new Set(lignes.map((l) => l.code)));
+  const [cochees, setCochees] = useState(() => new Set([...lignesFo.map((l) => "F" + l.code), ...lignesMo.map((l) => "M" + l.code)]));
   const [etat, setEtat] = useState(null);
   const annule = useRef(false);
   const enCours = etat?.phase === "attente";
@@ -38,7 +37,9 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
       return s;
     });
 
-  const selection = lignes.filter((l) => cochees.has(l.code));
+  const selFo = lignesFo.filter((l) => cochees.has("F" + l.code));
+  const selMo = lignesMo.filter((l) => cochees.has("M" + l.code));
+  const nbSelection = selFo.length + selMo.length;
   const idValide = /^\d{1,9}$/.test(affaireId.trim());
   const cheminValide = /^([A-Za-z]:|\\\\).{3,}\.(accdb|mdb)$/i.test(chemin.trim());
 
@@ -68,35 +69,44 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
       }
     }
     annule.current = false;
-    await envoyerFournituresGoat({
-      handle: h,
-      cheminBase: chemin,
-      affaireId: affaireId.trim(),
-      lignes: selection,
-      mode,
-      onEtat: setEtat,
-      estAnnule: () => annule.current,
-    });
+    // Deux envois à la suite (Fourniture puis MainOeuvre), chacun avec le
+    // budget et le reste à engager (RAE).
+    const lots = [
+      { mode: "fourniture", titre: "Fournitures", lignes: selFo },
+      { mode: "mo", titre: "Main d'œuvre", lignes: selMo },
+    ].filter((l) => l.lignes.length > 0);
+    const comptes = [];
+    for (const lot of lots) {
+      let dernier = null;
+      await envoyerFournituresGoat({
+        handle: h,
+        cheminBase: chemin,
+        affaireId: affaireId.trim(),
+        lignes: lot.lignes,
+        mode: lot.mode,
+        onEtat: (e) => {
+          dernier = e;
+          const prefixe = comptes.length ? comptes.join(" · ") + " · " : "";
+          setEtat({ ...e, message: prefixe + lot.titre + " : " + e.message });
+        },
+        estAnnule: () => annule.current,
+      });
+      if (!dernier || dernier.phase !== "ok") return;
+      comptes.push(lot.titre + " : " + dernier.message);
+    }
+    setEtat({ phase: "ok", message: comptes.join(" · ") });
   };
 
   return (
     <div className="modal-backdrop" onClick={enCours ? undefined : onClose}>
       <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
-        <h2>{estMo ? "Envoyer la main d'œuvre vers GOAT" : "Envoyer les fournitures vers GOAT"}</h2>
+        <h2>Synchro vers GOAT</h2>
         <p className="simple-list-meta" style={{ marginBottom: 10 }}>
-          {estMo ? (
-            <>
-              Table <strong>MainOeuvre</strong> de la base GOAT : AffaireID, SegmentCode (poste, 8 caractères),
-              SegmentLibelle, HeuresBudget (heures prévues).
-            </>
-          ) : (
-            <>
-              Table <strong>Fourniture</strong> de la base GOAT : AffaireID, TypeID (1 fourniture, 2 sous-traitant),
-              Code et Libellé SAP, Budget matériel.
-            </>
-          )}{" "}
-          Une ligne déjà présente (même affaire + même code) est mise à jour. Une copie de sauvegarde de la base
-          est faite avant l'écriture.
+          Écrit dans la base GOAT les tables <strong>Fourniture</strong> (TypeID, code et libellé SAP, budget
+          matériel) et <strong>MainOeuvre</strong> (poste, libellé, heures prévues), avec pour chaque ligne le
+          champ <strong>RAE</strong> (reste à engager : € restants en fourniture, heures restantes en main
+          d'œuvre). Une ligne déjà présente (même affaire + même code) est mise à jour. Une copie de sauvegarde
+          de la base est faite avant l'écriture.
         </p>
         <div className="form-inline" style={{ marginBottom: 10 }}>
           <label>
@@ -114,20 +124,27 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
             <input value={chemin} disabled={enCours} onChange={(e) => setChemin(e.target.value)} />
           </label>
         </div>
-        {lignes.length === 0 ? (
+        {nbSelection === 0 && lignesFo.length + lignesMo.length === 0 ? (
           <p className="simple-list-meta">Aucune donnée à envoyer dans les devis de ce chantier.</p>
         ) : (
           <div style={{ maxHeight: "40vh", overflow: "auto", marginBottom: 10 }}>
-            {lignes.map((l) => (
-              <label key={l.code} className="team-checklist-item">
-                <input type="checkbox" disabled={enCours} checked={cochees.has(l.code)} onChange={() => bascule(l.code)} />
+            {lignesFo.length > 0 && <strong>Fournitures (budget € / RAE €)</strong>}
+            {lignesFo.map((l) => (
+              <label key={"F" + l.code} className="team-checklist-item">
+                <input type="checkbox" disabled={enCours} checked={cochees.has("F" + l.code)} onChange={() => bascule("F" + l.code)} />
                 <span style={{ width: 70, display: "inline-block" }}>{l.code}</span>
-                {!estMo && (
-                  <span style={{ width: 24, display: "inline-block" }} title={l.typeId === 2 ? "Sous-traitant" : "Fourniture"}>
-                    {l.typeId}
-                  </span>
-                )}
-                {l.libelle} — {estMo ? formatEuro(l.heures) + " h" : formatEuro(l.budget) + " €"}
+                <span style={{ width: 24, display: "inline-block" }} title={l.typeId === 2 ? "Sous-traitant" : "Fourniture"}>
+                  {l.typeId}
+                </span>
+                {l.libelle} — {formatEuro(l.budget)} € / RAE {formatEuro(l.rae)} €
+              </label>
+            ))}
+            {lignesMo.length > 0 && <strong style={{ display: "block", marginTop: 8 }}>Main d'œuvre (heures / RAE h)</strong>}
+            {lignesMo.map((l) => (
+              <label key={"M" + l.code} className="team-checklist-item">
+                <input type="checkbox" disabled={enCours} checked={cochees.has("M" + l.code)} onChange={() => bascule("M" + l.code)} />
+                <span style={{ width: 70, display: "inline-block" }}>{l.code}</span>
+                {l.libelle} — {formatEuro(l.heures)} h / RAE {formatEuro(l.rae)} h
               </label>
             ))}
           </div>
@@ -151,10 +168,10 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
           <button
             type="button"
             className="btn-primary"
-            disabled={enCours || selection.length === 0 || !idValide || !cheminValide}
+            disabled={enCours || nbSelection === 0 || !idValide || !cheminValide}
             onClick={envoyer}
           >
-            <IconeAccess /> Envoyer {selection.length} ligne(s) vers GOAT
+            <IconeAccess /> Synchro vers GOAT ({nbSelection} ligne(s))
           </button>
         </div>
       </div>

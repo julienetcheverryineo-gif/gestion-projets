@@ -17,7 +17,7 @@ export function construireUrlGoat(mode = "fourniture") {
 
 const GESTIONNAIRE_GOAT = String.raw`
 ' Gestionnaire du lien ineo-goat://run?m=fourniture
-' Ecrit des lignes dans la table Fourniture de la base GOAT (Access).
+' Ecrit des lignes (budget + RAE) dans Fourniture ou MainOeuvre de la base GOAT (Access).
 Option Explicit
 Dim wsh, fso, BASE, EXPO, CHEMIN_STATUT, ARG_X86
 Set wsh = CreateObject("WScript.Shell")
@@ -148,7 +148,7 @@ Sub Principal()
   Dim url, chemin, txt, lignes, i, parts, affaire, rs, numAffaire, cmsg
   Dim typeId, code, lib, montant, tentatives, k, ok, errSql, idExistant, maxId
   Dim nbAjout, nbMaj, cn, sauv, x86, cols, vals, mode
-  Dim tTable, tId, tCode, tLib, tMont, nbParts, motifCode, majType, setType
+  Dim tTable, tId, tCode, tLib, tMont, nbParts, motifCode, majType, setType, rae, nbRaeErr, raeErr
 
   url = ""
   If WScript.Arguments.Count >= 1 Then url = WScript.Arguments(0)
@@ -167,10 +167,10 @@ Sub Principal()
   End If
   If mode = "fourniture" Then
     tTable = "Fourniture" : tId = "FournitureID" : tCode = "Code" : tLib = "Libelle" : tMont = "MontantBudg"
-    nbParts = 3 : motifCode = "^[A-Za-z0-9._-]{1,25}$"
+    nbParts = 4 : motifCode = "^[A-Za-z0-9._-]{1,25}$"
   Else
     tTable = "MainOeuvre" : tId = "MainOeuvreID" : tCode = "SegmentCode" : tLib = "SegmentLibelle" : tMont = "HeuresBudget"
-    nbParts = 2 : motifCode = "^[A-Za-z0-9._ -]{1,50}$"
+    nbParts = 3 : motifCode = "^[A-Za-z0-9._ -]{1,50}$"
   End If
 
   Statut "EN_COURS", "Lecture du lot"
@@ -203,6 +203,7 @@ Sub Principal()
       If Not Valide(motifCode, Trim(parts(k))) Then Echec "Code invalide ligne " & (i - 1) & " : " & Left(parts(k), 30)
       If Len(parts(k + 1)) > 255 Or Valide("[\x00-\x08\x0B-\x1F]", parts(k + 1)) Then Echec "Libelle invalide ligne " & (i - 1) & "."
       If Not Valide("^-?[0-9]{1,12}(\.[0-9]{1,4})?$", Trim(parts(k + 2))) Then Echec "Montant ou heures invalide ligne " & (i - 1) & "."
+      If Not Valide("^-?[0-9]{1,12}(\.[0-9]{1,4})?$", Trim(parts(k + 3))) Then Echec "RAE invalide ligne " & (i - 1) & "."
     End If
   Next
 
@@ -237,15 +238,15 @@ Sub Principal()
 
   sauv = Sauvegarder(chemin)
 
-  nbAjout = 0 : nbMaj = 0
+  nbAjout = 0 : nbMaj = 0 : nbRaeErr = 0 : raeErr = ""
   For i = 2 To UBound(lignes)
     If Trim(lignes(i)) <> "" Then
       parts = Split(lignes(i), vbTab)
       typeId = ""
       If mode = "fourniture" Then
-        typeId = Trim(parts(0)) : code = Trim(parts(1)) : lib = parts(2) : montant = Trim(parts(3))
+        typeId = Trim(parts(0)) : code = Trim(parts(1)) : lib = parts(2) : montant = Trim(parts(3)) : rae = Trim(parts(4))
       Else
-        code = Trim(parts(0)) : lib = parts(1) : montant = Trim(parts(2))
+        code = Trim(parts(0)) : lib = parts(1) : montant = Trim(parts(2)) : rae = Trim(parts(3))
       End If
       Statut "EN_COURS", "Ecriture " & (i - 1) & "/" & (UBound(lignes) - 1) & " : " & code
 
@@ -296,9 +297,16 @@ Sub Principal()
         End If
         nbAjout = nbAjout + 1
       End If
+
+      ' Reste a engager (RAE) : mise a jour a part, non bloquante.
+      If Not Executer(cn, "UPDATE " & tTable & " SET RAE=" & rae & " WHERE AffaireID=" & affaire & " AND " & tCode & "='" & Sq(code) & "'", errSql) Then
+        nbRaeErr = nbRaeErr + 1
+        If raeErr = "" Then raeErr = errSql
+      End If
     End If
   Next
   cn.Close
+  If nbRaeErr > 0 Then sauv = " ATTENTION : champ RAE non renseigne sur " & nbRaeErr & " ligne(s) (" & raeErr & ")." & sauv
   Statut "OK", nbAjout & " ligne(s) ajoutee(s), " & nbMaj & " mise(s) a jour dans " & tTable & " (affaire GOAT " & affaire & " - " & numAffaire & ")." & sauv
 End Sub
 

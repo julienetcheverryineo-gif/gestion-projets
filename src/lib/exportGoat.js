@@ -60,7 +60,7 @@ function codeParentFourniture(code) {
 // calculerRecap dans ElectriciteSiteDetail.jsx), sur le même périmètre
 // "tous devis du chantier". `normaliserCode` permet de fusionner plusieurs
 // codes sous une même clé avant de sommer (voir codeParentFourniture).
-function sommeParTypeFo(lignes, champValeur, normaliserCode) {
+function sommeParTypeFo(lignes, champValeur, normaliserCode, champAvancement) {
   const parType = new Map();
   lignes.forEach((l) => {
     if (estLigneSomme(l)) return;
@@ -70,9 +70,13 @@ function sommeParTypeFo(lignes, champValeur, normaliserCode) {
     if (!codeBrut) return;
     const code = normaliserCode ? normaliserCode(codeBrut) : codeBrut;
     if (!parType.has(code)) {
-      parType.set(code, { code, libelle: libelleTypeFo(l.typeFo), valeur: 0 });
+      parType.set(code, { code, libelle: libelleTypeFo(l.typeFo), valeur: 0, restant: 0 });
     }
     parType.get(code).valeur += valeur;
+    if (champAvancement) {
+      const pct = Math.max(0, Math.min(100, Number(l[champAvancement] || 0)));
+      parType.get(code).restant += valeur * (1 - pct / 100);
+    }
   });
   return [...parType.values()].sort((a, b) =>
     a.code.localeCompare(b.code, "fr", { numeric: true })
@@ -92,13 +96,15 @@ export function estSousTraitance(code) {
 // de la base) : une par Type de FO, code/libellé SAP quand une correspondance
 // existe, budget = somme du coût total FO. typeId : 1 fourniture, 2 sous-traitant.
 export function lignesFournitureGoat(lignesChiffrables) {
-  return sommeParTypeFo(lignesChiffrables, "coutTotalFo", codeParentFourniture).map((t) => {
+  return sommeParTypeFo(lignesChiffrables, "coutTotalFo", codeParentFourniture, "avancementFo").map((t) => {
     const sap = SAP_PAR_CODE_QDV.get(t.code);
     return {
       typeId: estSousTraitance(t.code) ? 2 : 1,
       code: String(sap ? sap.codeSap : t.code).trim(),
       libelle: String(sap ? sap.libelleSap : t.libelle).trim(),
       budget: Math.round(t.valeur * 100) / 100,
+      // Reste à engager : budget × (1 − avancement).
+      rae: Math.round(t.restant * 100) / 100,
     };
   });
 }
@@ -121,8 +127,11 @@ export function lignesMainOeuvreGoat(recapMo, codesMo = {}) {
       const libelle = l.sup ? l.libelle : libelleTypeFo(l.cle) || l.libelle;
       const cleCode = l.sup ? l.cle : codeTypeFo(l.cle);
       const code = codeMo(codesMo[cleCode], resumerPoste(libelle) || (l.sup ? "TACHE" : String(cleCode).slice(0, 8)));
-      if (parCode.has(code)) parCode.get(code).heures += l.budget;
-      else parCode.set(code, { code, libelle: String(libelle).trim().slice(0, 255), heures: l.budget });
+      const rae = Math.max(0, l.restant ?? 0);
+      if (parCode.has(code)) {
+        parCode.get(code).heures += l.budget;
+        parCode.get(code).rae += rae;
+      } else parCode.set(code, { code, libelle: String(libelle).trim().slice(0, 255), heures: l.budget, rae });
     });
-  return [...parCode.values()].map((m) => ({ ...m, heures: Math.round(m.heures * 100) / 100 }));
+  return [...parCode.values()].map((m) => ({ ...m, heures: Math.round(m.heures * 100) / 100, rae: Math.round(m.rae * 100) / 100 }));
 }

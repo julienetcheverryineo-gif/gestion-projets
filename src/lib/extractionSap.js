@@ -212,8 +212,8 @@ export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, li
       lignes
         .map((l) =>
           (mode === "mo"
-            ? [nettoie(l.code), nettoie(l.libelle), Number(l.heures).toFixed(2)]
-            : [l.typeId, nettoie(l.code), nettoie(l.libelle), Number(l.budget).toFixed(2)]
+            ? [nettoie(l.code), nettoie(l.libelle), Number(l.heures).toFixed(2), Number(l.rae ?? 0).toFixed(2)]
+            : [l.typeId, nettoie(l.code), nettoie(l.libelle), Number(l.budget).toFixed(2), Number(l.rae ?? 0).toFixed(2)]
           ).join("\t")
         )
         .join("\r\n") +

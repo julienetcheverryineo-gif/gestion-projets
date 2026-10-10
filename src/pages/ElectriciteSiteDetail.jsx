@@ -2434,19 +2434,10 @@ export default function ElectriciteSiteDetail() {
           {devis.length > 0 && peutGerer && (
             <button
               className="btn-ghost"
-              onClick={() => setAfficherEnvoiGoat("fourniture")}
-              title="Écrit les fournitures (code/libellé SAP, budget matériel) dans la table Fourniture de la base GOAT"
+              onClick={() => setAfficherEnvoiGoat(true)}
+              title="Écrit fournitures et main d'œuvre (budget + RAE = restant) dans la base GOAT"
             >
-              <IconeAccess /> Fournitures vers GOAT
-            </button>
-          )}
-          {devis.length > 0 && peutGerer && (
-            <button
-              className="btn-ghost"
-              onClick={() => setAfficherEnvoiGoat("mo")}
-              title="Écrit la main d'œuvre (poste, libellé, heures prévues) dans la table MainOeuvre de la base GOAT"
-            >
-              <IconeAccess /> Main d'œuvre vers GOAT
+              <IconeAccess /> Synchro vers GOAT
             </button>
           )}
           {peutGerer && (
@@ -3022,8 +3013,8 @@ export default function ElectriciteSiteDetail() {
         <EnvoyerFournituresGoatModal
           chantierId={chantierId}
           chantier={chantier}
-          mode={afficherEnvoiGoat}
-          lignes={afficherEnvoiGoat === "mo" ? lignesMainOeuvreGoat(construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", ordreTypesChantier), chantier, GENERAL, devis), chantier?.codesMo || {}) : lignesFournitureGoat(lignesChantier)}
+          lignesFo={lignesFournitureGoat(lignesChantier)}
+          lignesMo={lignesMainOeuvreGoat(construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", ordreTypesChantier), chantier, GENERAL, devis), chantier?.codesMo || {})}
           onClose={() => setAfficherEnvoiGoat(null)}
         />
       )}
