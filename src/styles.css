@@ -4135,3 +4135,8 @@ textarea:focus {
   .sit-ligne { grid-template-columns: 1fr 1fr; }
   .sit-desc { grid-column: 1 / -1; }
 }
+.sit-select {
+  max-width: min(100%, 560px); padding: 7px 12px; border-radius: 10px; font: inherit; font-size: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: inherit; text-overflow: ellipsis;
+}

@@ -207,20 +207,20 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
           </button>
         )}
         {mode === "devis" && (
-          <div className="sit-chips">
+          <select
+            className="sit-select"
+            value={devisActif?.id || ""}
+            onChange={(e) => {
+              setDevisChoisi(e.target.value);
+              setChoixIndex(null);
+            }}
+          >
             {devis.map((d) => (
-              <button
-                key={d.id}
-                className={"sit-chip" + (d.id === devisActif?.id ? " actif" : "")}
-                onClick={() => {
-                  setDevisChoisi(d.id);
-                  setChoixIndex(null);
-                }}
-              >
+              <option key={d.id} value={d.id}>
                 {d.nom}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         )}
       </div>
 
