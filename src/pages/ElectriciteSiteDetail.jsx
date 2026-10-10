@@ -2462,7 +2462,7 @@ export default function ElectriciteSiteDetail() {
           {peutGerer && (
             <>
               <button className="btn-ghost" onClick={() => setAfficherFormulaire(true)}>
-                Modifier le chantier
+                ✎ Modifier le chantier
               </button>
               <button className="btn-primary" onClick={() => setAfficherImport(true)}>
                 Importer / mettre à jour une minute

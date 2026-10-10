@@ -379,12 +379,16 @@ a {
 
 .btn-ghost {
   background: transparent;
-  color: var(--text-muted);
-  border-color: var(--border);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 35%, var(--border));
 }
 .btn-ghost:hover {
   color: var(--text);
-  border-color: var(--text-muted);
+  border-color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.btn-ghost:disabled {
+  color: var(--text-muted);
 }
 .btn-ghost:disabled {
   cursor: default;
@@ -4152,3 +4156,15 @@ textarea:focus {
   border: 1px solid var(--border); background: color-mix(in srgb, #16a34a 8%, transparent);
 }
 .sit-retard.en-retard { background: color-mix(in srgb, #f59e0b 14%, transparent); border-color: color-mix(in srgb, #f59e0b 50%, var(--border)); }
+
+.sit-validee-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+}

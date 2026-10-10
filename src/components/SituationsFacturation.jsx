@@ -56,7 +56,8 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
   const marche = montantMarche(rows);
   const sit = indexOuvert >= 0 ? situations[indexOuvert] : null;
   const estDerniere = indexOuvert === situations.length - 1;
-  const modifiable = peutGerer && estDerniere;
+  const verrouillee = !!sit?.validee;
+  const modifiable = peutGerer && estDerniere && !verrouillee;
 
   const enregistrer = (nouvelles, extra = {}) =>
     updateDoc(doc(db, "sites", chantierId), {
@@ -338,6 +339,30 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                   />
                 </label>
                 <span className="sit-actions">
+                  {verrouillee && <span className="sit-validee-badge">🔒 Validée{sit.valideeLe ? " le " + new Date(sit.valideeLe).toLocaleDateString("fr-FR") : ""}</span>}
+                  {peutGerer && estDerniere && !verrouillee && (
+                    <button
+                      type="button"
+                      className="btn-accent"
+                      title="À faire une fois la situation envoyée : plus aucune modification ne sera possible"
+                      onClick={() => {
+                        if (window.confirm("Valider la situation " + sit.numero + " ? Elle sera verrouillée (plus de modification possible).")) majSituation({ validee: true, valideeLe: new Date().toISOString() });
+                      }}
+                    >
+                      🔒 Valider la situation
+                    </button>
+                  )}
+                  {peutGerer && estDerniere && verrouillee && (
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => {
+                        if (window.confirm("Déverrouiller la situation " + sit.numero + " ?")) majSituation({ validee: false, valideeLe: null });
+                      }}
+                    >
+                      Déverrouiller
+                    </button>
+                  )}
                   {modifiable && (
                     <button type="button" className="btn-ghost btn-danger" onClick={supprimerDerniere}>
                       Supprimer
