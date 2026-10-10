@@ -18,7 +18,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
 import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal";
-import { libelleTypeActivite, estLigneMoIgnoree, estActiviteIgnoree, CODES_TYPES_ACTIVITE_CONNUS, inclutMaterielInterne } from "../lib/typesActiviteSap";
+import { libelleTypeActivite, normaliserTypeActivite, estLigneMoIgnoree, estActiviteIgnoree, CODES_TYPES_ACTIVITE_CONNUS, inclutMaterielInterne } from "../lib/typesActiviteSap";
 import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
@@ -281,6 +281,7 @@ function TableauRecap({
   profilsPossibles,
   kAchats,
   onChangerK,
+  tauxHoraire,
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
@@ -683,7 +684,24 @@ function TableauRecap({
                   })()}
                   {sapMo && (() => {
                     const g = sapMo.parCle.get(l.cle);
-                    const reste = l.budget - g.reel;
+                    // Reste budget valorisé : les heures prévues sont chiffrées au taux du
+                    // profil prévu (ex. automaticien 49 €/h), les heures pointées au taux
+                    // du profil réel (ex. apprenti 36 €/h). Le reste est donc
+                    // (budget € − réel €) converti en heures au taux prévu.
+                    const clePC = l.cle ? clePourCode(l) : null;
+                    const tPrevu = tauxHoraire ? tauxHoraire(profilsMo?.[clePC] || "I205") : null;
+                    let reelEuro = 0;
+                    let valorisable = Boolean(tPrevu);
+                    g.lignes.forEach((h) => {
+                      const tx = tauxHoraire ? tauxHoraire(normaliserTypeActivite(h.typAct)) : null;
+                      if (tx == null) valorisable = false;
+                      else reelEuro += (Number(h.heures) || 0) * tx;
+                    });
+                    const reelEquiv = valorisable ? reelEuro / tPrevu : g.reel;
+                    const reste = l.budget - reelEquiv;
+                    const infoReste = valorisable
+                      ? "Valorisé : heures prévues × " + formatNombre(tPrevu) + " €/h − heures SAP × taux de chaque type d'activité (" + formatNombre(reelEuro) + " €), converti en heures au taux prévu. Simple différence d'heures : " + formatNombre(l.budget - g.reel) + " h."
+                      : "Différence d'heures (taux manquant pour une valorisation).";
                     return (
                       <>
                         <td className="col-num" data-label={libelleReel}>
@@ -700,11 +718,11 @@ function TableauRecap({
                             "—"
                           )}
                         </td>
-                        <td className={"col-num " + classeReste(reste)} data-label="Reste budget">
+                        <td className={"col-num " + classeReste(reste)} data-label="Reste budget" title={infoReste}>
                           {formatMontant(reste, uniteValeur)}
                         </td>
                         <td className="col-avancement" data-label="Réel / Budget">
-                          <BarreReelBudget reel={g.reel} budget={l.budget} />
+                          <BarreReelBudget reel={reelEquiv} budget={l.budget} />
                         </td>
                       </>
                     );
@@ -2678,6 +2696,7 @@ export default function ElectriciteSiteDetail() {
                 profilsMo={avecSup ? profilsMoChantier : null}
                 onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
                 profilsPossibles={profilsPossibles}
+                tauxHoraire={tauxHoraire}
                 kAchats={null}
                 onChangerK={null}
                 sup={
@@ -2716,6 +2735,7 @@ export default function ElectriciteSiteDetail() {
                 profilsMo={avecSup ? profilsMoChantier : null}
                 onChangerProfilMo={avecSup && peutGerer ? changerProfilMo : null}
                 profilsPossibles={profilsPossibles}
+                tauxHoraire={tauxHoraire}
                 kAchats={!avecSup ? kAchatsDevis(d.id) : null}
                 onChangerK={!avecSup && peutGerer ? (cle, v) => changerKAchat(d.id, cle, v) : null}
                   sup={
