@@ -1439,7 +1439,7 @@ function LigneDevisRow({
       <td className="elec-col-etroite">{l.unite || "—"}</td>
       <td className="elec-col-etroite">{formatNombre(l.quantite)}</td>
       <td className="elec-col-materiel elec-col-saisie">
-        {l.informative ? (
+        {l.informative || !coutTotalFoAffiche ? (
           "—"
         ) : (
           <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
@@ -1489,7 +1489,7 @@ function LigneDevisRow({
         {coutTotalFoAffiche ? formatEuro((coutTotalFoAffiche * pctFo) / 100) + " €" : "—"}
       </td>
       <td className="elec-col-mo elec-col-saisie">
-        {l.informative ? (
+        {l.informative || !tempsTotalAffiche ? (
           "—"
         ) : (
           <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
