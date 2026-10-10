@@ -148,7 +148,7 @@ Sub Principal()
   Dim url, chemin, txt, lignes, i, parts, affaire, rs, numAffaire, cmsg
   Dim typeId, code, lib, montant, tentatives, k, ok, errSql, idExistant, maxId
   Dim nbAjout, nbMaj, cn, sauv, x86, cols, vals, mode
-  Dim tTable, tId, tCode, tLib, tMont, nbParts, motifCode, majType, setType, rae, nbRaeErr, raeErr
+  Dim tTable, tId, tCode, tLib, tMont, nbParts, motifCode, majType, setType, rae, nbRaeErr, raeErr, tRae
 
   url = ""
   If WScript.Arguments.Count >= 1 Then url = WScript.Arguments(0)
@@ -166,10 +166,10 @@ Sub Principal()
     Echec "Lien GOAT invalide : " & Left(url, 60)
   End If
   If mode = "fourniture" Then
-    tTable = "Fourniture" : tId = "FournitureID" : tCode = "Code" : tLib = "Libelle" : tMont = "MontantBudg"
+    tTable = "Fourniture" : tId = "FournitureID" : tCode = "Code" : tLib = "Libelle" : tMont = "MontantBudg" : tRae = "MontantRae"
     nbParts = 4 : motifCode = "^[A-Za-z0-9._-]{1,25}$"
   Else
-    tTable = "MainOeuvre" : tId = "MainOeuvreID" : tCode = "SegmentCode" : tLib = "SegmentLibelle" : tMont = "HeuresBudget"
+    tTable = "MainOeuvre" : tId = "MainOeuvreID" : tCode = "SegmentCode" : tLib = "SegmentLibelle" : tMont = "HeuresBudget" : tRae = "HeuresRae"
     nbParts = 3 : motifCode = "^[A-Za-z0-9._ -]{1,50}$"
   End If
 
@@ -299,14 +299,14 @@ Sub Principal()
       End If
 
       ' Reste a engager (RAE) : mise a jour a part, non bloquante.
-      If Not Executer(cn, "UPDATE " & tTable & " SET RAE=" & rae & " WHERE AffaireID=" & affaire & " AND " & tCode & "='" & Sq(code) & "'", errSql) Then
+      If Not Executer(cn, "UPDATE " & tTable & " SET " & tRae & "=" & rae & " WHERE AffaireID=" & affaire & " AND " & tCode & "='" & Sq(code) & "'", errSql) Then
         nbRaeErr = nbRaeErr + 1
         If raeErr = "" Then raeErr = errSql
       End If
     End If
   Next
   cn.Close
-  If nbRaeErr > 0 Then sauv = " ATTENTION : champ RAE non renseigne sur " & nbRaeErr & " ligne(s) (" & raeErr & ")." & sauv
+  If nbRaeErr > 0 Then sauv = " ATTENTION : champ " & tRae & " non renseigne sur " & nbRaeErr & " ligne(s) (" & raeErr & ")." & sauv
   Statut "OK", nbAjout & " ligne(s) ajoutee(s), " & nbMaj & " mise(s) a jour dans " & tTable & " (affaire GOAT " & affaire & " - " & numAffaire & ")." & sauv
 End Sub
 
