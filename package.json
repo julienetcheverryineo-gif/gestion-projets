@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "firebase": "^12.18.0",
     "mammoth": "^1.13.0",
     "react": "^19.2.8",

@@ -165,7 +165,7 @@ export function analyserMinuteElectricite(arrayBuffer) {
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter(Boolean);
-    const detail = reste.join(" ").slice(0, 300);
+    const detail = reste.join("\n").slice(0, 2000);
 
     // Ligne purement informative (ex: "Barattage :", un sous-titre, ou le
     // titre du devis en première ligne) : repérée par l'absence d'unité
