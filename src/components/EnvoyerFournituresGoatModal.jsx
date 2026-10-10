@@ -144,7 +144,7 @@ export default function EnvoyerFournituresGoatModal({ chantierId, chantier, lign
               <label key={"M" + l.code} className="team-checklist-item">
                 <input type="checkbox" disabled={enCours} checked={cochees.has("M" + l.code)} onChange={() => bascule("M" + l.code)} />
                 <span style={{ width: 70, display: "inline-block" }}>{l.code}</span>
-                {l.libelle} — {formatEuro(l.heures)} h / RAE {formatEuro(l.rae)} h
+                {l.libelle} — {formatEuro(l.heures)} h / RAE {formatEuro(l.rae)} h{l.familles?.length ? " · " + l.familles.join(", ") : " · (pas de type de personnel)"}
               </label>
             ))}
           </div>

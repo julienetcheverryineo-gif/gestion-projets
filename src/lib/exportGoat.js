@@ -119,7 +119,7 @@ export function codeMo(saisi, defaut) {
 // Lignes Main d'œuvre à écrire dans GOAT (table MainOeuvre) à partir du
 // Récap MO final de la synthèse (heures adaptées comprises) : une ligne par
 // tâche ayant des heures, code à 8 caractères (modifiable, voir codeMo).
-export function lignesMainOeuvreGoat(recapMo, codesMo = {}) {
+export function lignesMainOeuvreGoat(recapMo, codesMo = {}, profilsMo = {}) {
   const parCode = new Map();
   recapMo.parType
     .filter((l) => l.cle && l.budget > 0)
@@ -128,10 +128,15 @@ export function lignesMainOeuvreGoat(recapMo, codesMo = {}) {
       const cleCode = l.sup ? l.cle : codeTypeFo(l.cle);
       const code = codeMo(codesMo[cleCode], resumerPoste(libelle) || (l.sup ? "TACHE" : String(cleCode).slice(0, 8)));
       const rae = Math.max(0, l.restant ?? 0);
-      if (parCode.has(code)) {
-        parCode.get(code).heures += l.budget;
-        parCode.get(code).rae += rae;
-      } else parCode.set(code, { code, libelle: String(libelle).trim().slice(0, 255), heures: l.budget, rae });
+      // Type de personnel prévu (code SAP, ex. I205) → GroupeFamille de GOAT.
+      const profil = String(profilsMo[cleCode] || "").trim().toUpperCase();
+      if (!parCode.has(code)) {
+        parCode.set(code, { code, libelle: String(libelle).trim().slice(0, 255), heures: 0, rae: 0, familles: [] });
+      }
+      const m = parCode.get(code);
+      m.heures += l.budget;
+      m.rae += rae;
+      if (/^[A-Z0-9]{1,10}$/.test(profil) && !m.familles.includes(profil)) m.familles.push(profil);
     });
   return [...parCode.values()].map((m) => ({ ...m, heures: Math.round(m.heures * 100) / 100, rae: Math.round(m.rae * 100) / 100 }));
 }

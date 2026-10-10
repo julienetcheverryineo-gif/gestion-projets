@@ -148,7 +148,7 @@ Sub Principal()
   Dim url, chemin, txt, lignes, i, parts, affaire, rs, numAffaire, cmsg
   Dim typeId, code, lib, montant, tentatives, k, ok, errSql, idExistant, maxId
   Dim nbAjout, nbMaj, cn, sauv, x86, cols, vals, mode
-  Dim tTable, tId, tCode, tLib, tMont, nbParts, motifCode, majType, setType, rae, nbRaeErr, raeErr, tRae
+  Dim tTable, tId, tCode, tLib, tMont, nbParts, motifCode, majType, setType, rae, nbRaeErr, raeErr, tRae, familles, nbFam, famErr, fams, f, idMo, idFam, nbFamIns, nbFamErr
 
   url = ""
   If WScript.Arguments.Count >= 1 Then url = WScript.Arguments(0)
@@ -170,7 +170,7 @@ Sub Principal()
     nbParts = 4 : motifCode = "^[A-Za-z0-9._-]{1,25}$"
   Else
     tTable = "MainOeuvre" : tId = "MainOeuvreID" : tCode = "SegmentCode" : tLib = "SegmentLibelle" : tMont = "HeuresBudget" : tRae = "HeuresRae"
-    nbParts = 3 : motifCode = "^[A-Za-z0-9._ -]{1,50}$"
+    nbParts = 4 : motifCode = "^[A-Za-z0-9._ -]{1,50}$"
   End If
 
   Statut "EN_COURS", "Lecture du lot"
@@ -204,6 +204,9 @@ Sub Principal()
       If Len(parts(k + 1)) > 255 Or Valide("[\x00-\x08\x0B-\x1F]", parts(k + 1)) Then Echec "Libelle invalide ligne " & (i - 1) & "."
       If Not Valide("^-?[0-9]{1,12}(\.[0-9]{1,4})?$", Trim(parts(k + 2))) Then Echec "Montant ou heures invalide ligne " & (i - 1) & "."
       If Not Valide("^-?[0-9]{1,12}(\.[0-9]{1,4})?$", Trim(parts(k + 3))) Then Echec "RAE invalide ligne " & (i - 1) & "."
+      If mode = "mo" Then
+        If Not Valide("^([A-Za-z0-9]{1,10}(\|[A-Za-z0-9]{1,10})*)?$", Trim(parts(4))) Then Echec "Familles invalides ligne " & (i - 1) & "."
+      End If
     End If
   Next
 
@@ -238,7 +241,7 @@ Sub Principal()
 
   sauv = Sauvegarder(chemin)
 
-  nbAjout = 0 : nbMaj = 0 : nbRaeErr = 0 : raeErr = ""
+  nbAjout = 0 : nbMaj = 0 : nbRaeErr = 0 : raeErr = "" : nbFamIns = 0 : nbFamErr = 0 : famErr = ""
   For i = 2 To UBound(lignes)
     If Trim(lignes(i)) <> "" Then
       parts = Split(lignes(i), vbTab)
@@ -246,7 +249,7 @@ Sub Principal()
       If mode = "fourniture" Then
         typeId = Trim(parts(0)) : code = Trim(parts(1)) : lib = parts(2) : montant = Trim(parts(3)) : rae = Trim(parts(4))
       Else
-        code = Trim(parts(0)) : lib = parts(1) : montant = Trim(parts(2)) : rae = Trim(parts(3))
+        code = Trim(parts(0)) : lib = parts(1) : montant = Trim(parts(2)) : rae = Trim(parts(3)) : familles = Trim(parts(4))
       End If
       Statut "EN_COURS", "Ecriture " & (i - 1) & "/" & (UBound(lignes) - 1) & " : " & code
 
@@ -303,10 +306,50 @@ Sub Principal()
         nbRaeErr = nbRaeErr + 1
         If raeErr = "" Then raeErr = errSql
       End If
+
+      ' Main d'oeuvre : familles de personnel (MainOeuvreHasFamilleGroupe),
+      ' Pourcent = 100. On remplace les liens existants de la tache.
+      If mode = "mo" And familles <> "" Then
+        idMo = ""
+        Set rs = cn.Execute("SELECT MainOeuvreID FROM MainOeuvre WHERE AffaireID=" & affaire & " AND SegmentCode='" & Sq(code) & "'")
+        If Not rs.EOF Then idMo = CStr(rs.Fields(0).Value)
+        rs.Close
+        If idMo <> "" Then
+          If Executer(cn, "DELETE FROM MainOeuvreHasFamilleGroupe WHERE MainOeuvreID=" & idMo, errSql) Then
+            fams = Split(familles, "|")
+            For Each f In fams
+              idFam = ""
+              Set rs = cn.Execute("SELECT GroupeFamilleID FROM GroupeFamille WHERE Code='" & Sq(f) & "'")
+              If Not rs.EOF Then idFam = CStr(rs.Fields(0).Value)
+              rs.Close
+              If idFam = "" Then
+                nbFamErr = nbFamErr + 1
+                If famErr = "" Then famErr = "famille " & f & " absente de GroupeFamille"
+              Else
+                ok = Executer(cn, "INSERT INTO MainOeuvreHasFamilleGroupe (MainOeuvreID, GroupeFamilleID, Pourcent) VALUES (" & idMo & ", " & idFam & ", 100)", errSql)
+                If Not ok Then ok = Executer(cn, "INSERT INTO MainOeuvreHasFamilleGroupe (MainOeuvreID, GroupeFamilleID, Pourcent, SSMA_TimeStamp) SELECT TOP 1 " & idMo & ", " & idFam & ", 100, SSMA_TimeStamp FROM MainOeuvre", errSql)
+                If ok Then
+                  nbFamIns = nbFamIns + 1
+                Else
+                  nbFamErr = nbFamErr + 1
+                  If famErr = "" Then famErr = errSql
+                End If
+              End If
+            Next
+          Else
+            nbFamErr = nbFamErr + 1
+            If famErr = "" Then famErr = errSql
+          End If
+        End If
+      End If
     End If
   Next
   cn.Close
   If nbRaeErr > 0 Then sauv = " ATTENTION : champ " & tRae & " non renseigne sur " & nbRaeErr & " ligne(s) (" & raeErr & ")." & sauv
+  If mode = "mo" Then
+    sauv = " Familles de personnel : " & nbFamIns & " lien(s) ecrit(s)" & sauv
+    If nbFamErr > 0 Then sauv = " ATTENTION : " & nbFamErr & " famille(s) non ecrite(s) (" & famErr & ")." & sauv
+  End If
   Statut "OK", nbAjout & " ligne(s) ajoutee(s), " & nbMaj & " mise(s) a jour dans " & tTable & " (affaire GOAT " & affaire & " - " & numAffaire & ")." & sauv
 End Sub
 

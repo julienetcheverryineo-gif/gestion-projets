@@ -3014,7 +3014,7 @@ export default function ElectriciteSiteDetail() {
           chantierId={chantierId}
           chantier={chantier}
           lignesFo={lignesFournitureGoat(lignesChantier)}
-          lignesMo={lignesMainOeuvreGoat(construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", ordreTypesChantier), chantier, GENERAL, devis), chantier?.codesMo || {})}
+          lignesMo={lignesMainOeuvreGoat(construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", ordreTypesChantier), chantier, GENERAL, devis), chantier?.codesMo || {}, chantier?.profilsMo || {})}
           onClose={() => setAfficherEnvoiGoat(null)}
         />
       )}
