@@ -1,5 +1,5 @@
 import logoUrl from "../assets/logo-ineo-situation.png";
-import { montantAvancement, montantMarche, pctCumule, totalCumule } from "./situations";
+import { montantADeduire, montantAvancement, montantMarche, pctCumule, totalCumule } from "./situations";
 
 // Fichier de situation de travaux (.xlsx) : même présentation que le modèle
 // du service (en-tête, tableau turquoise, totaux de chapitre en rouge,
@@ -39,7 +39,7 @@ async function chargerLogo() {
 }
 
 // Construit le classeur et renvoie un Blob.
-export async function genererFichierSituation({ chantier, rows, situations, indexSituation, tauxTva }) {
+export async function genererFichierSituation({ chantier, rows, situations, indexSituation, tauxTva, acompte = 0 }) {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = "Pilotage de projets";
@@ -48,7 +48,8 @@ export async function genererFichierSituation({ chantier, rows, situations, inde
   const nb = indexSituation + 1;
   const tva = (Number(tauxTva) || 0) / 100;
   const cumuls = Array.from({ length: nb }, (_, i) => totalCumule(rows, situations, i));
-  const periodes = cumuls.map((c, i) => arrondi2(c - (i > 0 ? cumuls[i - 1] : 0)));
+  const aDeduire = cumuls.map((_, i) => montantADeduire(rows, situations, i, acompte));
+  const periodes = cumuls.map((c, i) => arrondi2(c - aDeduire[i]));
 
   // ---------- Récapitulatif ----------
   const rec = wb.addWorksheet("Récapitulatif", { views: [{ showGridLines: false }] });
@@ -289,7 +290,7 @@ export async function genererFichierSituation({ chantier, rows, situations, inde
   // Montant total + TVA + TTC (période courante)
   const totalHt = marche;
   const cumulCourant = cumuls[indexSituation];
-  const periode = periodes[indexSituation];
+  const periode = arrondi2(cumulCourant - (indexSituation > 0 ? cumuls[indexSituation - 1] : 0)); // travaux de la période
   const blocTotal = (libelle, valeurs, ligne) => {
     sh.mergeCells(ligne, 1, ligne, 5);
     sh.getCell(ligne, 1).value = libelle;
@@ -326,10 +327,10 @@ export async function genererFichierSituation({ chantier, rows, situations, inde
   r += 2;
 
   // Montant du mois
-  const precedent = indexSituation > 0 ? cumuls[indexSituation - 1] : 0;
+  const precedent = aDeduire[indexSituation];
   const lignesBas = [
     ["MONTANT AVANCEMENT HT", cumulCourant],
-    ["SITUATION A DEDUIRE HT", precedent],
+    [indexSituation === 0 && acompte ? "ACOMPTE ET SITUATIONS A DEDUIRE HT" : "SITUATION A DEDUIRE HT", precedent],
     ["MONTANT DU MOIS HT", arrondi2(cumulCourant - precedent)],
     ["TVA (" + (tauxTva ?? 20) + "%)", arrondi2((cumulCourant - precedent) * tva)],
     ["MONTANT DU MOIS TTC", arrondi2(cumulCourant - precedent + arrondi2((cumulCourant - precedent) * tva))],

@@ -45,6 +45,13 @@ function niveauGris(cellule) {
   return r >= 0xf4 ? null : r;
 }
 
+// Ligne de compensation : fond à hachures (motif, pas un aplat) — jaune
+// hachuré de rouge dans les minutes. Repérée par le motif de remplissage.
+function estHachure(cellule) {
+  const p = cellule?.s?.patternType;
+  return Boolean(p && p !== "solid" && p !== "none");
+}
+
 // Repère les regroupements : une ligne d'article gris foncé suivie
 // immédiatement de lignes gris plus clair forme un groupe (la ligne foncée
 // en est la tête). Marque chaque ligne concernée avec groupeCle (n° du
@@ -106,6 +113,11 @@ export function analyserMinuteElectricite(arrayBuffer) {
     }
     return null;
   };
+
+  const hachureDeLigne = (i) =>
+    [c.description, c.numero, c.nomArticle, c.quantite, c.pvLigne].some(
+      (idx) => idx != null && idx >= 0 && estHachure(feuille[XLSX.utils.encode_cell({ r: ligneDepart + i, c: idx })])
+    );
 
   const texte = (ligne, idx) => (idx >= 0 ? String(ligne[idx] ?? "").trim() : "");
   const nombre = (ligne, idx) => (idx >= 0 ? Number(ligne[idx] ?? 0) || 0 : 0);
@@ -199,6 +211,7 @@ export function analyserMinuteElectricite(arrayBuffer) {
       informative,
       sansDesignation,
       gris: grisDeLigne(i),
+      compensation: hachureDeLigne(i),
       ordre: ordre++,
     });
   }

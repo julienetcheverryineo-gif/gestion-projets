@@ -25,6 +25,7 @@ const CHAMPS = [
   { champ: "pvTotal", label: "PV total", type: "nombre" },
   { champ: "pvLigne", label: "PV ligne", type: "nombre" },
   { champ: "informative", label: "Ligne informative", type: "booleen" },
+  { champ: "compensation", label: "Ligne de compensation", type: "booleen" },
 ];
 
 function valeurNormalisee(ligne, { champ, type }) {
@@ -61,6 +62,7 @@ export function champsDocumentLigne(ligne) {
     pvLigne: ligne.pvLigne || 0,
     facteurPoste: ligne.facteurPoste || 1,
     informative: ligne.informative || false,
+    compensation: ligne.compensation || false,
     avancementFo: 0,
     avancementMo: 0,
     ordre: ligne.ordre,
