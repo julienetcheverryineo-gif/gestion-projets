@@ -7,6 +7,7 @@ import {
   autoActif,
   executerExtraction,
   isoAujourdhui,
+  DEBUT_HEURES_DEFAUT,
   lireParamsSap,
   optionsValidation,
   validerParametres,
@@ -42,7 +43,7 @@ function ImportSapAutoInterne({ user }) {
   const tente = useRef(false);
 
   const demarrer = async (handle, otp) => {
-    const debut = isoAujourdhui(-1);
+    const debut = DEBUT_HEURES_DEFAUT;
     const fin = isoAujourdhui();
     const params = lireParamsSap();
     const problemes = ["fo", "mo", "adv"].flatMap((t) =>

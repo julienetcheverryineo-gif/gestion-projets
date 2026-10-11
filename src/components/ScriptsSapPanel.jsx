@@ -14,6 +14,7 @@ import {
   definirAutoActif,
   executerExtraction,
   isoAujourdhui,
+  DEBUT_HEURES_DEFAUT,
   lireParamsSap,
   optionsValidation,
   sauverParamsSap,
@@ -45,7 +46,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
   const [otp, setOtp] = useState([]);
   const [menuOuvert, setMenuOuvert] = useState(false);
   const [recherche, setRecherche] = useState("");
-  const [debut, setDebut] = useState(isoAujourdhui(-1));
+  const [debut, setDebut] = useState(DEBUT_HEURES_DEFAUT);
   const [fin, setFin] = useState(isoAujourdhui());
   const [erreurs, setErreurs] = useState([]);
   const [ouvert, setOuvert] = useState(false);

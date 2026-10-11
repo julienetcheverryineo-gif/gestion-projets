@@ -34,6 +34,10 @@ export function sauverParamsSap(params) {
   }
 }
 
+// Début de la lecture des heures (ZCAT3) : fixe, et non plus « un an glissant »,
+// pour que le cumul des heures corresponde au cumul comptable SAP.
+export const DEBUT_HEURES_DEFAUT = "2025-01-01";
+
 export function isoAujourdhui(decalageAnnees = 0) {
   const d = new Date();
   d.setFullYear(d.getFullYear() + decalageAnnees);
