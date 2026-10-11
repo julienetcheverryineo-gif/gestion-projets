@@ -22,7 +22,13 @@ export default function ElectriciteChantiers() {
   const [tous, setTous] = useState(false);
   const chantiersElec = tousChantiers.filter(estChantierElectricite);
   // Par défaut : seulement les chantiers dont l'utilisateur est le RA.
-  const chantiers = tous ? chantiersElec : chantiersElec.filter((c) => (c.ra || "") === (profile?.nom || ""));
+  const chantiers = (tous ? chantiersElec : chantiersElec.filter((c) => (c.ra || "") === (profile?.nom || ""))).slice().sort((a, b) => {
+    // Tri par numéro de compte (ordre naturel) ; sans compte en fin de liste.
+    const ca = String(a.compte || "").trim();
+    const cb = String(b.compte || "").trim();
+    if (!ca !== !cb) return ca ? -1 : 1;
+    return ca.localeCompare(cb, "fr", { numeric: true, sensitivity: "base" }) || String(a.nom || "").localeCompare(String(b.nom || ""), "fr");
+  });
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
@@ -93,6 +99,7 @@ export default function ElectriciteChantiers() {
           <table className="data-table chantiers-table">
             <thead>
               <tr>
+                <th>N° compte</th>
                 <th>Client</th>
                 <th>Chantier</th>
                 <th>Statut</th>
@@ -104,6 +111,9 @@ export default function ElectriciteChantiers() {
             <tbody>
               {chantiers.map((chantier) => (
                 <tr key={chantier.id}>
+                  <td data-label="N° compte" style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    {chantier.compte || "—"}
+                  </td>
                   <td
                     data-label="Client"
                     style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
