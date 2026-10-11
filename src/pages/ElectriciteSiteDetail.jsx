@@ -2849,7 +2849,28 @@ export default function ElectriciteSiteDetail() {
               onClick={() => setRecapActif("finance")}
               title="Budget, réel et atterrissage en euros (taux horaires par type d'activité)"
             >
-              💶 Bilan financier
+              💶 Bilan affaire
+            </button>
+            <button
+              className={recapActif === "eat" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif("eat")}
+              title="Import CJI3, engagé SAP et EAT réaliste"
+            >
+              🎯 EAT
+            </button>
+            <button
+              className={recapActif === "eatAnnonce" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif("eatAnnonce")}
+              title="EAT à déclarer pour tenir la marge annoncée"
+            >
+              🛡️ EAT pour marge annoncée
+            </button>
+            <button
+              className={recapActif === "eatPilotage" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif("eatPilotage")}
+              title="EAT à déclarer pour une marge nette choisie"
+            >
+              🎚️ EAT pilotage à la marge
             </button>
             {(achatsSap.length > 0 || heuresSap.length > 0) && (
               <button
@@ -2945,7 +2966,7 @@ export default function ElectriciteSiteDetail() {
             </>
           )}
 
-          {(recapActif === "finance" || recapActif === "autresfrais") &&
+          {(["finance", "autresfrais", "eat", "eatAnnonce", "eatPilotage"].includes(recapActif)) &&
             (() => {
               const totFo = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
               const recapMoSynthese = construireRecapMo(
@@ -2984,7 +3005,7 @@ export default function ElectriciteSiteDetail() {
                 detailFo.push({ libelle: "Achats hors budget", prevu: 0, reel: rapproFo.horsBudget.reel, av: 0 });
               return (
                 <BilanFinancier
-                  affichage={recapActif === "autresfrais" ? "autresFrais" : "finance"}
+                  affichage={recapActif === "autresfrais" ? "autresFrais" : recapActif}
                   detailFo={detailFo}
                   achatsSap={achatsSap}
                   heuresMatInternePrevues={heuresMatInternePrevues}

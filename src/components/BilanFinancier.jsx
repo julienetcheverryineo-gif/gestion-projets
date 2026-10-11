@@ -483,9 +483,13 @@ export default function BilanFinancier({
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
       <div className="panel-header">
-        <h2>💶 Bilan financier de l'affaire</h2>
+        <h2>
+          {affichage === "eat" ? "🎯 EAT — aide à la déclaration" : affichage === "eatAnnonce" ? "🛡️ EAT pour marge annoncée" : affichage === "eatPilotage" ? "🎚️ EAT pilotage à la marge" : "💶 Bilan de l'affaire"}
+        </h2>
       </div>
 
+      {affichage === "finance" && (
+      <>
       <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
         <label>
           CA H.T. (€) {champCa("caHt", ca)}
@@ -565,8 +569,11 @@ export default function BilanFinancier({
         <br />
         Réglage des taux dans « Import SAP » (commun à toutes les affaires).
       </p>
+      </>
+      )}
 
 
+      {affichage === "eat" && (
       <div className="bf-eat" style={{ marginTop: 18 }}>
         <h3 style={{ margin: "0 0 4px" }}>🎯 Aide à la déclaration EAT (estimation à terme)</h3>
         <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
@@ -741,6 +748,7 @@ export default function BilanFinancier({
           );
         })()}
       </div>
+      )}
 
 
       {(() => {
@@ -825,7 +833,7 @@ export default function BilanFinancier({
             <div style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
               {cji3Eat && engageE === 0 && (
                 <div style={{ color: ROUGE, marginBottom: 4 }}>
-                  ⚠ Aucun engagé détecté dans le ME2J. Si l'écran RàE affiche un montant en « Engag Trv », saisissez-le dans « Engagé SAP » (plus haut) : sans lui SAP affichera une marge plus basse.
+                  ⚠ Aucun engagé détecté dans le ME2J. Si l'écran RàE affiche un montant en « Engag Trv », saisissez-le dans « Engagé SAP » (onglet EAT) : sans lui SAP affichera une marge plus basse.
                 </div>
               )}
               <div>
@@ -858,12 +866,13 @@ export default function BilanFinancier({
         const resCible = kSaisi !== null ? resoudreEat(kSaisi * base) : null;
         return (
           <>
-            {tableauEat(
+            {affichage === "eatAnnonce" && tableauEat(
               "🛡️ EAT à déclarer pour tenir la marge annoncée",
               "Même marge nette que le prévu (" + eur(prevuEat.nette) + ", k " + (prevuEat.k === null ? "—" : num(prevuEat.k * 100, 1) + " %") + ") : l'outil calcule la part du reste à faire à ne pas dépasser, ligne par ligne, avec le FRA, les frais généraux et le matériel interne recalculés.",
               resAnnonce,
               prevuEat.nette
             )}
+            {affichage === "eatPilotage" && (<>
             <div style={{ marginTop: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <h3 style={{ margin: 0 }}>🎚️ Je veux annoncer</h3>
               <input
@@ -894,6 +903,7 @@ export default function BilanFinancier({
                   kSaisi * base
                 )
               : <p className="simple-list-meta" style={{ marginTop: 6 }}>Saisissez un pourcentage pour obtenir les valeurs à déclarer.</p>}
+            </>)}
           </>
         );
       })()}
