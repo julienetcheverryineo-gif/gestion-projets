@@ -2499,7 +2499,7 @@ export default function ElectriciteSiteDetail() {
               onClick={() => setRecapActif("situations")}
               title="Situations de travaux : avancement cumulé par ligne de la minute et export Excel pour la facturation"
             >
-              🧾 Situations
+              🧾 Facturation
             </button>
             <button
               className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
