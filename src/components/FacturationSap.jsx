@@ -16,6 +16,21 @@ const classeEtat = (e) =>
     .toLowerCase()
     .replace(/[^a-z]+/g, "-");
 const dateFr = (d) => String(d || "").replace(/\./g, "/"); // "12.06.2026" -> "12/06/2026"
+const dateObj = (d) => {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(d || "").trim());
+  return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+};
+// Statut d'une facture SAP : payee (vert), attente (orange), retard (rouge), annulee (gris).
+function statutFacture(f) {
+  if (f.annulee) return "annulee";
+  if (f.payee) return "payee";
+  const ech = dateObj(f.echeance);
+  const finJour = new Date();
+  finJour.setHours(0, 0, 0, 0);
+  if (f.retardJours > 0 || (ech && ech < finJour)) return "retard";
+  return "attente";
+}
+const LIBELLE_STATUT = { payee: "payée", attente: "à régler", retard: "échéance dépassée", annulee: "annulée (avoir)" };
 const dateIsoFr = (d) => (d ? new Date(d).toLocaleDateString("fr-FR") : "");
 const dateTri = (d) => String(d).split(".").reverse().join("");
 
@@ -226,16 +241,28 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
                             {fact.length === 0 ? (
                               <span className="fsap-meta">—</span>
                             ) : (
-                              fact.map((f, i) => (
-                                <span
-                                  key={i}
-                                  className={"fsap-chip" + (f.montantHt < 0 ? " annul" : "")}
-                                  title={[f.libelle || f.type, f.date, euro(f.montantHt) + " € HT", euro(f.montantTtc) + " € TTC"].join(" · ")}
-                                >
-                                  {f.numero || dateFr(f.date)}
-                                  {c.montantHt ? " (" + pct((f.montantHt / c.montantHt) * 100) + " %)" : ""}
-                                </span>
-                              ))
+                              fact.map((f, i) => {
+                                const st = statutFacture(f);
+                                return (
+                                  <span
+                                    key={i}
+                                    className={"fsap-chip st-" + st}
+                                    title={[
+                                      "Facture " + (f.numero || ""),
+                                      LIBELLE_STATUT[st],
+                                      f.dateRegl && "réglée le " + dateFr(f.dateRegl),
+                                      f.echeance && "échéance " + dateFr(f.echeance),
+                                      st === "retard" && f.retardJours > 0 && f.retardJours + " j de retard",
+                                      euro(f.montantHt) + " € HT · " + euro(f.montantTtc) + " € TTC",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  >
+                                    {f.numero || dateFr(f.date)}
+                                    {c.montantHt ? " (" + pct((f.montantHt / c.montantHt) * 100) + " %)" : ""}
+                                  </span>
+                                );
+                              })
                             )}
                           </div>
                         </td>
@@ -299,6 +326,9 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
             <button type="button" className="btn-ghost fsap-import" onClick={() => entree.current?.click()}>
               ⤓ Importer le fichier de suivi (Excel)
             </button>
+            <span className="fsap-legende">
+              <i className="st-payee">●</i> payée <i className="st-attente">●</i> à régler <i className="st-retard">●</i> échéance dépassée
+            </span>
             {suivi.importeLe && <span className="fsap-meta">importé le {new Date(suivi.importeLe).toLocaleDateString("fr-FR")}</span>}
             {message && <span className={message.type === "ok" ? "form-success" : "form-error"}>{message.texte}</span>}
           </div>

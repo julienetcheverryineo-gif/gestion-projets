@@ -26,6 +26,12 @@ const COL_DEFAUT = {
   numeroFacture: 60,
   designation3: 57,
   creeLe: 58,
+  dateEchF: 19,
+  pieceRegl: 36,
+  dateRegl: 38,
+  echeance: 39,
+  retardJours: 40,
+  montantRegl: 61,
 };
 
 // "170.000,00" -> 170000 ; "4.339,36-" (signe à droite) -> -4339.36
@@ -71,12 +77,19 @@ function colonnesDepuisEntete(lignes) {
     montantTtc: trouve(/^mt facttc$/, COL_DEFAUT.montantTtc),
     numeroFacture: trouve(/^facture$/, COL_DEFAUT.numeroFacture),
     creeLe: trouve(/^cr.{1,4}\s*le$/, COL_DEFAUT.creeLe),
+    dateEchF: trouve(/^dte .{1,4}ch f$/, COL_DEFAUT.dateEchF),
+    pieceRegl: trouve(/^pi.{1,4}ce r.{1,4}gl$/, COL_DEFAUT.pieceRegl),
+    dateRegl: trouve(/^date r.{1,4}gl\.$/, COL_DEFAUT.dateRegl),
+    echeance: trouve(/^eche regl\.$/, COL_DEFAUT.echeance),
+    retardJours: trouve(/^jr reg ech$/, COL_DEFAUT.retardJours),
+    montantRegl: trouve(/^mtregl ttc$/, COL_DEFAUT.montantRegl),
   };
 }
 
 export function analyserSapCommandes(texte) {
   const commandes = new Map();
   const factures = [];
+  const paiements = [];
   const toutes = texte.split(/\r\n|\r|\n/);
   const COL = colonnesDepuisEntete(toutes);
   toutes.forEach((ligne) => {
@@ -107,6 +120,15 @@ export function analyserSapCommandes(texte) {
         resteHt: reste,
       });
     }
+    if ((c[COL.pieceRegl] || "").trim()) {
+      paiements.push({
+        cle,
+        dateEchF: (c[COL.dateEchF] || "").trim(),
+        dateRegl: (c[COL.dateRegl] || "").trim(),
+        montant: nombreSap(c[COL.montantRegl]),
+        utilise: false,
+      });
+    }
     const type = (c[COL.typeFacture] || "").trim();
     const factureHt = nombreSap(c[COL.montantFacture]);
     if (type && factureHt !== 0) {
@@ -118,11 +140,50 @@ export function analyserSapCommandes(texte) {
         type,
         libelle: (c[COL.libelleFacture] || "").trim(),
         numero: (c[COL.numeroFacture] || "").trim(),
+        dateEchF: (c[COL.dateEchF] || "").trim(),
+        echeance: (c[COL.echeance] || "").trim(),
+        retardJours: parseInt((c[COL.retardJours] || "0").trim(), 10) || 0,
         date: (c[COL.dateFacture] || "").trim(),
         montantHt: factureHt,
         montantTtc: nombreSap(c[COL.montantTtc]),
       });
     }
   });
+  rapprocherReglements(factures, paiements);
   return { commandes: [...commandes.values()], factures };
+}
+
+// Statut de règlement de chaque facture : annulée (avoir ZS1 de même montant),
+// payée (un règlement de même montant TTC, de préférence à la même échéance F)
+// ou à régler (échéance de règlement et jours de retard lus dans SAP).
+function rapprocherReglements(factures, paiements) {
+  const parCle = new Map();
+  factures.forEach((f) => {
+    if (!parCle.has(f.cle)) parCle.set(f.cle, []);
+    parCle.get(f.cle).push(f);
+  });
+  const tri = (d) => String(d).split(".").reverse().join("");
+  parCle.forEach((liste, cle) => {
+    liste.sort((a, b) => tri(a.date).localeCompare(tri(b.date)));
+    liste.forEach((av) => {
+      if (!(av.montantTtc < 0)) return;
+      const f = liste.find((x) => !x.annulee && x.montantTtc > 0 && Math.abs(x.montantTtc + av.montantTtc) < 0.01);
+      if (f) {
+        f.annulee = true;
+        av.annulee = true;
+      }
+    });
+    const regl = paiements.filter((p) => p.cle === cle);
+    liste.forEach((f) => {
+      if (f.annulee || !(f.montantTtc > 0)) return;
+      const choix =
+        regl.find((p) => !p.utilise && f.dateEchF && p.dateEchF === f.dateEchF && Math.abs(p.montant - f.montantTtc) < 0.01) ||
+        regl.find((p) => !p.utilise && Math.abs(p.montant - f.montantTtc) < 0.01);
+      if (choix) {
+        choix.utilise = true;
+        f.payee = true;
+        f.dateRegl = choix.dateRegl;
+      }
+    });
+  });
 }

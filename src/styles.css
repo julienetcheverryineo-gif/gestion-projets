@@ -4359,3 +4359,13 @@ textarea:focus {
 .fsap-total td { font-weight: 600; background: color-mix(in srgb, var(--accent) 6%, transparent); border-bottom: 0; }
 .fsap-sep td { padding-top: 14px; font-size: 0.74rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); }
 .fsap-libre td { background: color-mix(in srgb, var(--text-muted) 4%, transparent); }
+
+.fsap-chip.st-payee { background: color-mix(in srgb, #2e9e5b 16%, var(--panel)); border-color: #2e9e5b; color: #1f7a43; }
+.fsap-chip.st-attente { background: color-mix(in srgb, #e08a1e 16%, var(--panel)); border-color: #e08a1e; color: #a8620a; }
+.fsap-chip.st-retard { background: color-mix(in srgb, #d23b3b 16%, var(--panel)); border-color: #d23b3b; color: #b02727; font-weight: 600; }
+.fsap-chip.st-annulee { background: transparent; border-style: dashed; color: var(--text-muted); text-decoration: line-through; }
+.fsap-legende { font-size: 0.74rem; color: var(--text-muted); display: inline-flex; gap: 6px; align-items: center; }
+.fsap-legende i { font-style: normal; }
+.fsap-legende .st-payee { color: #2e9e5b; }
+.fsap-legende .st-attente { color: #e08a1e; }
+.fsap-legende .st-retard { color: #d23b3b; }
