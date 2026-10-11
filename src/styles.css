@@ -4045,8 +4045,8 @@ textarea:focus {
 .bf-detail td:first-child {
   border-left: 4px solid color-mix(in srgb, var(--bf-c) 30%, transparent);
 }
-.af-table {
-  width: 100%;
+table.af-table.table-recap {
+  width: 100% !important;
   table-layout: fixed;
 }
 .af-table th:nth-child(1),
