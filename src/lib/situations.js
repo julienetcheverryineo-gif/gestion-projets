@@ -81,9 +81,11 @@ export function construireLignesSituation(devisList, toutesLignes, chantierId, g
           return;
         }
         const membres = duDevis.filter((m) => m.groupeId === l.groupeId);
-        const somme = membres.reduce((t, m) => t + (m.id === l.id ? 0 : Number(m.pvLigne) || 0), 0);
+        const somme = membres.reduce((t, m) => t + (m.id === l.id || m.compensation ? 0 : Number(m.pvLigne) || 0), 0);
         const pvTete = Number(l.pvLigne) || 0;
-        const pv = pvTete !== 0 ? pvTete : somme;
+        // Tête gris foncé = déjà le total des gris clair → on la garde telle
+        // quelle ; sinon (tête avec son propre montant) on y ajoute les gris clair.
+        const pv = Math.abs(pvTete - somme) < 0.015 ? pvTete : arrondi2(pvTete + somme);
         if (pv === 0) {
           if (texte) rows.push({ type: "titre", id: l.id, texte });
           return;
