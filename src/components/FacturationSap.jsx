@@ -1,84 +1,119 @@
-import { Fragment, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { autoriser, choisirDossier, dossierSupporte, lireDossierMemorise } from "../lib/dossierExportSap";
-import { extraireFacturationSap, lireParamsSap } from "../lib/extractionSap";
+import { ETATS_FACTURATION, etatAutoSap, lireFichierSuivi, rattacherSuivi } from "../lib/suiviFacturation";
 
 const euro = (n) =>
   Number(n || 0)
     .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     .replace(/[  ]/g, " ");
 const pct = (v) => String(Math.round((Number(v) || 0) * 10) / 10).replace(".", ",");
+const classeEtat = (e) =>
+  "etat-" +
+  String(e || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z]+/g, "-");
+const dateCourte = (d) => String(d || "").slice(0, 5); // "12.06.2026" -> "12.06"
+const dateTri = (d) => String(d).split(".").reverse().join("");
 
-// Facturation réellement enregistrée dans SAP (transaction ZSD_ADV), comme la
-// table Facturation de GOAT : commandes clients du chantier, montant du poste,
-// reste à facturer, factures émises — comparée au cumul de nos situations.
-// Stockage dans le document chantier : sapFacturation { importeLe, commandes,
-// factures } et commentairesFacturationSap { <cle commande>: texte }.
+// Suivi de facturation d'un chantier : commandes clients lues dans SAP
+// (transaction ZSD_ADV, alimentée par l'import SAP automatique) + état de
+// facturation, n° de commande client et commentaire saisis ici, + devis du
+// fichier de suivi Excel qui n'ont pas (encore) de commande SAP.
+// Stockage dans le document chantier : sapFacturation (données SAP) et
+// suiviFacturation { importeLe, lignes: { <cle commande>: { etat, cmdClient,
+// devis, commentaire } }, libres: [...] }. commentairesFacturationSap = ancien
+// emplacement des commentaires (toujours lu).
 export default function FacturationSap({ chantierId, chantier, otp, peutGerer, factureSituations }) {
-  const [ouverts, setOuverts] = useState(new Set());
+  const entree = useRef(null);
+  const [message, setMessage] = useState(null);
   const data = chantier?.sapFacturation || null;
-  const commentaires = chantier?.commentairesFacturationSap || {};
+  const suivi = chantier?.suiviFacturation || {};
+  const anciensCommentaires = chantier?.commentairesFacturationSap || {};
   const commandes = data?.commandes || [];
   const factures = data?.factures || [];
+  const libres = suivi.libres || [];
 
-  const [etat, setEtat] = useState(null);
-  const annule = useRef(false);
-  const enCours = etat?.phase === "attente" || etat?.phase === "import";
+  const enregistrerSuivi = (patch) =>
+    updateDoc(doc(db, "sites", chantierId), { suiviFacturation: { ...suivi, ...patch } });
+  const majLigne = (cle, patch) =>
+    enregistrerSuivi({ lignes: { ...(suivi.lignes || {}), [cle]: { ...(suivi.lignes?.[cle] || {}), ...patch } } });
+  const majLibre = (i, patch) => enregistrerSuivi({ libres: libres.map((l, k) => (k === i ? { ...l, ...patch } : l)) });
 
-  const recupererSap = async () => {
-    if (!otp) return setEtat({ phase: "erreur", message: "Renseignez le champ « Compte » du chantier (code OTP)." });
-    if (!dossierSupporte()) return setEtat({ phase: "erreur", message: "Navigateur non compatible (Chrome ou Edge requis)." });
+  const importerSuivi = async (fichier) => {
+    if (!fichier) return;
+    setMessage(null);
     try {
-      let h = await lireDossierMemorise();
-      if (!h) h = await choisirDossier();
-      if (!(await autoriser(h))) return setEtat({ phase: "erreur", message: "Accès au dossier d'export refusé." });
-      annule.current = false;
-      await extraireFacturationSap({
-        handle: h,
-        chantierId,
-        otp,
-        params: lireParamsSap(),
-        onEtat: setEtat,
-        estAnnule: () => annule.current,
+      if (!otp) throw new Error("renseignez d'abord le champ « Compte » du chantier (code OTP).");
+      const lignes = lireFichierSuivi(await fichier.arrayBuffer());
+      const res = rattacherSuivi(lignes, otp, commandes);
+      if (res.nbChantier === 0) {
+        setMessage({ type: "erreur", texte: "Aucune ligne du fichier ne porte le compte " + otp + " (" + res.nbLignesFichier + " lignes lues)." });
+        return;
+      }
+      await enregistrerSuivi({ importeLe: new Date().toISOString(), lignes: res.lignes, libres: res.libres });
+      setMessage({
+        type: "ok",
+        texte:
+          res.nbChantier + " devis du compte " + otp + " : " + Object.keys(res.lignes).length + " rattaché(s) aux commandes SAP, " + res.libres.length + " ajouté(s) aux autres devis.",
       });
     } catch (e) {
-      if (e?.name !== "AbortError") setEtat({ phase: "erreur", message: e?.message || String(e) });
+      setMessage({ type: "erreur", texte: "Import impossible : " + (e?.message || e) });
+    } finally {
+      if (entree.current) entree.current.value = "";
     }
-  };
-
-  const enregistrerCommentaire = (cle, texte) => {
-    const t = texte.trim();
-    if ((commentaires[cle] || "") === t) return;
-    const maj = { ...commentaires };
-    if (t) maj[cle] = t;
-    else delete maj[cle];
-    return updateDoc(doc(db, "sites", chantierId), { commentairesFacturationSap: maj });
   };
 
   const totalMontant = commandes.reduce((s, c) => s + c.montantHt, 0);
   const totalReste = commandes.reduce((s, c) => s + c.resteHt, 0);
   const totalFacture = totalMontant - totalReste;
+  const pctFact = totalMontant ? (totalFacture / totalMontant) * 100 : 0;
   const ecart = Math.round((totalFacture - (factureSituations || 0)) * 100) / 100;
-  const basculer = (cle) =>
-    setOuverts((p) => {
-      const n = new Set(p);
-      if (n.has(cle)) n.delete(cle);
-      else n.add(cle);
-      return n;
-    });
+  const coherent = Math.abs(ecart) < 1;
+
+  const selectEtat = (valeur, auto, onChange) => {
+    const effectif = valeur || auto || "";
+    return (
+      <select
+        className={"fsap-etat " + classeEtat(effectif) + (valeur ? "" : " auto")}
+        value={valeur || ""}
+        disabled={!peutGerer}
+        title={valeur ? "État saisi" : "État déduit de SAP"}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {auto !== undefined && <option value="">{auto ? auto + " (SAP)" : "—"}</option>}
+        {auto === undefined && <option value="">—</option>}
+        {ETATS_FACTURATION.map((e) => (
+          <option key={e} value={e}>
+            {e}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  const champCommentaire = (valeur, onSave) => (
+    <input
+      key={valeur}
+      className="fsap-comm"
+      defaultValue={valeur}
+      disabled={!peutGerer}
+      placeholder="Commentaire…"
+      onBlur={(e) => e.target.value.trim() !== valeur && onSave(e.target.value.trim())}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+    />
+  );
 
   return (
-    <details className="sit-sap">
+    <details className="fsap">
       <summary>
-        <strong>Facturation SAP</strong>
-        <span className="simple-list-meta">
-          {" "}
-          · transaction ZSD_ADV{data?.importeLe ? " · importée le " + new Date(data.importeLe).toLocaleDateString("fr-FR") : ""}
-        </span>
+        <strong>Suivi de facturation</strong>
+        <span className="fsap-src">SAP ZSD_ADV{data?.importeLe ? " · " + new Date(data.importeLe).toLocaleDateString("fr-FR") : ""}</span>
         {commandes.length > 0 && (
-          <span className={"sit-sap-flag " + (Math.abs(ecart) < 1 ? "ok" : "ecart")}>
-            {Math.abs(ecart) < 1
+          <span className={"sit-sap-flag " + (coherent ? "ok" : "ecart")}>
+            {coherent
               ? "👍 Cohérent avec les situations"
               : ecart > 0
                 ? "⚠ SAP a facturé " + euro(ecart) + " € de plus que les situations"
@@ -86,123 +121,149 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
           </span>
         )}
       </summary>
-      <div className="sit-sap-corps">
-        {peutGerer && (
-          <div className="sit-sap-import">
-            <button type="button" className="btn btn-primary" disabled={enCours} onClick={recupererSap}>
-              ↻ Récupérer depuis SAP
-            </button>
-            {enCours && (
-              <button type="button" className="btn" onClick={() => { annule.current = true; setEtat(null); }}>
-                Annuler
-              </button>
-            )}
-            <span className="simple-list-meta">
-              {etat ? etat.message : "Extraction automatique de la transaction ZSD_ADV pour ce chantier."}
-            </span>
-          </div>
-        )}
-        {etat && (etat.phase === "erreur" || etat.phase === "ok") && (
-          <div className={etat.phase === "ok" ? "form-success" : "form-error"}>{etat.message}</div>
-        )}
-        {commandes.length === 0 ? (
-          <p className="simple-list-meta">Aucune donnée SAP importée pour ce chantier.</p>
+
+      <div className="fsap-corps">
+        {commandes.length === 0 && libres.length === 0 ? (
+          <p className="simple-list-meta">
+            Aucune donnée SAP pour ce chantier : elle arrive avec l'import SAP automatique (renseignez le compte du chantier).
+          </p>
         ) : (
           <>
-            <div className={"sit-sap-synthese" + (Math.abs(ecart) < 1 ? " ok" : " ecart")}>
-              <span>
-                Marché SAP : <b>{euro(totalMontant)} € HT</b> · facturé : <b>{euro(totalFacture)} €</b> · reste à facturer : <b>{euro(totalReste)} €</b> ({pct(totalMontant ? (totalReste / totalMontant) * 100 : 0)} %)
-              </span>
-              <span>
-                Situations saisies : <b>{euro(factureSituations)} €</b> ·{" "}
-                {Math.abs(ecart) < 1 ? (
-                  <b>👍 cohérent avec SAP</b>
-                ) : ecart > 0 ? (
-                  <b>⚠ SAP a facturé {euro(ecart)} € de plus que les situations</b>
-                ) : (
-                  <b>⚠ les situations dépassent SAP de {euro(-ecart)} € (pas encore facturé dans SAP)</b>
-                )}
-              </span>
-            </div>
-            <div className="data-table-wrapper">
-              <table className="data-table detail-sap-table sit-sap-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 110 }}>Doc. vente</th>
-                    <th>Désignation</th>
-                    <th style={{ width: 120 }}>Montant HT</th>
-                    <th style={{ width: 120 }}>Facturé</th>
-                    <th style={{ width: 120 }}>Reste à facturer</th>
-                    <th style={{ width: 70 }}>% facturé</th>
-                    <th style={{ width: 220 }}>Commentaire</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {commandes.map((c) => {
-                    const fact = factures.filter((f) => f.cle === c.cle).sort((a, b) => String(a.date).split(".").reverse().join("").localeCompare(String(b.date).split(".").reverse().join("")));
-                    const ouvert = ouverts.has(c.cle);
-                    const facture = c.montantHt - c.resteHt;
-                    return (
-                      <Fragment key={c.cle}>
-                        <tr>
-                          <td data-label="Doc. vente">
-                            <button type="button" className="btn-ghost recap-sap-toggle" onClick={() => basculer(c.cle)} disabled={fact.length === 0}>
-                              {fact.length ? (ouvert ? "▾ " : "▸ ") : ""}
-                              {c.docVente}
-                            </button>
-                          </td>
-                          <td data-label="Désignation">
-                            {c.designation}
-                            <div className="simple-list-meta">
-                              {[c.nomDo, c.reference].filter(Boolean).join(" · ")}
-                            </div>
-                          </td>
-                          <td data-label="Montant HT" className="col-num">{euro(c.montantHt)}</td>
-                          <td data-label="Facturé" className="col-num">{euro(facture)}</td>
-                          <td data-label="Reste à facturer" className="col-num"><b>{euro(c.resteHt)}</b></td>
-                          <td data-label="% facturé" className="col-num">{c.montantHt ? pct((facture / c.montantHt) * 100) + " %" : "—"}</td>
-                          <td data-label="Commentaire">
-                            <input
-                              key={c.cle + (commentaires[c.cle] || "")}
-                              className="sit-sap-commentaire"
-                              defaultValue={commentaires[c.cle] || ""}
-                              disabled={!peutGerer}
-                              placeholder="…"
-                              onBlur={(e) => enregistrerCommentaire(c.cle, e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                            />
-                          </td>
-                        </tr>
-                        {ouvert &&
+            {commandes.length > 0 && (
+              <div className="fsap-kpis">
+                <div>
+                  <span>Marché SAP</span>
+                  <b>{euro(totalMontant)} €</b>
+                </div>
+                <div>
+                  <span>Facturé</span>
+                  <b>{euro(totalFacture)} €</b>
+                </div>
+                <div>
+                  <span>Reste à facturer</span>
+                  <b>{euro(totalReste)} €</b>
+                </div>
+                <div className="fsap-kpi-barre">
+                  <span>{pct(pctFact)} % facturé</span>
+                  <div className="sit-barre">
+                    <i style={{ width: Math.min(100, pctFact) + "%" }} />
+                  </div>
+                </div>
+                <div>
+                  <span>Situations saisies</span>
+                  <b>{euro(factureSituations)} €</b>
+                </div>
+              </div>
+            )}
+
+            {commandes.length > 0 && (
+              <div className="fsap-liste">
+                <div className="fsap-ligne fsap-tete">
+                  <span>État</span>
+                  <span>Commande</span>
+                  <span>Facturation</span>
+                  <span>Factures</span>
+                  <span>Commentaire</span>
+                </div>
+                {commandes.map((c) => {
+                  const fact = factures.filter((f) => f.cle === c.cle).sort((a, b) => dateTri(a.date).localeCompare(dateTri(b.date)));
+                  const facture = c.montantHt - c.resteHt;
+                  const p = c.montantHt ? (facture / c.montantHt) * 100 : 0;
+                  const l = suivi.lignes?.[c.cle] || {};
+                  const auto = etatAutoSap(c);
+                  const incoherent = l.etat === "Soldé" && c.resteHt > 0.5;
+                  return (
+                    <div className="fsap-ligne" key={c.cle}>
+                      <div className="fsap-cel-etat">
+                        {selectEtat(l.etat, auto, (v) => majLigne(c.cle, { etat: v }))}
+                        {incoherent && <i className="fsap-alerte" title={"SAP indique encore " + euro(c.resteHt) + " € à facturer"}>⚠</i>}
+                      </div>
+                      <div className="fsap-cel-cmd">
+                        <div className="fsap-titre">{c.designation}</div>
+                        <div className="fsap-meta">
+                          {[c.docVente, c.nomDo, c.reference, l.devis].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                      <div className="fsap-cel-fact">
+                        <div className="fsap-montants">
+                          <b>{euro(facture)}</b> / {euro(c.montantHt)} €
+                        </div>
+                        <div className="sit-barre">
+                          <i style={{ width: Math.min(100, Math.max(0, p)) + "%" }} />
+                        </div>
+                        <div className="fsap-meta">
+                          {pct(p)} % · reste {euro(c.resteHt)} €
+                        </div>
+                      </div>
+                      <div className="fsap-cel-factures">
+                        {fact.length === 0 ? (
+                          <span className="fsap-meta">—</span>
+                        ) : (
                           fact.map((f, i) => (
-                            <tr key={c.cle + i} className="recap-groupe-ligne">
-                              <td></td>
-                              <td>
-                                {f.libelle || f.type} · {f.date}
-                              </td>
-                              <td></td>
-                              <td className="col-num">{euro(f.montantHt)}</td>
-                              <td className="col-num simple-list-meta">TTC {euro(f.montantTtc)}</td>
-                              <td></td>
-                              <td></td>
-                            </tr>
-                          ))}
-                      </Fragment>
-                    );
-                  })}
-                  <tr className="table-recap-total">
-                    <td></td>
-                    <td>TOTAL</td>
-                    <td className="col-num">{euro(totalMontant)}</td>
-                    <td className="col-num">{euro(totalFacture)}</td>
-                    <td className="col-num">{euro(totalReste)}</td>
-                    <td className="col-num">{totalMontant ? pct((totalFacture / totalMontant) * 100) + " %" : "—"}</td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                            <span key={i} className={"fsap-chip" + (f.montantHt < 0 ? " annul" : "")} title={f.libelle || f.type}>
+                              {dateCourte(f.date)} · {euro(f.montantHt)} €
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      <div className="fsap-cel-comm">
+                        {champCommentaire(l.commentaire ?? anciensCommentaires[c.cle] ?? "", (t) => majLigne(c.cle, { commentaire: t }))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {libres.length > 0 && (
+              <>
+                <div className="fsap-sous-titre">Autres devis du fichier de suivi (sans commande SAP rattachée)</div>
+                <div className="fsap-liste">
+                  <div className="fsap-ligne fsap-tete">
+                    <span>État</span>
+                    <span>Devis</span>
+                    <span>Montants</span>
+                    <span>Factures</span>
+                    <span>Commentaire</span>
+                  </div>
+                  {libres.map((l, i) => (
+                    <div className="fsap-ligne" key={l.devis + i}>
+                      <div className="fsap-cel-etat">{selectEtat(l.etat, undefined, (v) => majLibre(i, { etat: v }))}</div>
+                      <div className="fsap-cel-cmd">
+                        <div className="fsap-titre">{l.designation || l.devis}</div>
+                        <div className="fsap-meta">
+                          {[l.devis, l.date && new Date(l.date).toLocaleDateString("fr-FR"), l.etatChantier, l.commande && "cde " + l.commande].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                      <div className="fsap-cel-fact">
+                        <div className="fsap-montants">
+                          Devis <b>{euro(l.montantDevis)}</b> €
+                        </div>
+                        {l.montantCommande > 0 && <div className="fsap-meta">Commande {euro(l.montantCommande)} €</div>}
+                      </div>
+                      <div className="fsap-cel-factures">
+                        {l.factures ? l.factures.split("\n").map((f, k) => (
+                          <span key={k} className="fsap-chip">{f}</span>
+                        )) : <span className="fsap-meta">—</span>}
+                      </div>
+                      <div className="fsap-cel-comm">{champCommentaire(l.commentaire || "", (t) => majLibre(i, { commentaire: t }))}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </>
+        )}
+
+        {peutGerer && (
+          <div className="fsap-pied">
+            <input ref={entree} type="file" accept=".xlsx,.xlsm,.xls" hidden onChange={(e) => importerSuivi(e.target.files?.[0])} />
+            <button type="button" className="btn-ghost fsap-import" onClick={() => entree.current?.click()}>
+              ⤓ Importer le fichier de suivi (Excel)
+            </button>
+            {suivi.importeLe && <span className="fsap-meta">importé le {new Date(suivi.importeLe).toLocaleDateString("fr-FR")}</span>}
+            {message && <span className={message.type === "ok" ? "form-success" : "form-error"}>{message.texte}</span>}
+          </div>
         )}
       </div>
     </details>

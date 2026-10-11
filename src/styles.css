@@ -4299,3 +4299,45 @@ textarea:focus {
 
 .sit-chip-ajout { border: 1px solid var(--accent); border-style: solid; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); font-weight: 600; }
 .sit-chip-ajout:hover { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
+
+/* Suivi de facturation (zone SAP + fichier de suivi) */
+.fsap { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; background: var(--panel); }
+.fsap > summary { cursor: pointer; list-style: none; padding: 10px 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.fsap > summary::-webkit-details-marker { display: none; }
+.fsap > summary::before { content: "▸"; color: var(--text-muted); font-size: 0.8rem; }
+.fsap[open] > summary::before { content: "▾"; }
+.fsap-src { color: var(--text-muted); font-size: 0.78rem; }
+.fsap-corps { padding: 2px 14px 12px; }
+.fsap-kpis { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 8px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px; align-items: flex-end; }
+.fsap-kpis > div { display: flex; flex-direction: column; gap: 2px; }
+.fsap-kpis span { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.fsap-kpis b { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.fsap-kpi-barre { min-width: 140px; }
+.fsap-liste { display: flex; flex-direction: column; }
+.fsap-ligne { display: grid; grid-template-columns: 150px minmax(180px, 1.6fr) minmax(150px, 1fr) minmax(140px, 1.2fr) minmax(150px, 1fr); gap: 4px 14px; align-items: center; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.fsap-ligne:last-child { border-bottom: 0; }
+.fsap-tete { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); padding: 8px 0 4px; }
+.fsap-titre { font-size: 0.88rem; line-height: 1.25; }
+.fsap-meta { font-size: 0.74rem; color: var(--text-muted); }
+.fsap-montants { font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.fsap-cel-fact .sit-barre { margin: 3px 0; height: 4px; }
+.fsap-cel-etat { display: flex; align-items: center; gap: 4px; }
+.fsap-etat { width: 100%; font-size: 0.76rem; font-weight: 600; padding: 3px 6px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+.fsap-etat.auto { font-weight: 500; font-style: italic; color: var(--text-muted); }
+.fsap-etat.etat-solde { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+.fsap-etat.etat-a-facturer, .fsap-etat.etat-pv-signe { border-color: var(--warn); color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); }
+.fsap-etat.etat-facturation-partielle { border-color: color-mix(in srgb, var(--accent) 60%, var(--warn)); }
+.fsap-etat.etat-archive { opacity: 0.65; }
+.fsap-alerte { color: var(--warn); font-style: normal; cursor: help; }
+.fsap-cel-factures { display: flex; flex-wrap: wrap; gap: 4px; }
+.fsap-chip { font-size: 0.72rem; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fsap-chip.annul { background: color-mix(in srgb, var(--warn) 10%, transparent); border-color: var(--warn); }
+.fsap-comm { width: 100%; border: 0; border-bottom: 1px solid transparent; background: transparent; font-size: 0.8rem; padding: 3px 2px; color: var(--text); }
+.fsap-comm:hover, .fsap-comm:focus { border-bottom-color: var(--border); outline: 0; }
+.fsap-sous-titre { margin: 14px 0 2px; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+.fsap-pied { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.fsap-import { font-size: 0.8rem; padding: 4px 10px; }
+@media (max-width: 900px) {
+  .fsap-ligne { grid-template-columns: 1fr; }
+  .fsap-tete { display: none; }
+}
