@@ -4261,3 +4261,15 @@ textarea:focus {
 .switch-filtre input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
 .detail-sap-mo th.col-chk { width: 36px; }
 .detail-sap-mo th:not(.col-chk):not(:last-child) { width: 20%; }
+.sap-repar-btn { font-size: 0.72rem; padding: 1px 8px; }
+.sap-repar-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; white-space: normal; font-weight: 400; font-size: 0.85rem; }
+.sap-repar-edit select { max-width: 360px; }
+
+/* Onglets du chantier : tous de la largeur du plus large (Bilan Main d'œuvre) */
+.chantier-actions-bar-recap > button {
+  flex: 0 0 192px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}

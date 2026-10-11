@@ -295,6 +295,8 @@ function TableauRecap({
   const [triMo, setTriMo] = useState(TRI_FILTRE_VIDE);
   const [selHeures, setSelHeures] = useState(new Set());
   const [cibleLot, setCibleLot] = useState("");
+  // Éditeur de répartition MO / FO d'une commande (sous-traitance).
+  const [edRepar, setEdRepar] = useState(null);
   // Lignes SAP dépliées (clé d'un Type de FO, ou "__hors" / "__mo").
   const [ouverts, setOuverts] = useState(new Set());
   const basculer = (cle) =>
@@ -402,6 +404,16 @@ function TableauRecap({
                 const fournisseurs = [...new Set(g.lignes.map((a) => a.nomFournisseur).filter(Boolean))];
                 const cles = g.lignes.map(cleLigneAchat);
                 const valeurs = new Set(cles.map(valeurAffectationAchat));
+                const reparCmd = sap?.repartitions?.[cles[0]];
+                const pctMoCmd = reparCmd && reparCmd.tache ? Number(reparCmd.pctMo) || 0 : 0;
+                const totalBrut = g.lignes.reduce((t, a) => t + (Number(a.valNetteBrute ?? a.valNette) || 0), 0);
+                const optionsTachesMo = (sap?.optionsMo || []).flatMap((og) =>
+                  og.taches.map((t) => (
+                    <option key={og.devisId + t.cle} value={og.devisId + SEP_AFFECTATION + t.cle}>
+                      {og.nom} — {t.libelle}
+                    </option>
+                  ))
+                );
                 return (
                   <Fragment key={g.num}>
                     <tr className="recap-groupe-ligne">
@@ -411,7 +423,24 @@ function TableauRecap({
                         </button>{" "}
                         <span className="simple-list-meta">
                           {fournisseurs.join(", ")} · {g.lignes.length} ligne{g.lignes.length > 1 ? "s" : ""}
-                        </span>
+                          {pctMoCmd > 0 ? " · " + formatNombre(pctMoCmd) + " % MO" : ""}
+                        </span>{" "}
+                        {sap?.onRepartir && (
+                          <button
+                            type="button"
+                            className="btn-ghost sap-repar-btn"
+                            title="Répartir cette commande entre main d'œuvre et fourniture (sous-traitance)"
+                            onClick={() =>
+                              setEdRepar(
+                                edRepar?.cle === cleG
+                                  ? null
+                                  : { cle: cleG, pct: pctMoCmd ? String(pctMoCmd) : "", tache: reparCmd?.tache || "" }
+                              )
+                            }
+                          >
+                            ⚖ MO / FO
+                          </button>
+                        )}
                       </td>
                       <td data-label="Val. nette €">
                         <strong>{formatValeurSap(g.total, true, true)}</strong>
@@ -429,6 +458,57 @@ function TableauRecap({
                         </select>
                       </td>
                     </tr>
+                    {edRepar?.cle === cleG && (
+                      <tr className="recap-groupe-ligne">
+                        <td colSpan={COLONNES_SAP_FO.length + 1}>
+                          <div className="sap-repar-edit">
+                            <span>
+                              Commande de {formatValeurSap(totalBrut, true, true)} € — part main d'œuvre :
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="any"
+                              value={edRepar.pct}
+                              onChange={(e) => setEdRepar({ ...edRepar, pct: e.target.value })}
+                              style={{ width: 70 }}
+                            />
+                            <span>% (le reste, {formatNombre(100 - (Number(edRepar.pct) || 0))} %, reste en fourniture) → tâche MO :</span>
+                            <select value={edRepar.tache} onChange={(e) => setEdRepar({ ...edRepar, tache: e.target.value })}>
+                              <option value="">Choisir une tâche…</option>
+                              {optionsTachesMo}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              disabled={!edRepar.tache || !(Number(edRepar.pct) > 0)}
+                              onClick={async () => {
+                                await sap.onRepartir(cles, {
+                                  pctMo: Math.min(100, Math.max(0, Number(edRepar.pct) || 0)),
+                                  tache: edRepar.tache,
+                                });
+                                setEdRepar(null);
+                              }}
+                            >
+                              Appliquer
+                            </button>
+                            {pctMoCmd > 0 && (
+                              <button
+                                type="button"
+                                className="btn-ghost"
+                                onClick={async () => {
+                                  await sap.onRepartir(cles, null);
+                                  setEdRepar(null);
+                                }}
+                              >
+                                100 % fourniture
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     {ouvert &&
                       g.lignes.map((a, i) => {
                         const cleA = cleLigneAchat(a);
@@ -618,7 +698,7 @@ function TableauRecap({
                             </td>
                           ))}
                           <td data-label="Affecter à">
-                            <select className="sap-aff" value={valeur} disabled={!sap?.onAffecter} onChange={(e) => sap.onAffecter(cleH, e.target.value)}>
+                            <select className="sap-aff" value={valeur} disabled={!sap?.onAffecter || h.sousTraitance} title={h.sousTraitance ? "Part MO d'une commande sous-traitée : à modifier depuis le Bilan Fournitures" : undefined} onChange={(e) => sap.onAffecter(cleH, e.target.value)}>
                               <option value="">Non affectée</option>
                               {ancienne && <option value={manuel}>{formatTypeFo(manuel)} (devis non précisé)</option>}
                               {(sap?.options || []).map((g) =>
@@ -1960,7 +2040,7 @@ export default function ElectriciteSiteDetail() {
   // lib/parseSapExports.js) et lignes SAP importées qui s'y rattachent —
   // vide tant que rien n'a été importé pour ce chantier.
   const otpSap = useMemo(() => otpDepuisCompte(chantier?.compte), [chantier]);
-  const achatsSap = useMemo(
+  const achatsSapBrut = useMemo(
     () =>
       otpSap
         ? sapLignesFo
@@ -1979,7 +2059,7 @@ export default function ElectriciteSiteDetail() {
   const { taux: tauxHoraire } = useTauxHoraires();
   const paramsFoa = useParametresFoa();
   const montantZone = useMontantsZone();
-  const heuresSap = useMemo(
+  const heuresSapBrut = useMemo(
     () =>
       otpSap
         ? sapLignesMo.filter((l) => memeOtp(l.otp, otpSap) && !estLigneMoIgnoree(l)).sort((a, b) => tsDateSap(b.date) - tsDateSap(a.date))
@@ -2357,6 +2437,50 @@ export default function ElectriciteSiteDetail() {
 
   // Idem pour les heures pointées : ligne de pointage -> Tâche du Récap MO.
   const affectationsHeures = chantier?.affectationsSapHeures || {};
+
+  // Sous-traitance : une commande peut être répartie entre MO et FO
+  // (chantier.sousTraitance = { <cleLigneAchat>: { pctMo, tache } }). La part FO
+  // reste dans les achats ; la part MO devient des heures équivalentes
+  // (montant ÷ taux horaire de la tâche) rattachées à la tâche MO choisie.
+  const sousTraitance = chantier?.sousTraitance || {};
+  const tauxDefautSt = totalTauxDefaut(chantier, tauxHoraire);
+  const tauxTacheSt = (tacheValeur) => {
+    const { cle } = lireAffectationHeure(tacheValeur);
+    const profil = cle ? profilsMoChantier[estCleSup(cle) ? cle : codeTypeFo(cle)] : "";
+    return (profil ? tauxHoraire(profil) : null) ?? tauxDefautSt ?? 49;
+  };
+  const heuresSousTraitance = [];
+  const affectationsHeuresSt = {};
+  const achatsSap = achatsSapBrut.map((a) => {
+    const cleA = cleLigneAchat(a);
+    const r = sousTraitance[cleA];
+    const p = r && r.tache ? Math.min(100, Math.max(0, Number(r.pctMo) || 0)) / 100 : 0;
+    if (!p) return a;
+    const brut = Number(a.valNette) || 0;
+    const h = {
+      id: "st_" + cleA,
+      nomPrenom: "Sous-traitance · " + (a.nomFournisseur || "") + " (" + (a.docAchat || "") + ")",
+      date: a.dateDoc,
+      tache: "",
+      typAct: "I205",
+      heures: (brut * p) / (tauxTacheSt(r.tache) || 49),
+      imputation: a.docAchat,
+      sousTraitance: true,
+    };
+    heuresSousTraitance.push(h);
+    affectationsHeuresSt[cleLigneHeure(h)] = r.tache;
+    return { ...a, valNette: brut * (1 - p), valNetteBrute: brut, pctMoSt: p * 100 };
+  });
+  const heuresSap = heuresSousTraitance.length ? [...heuresSapBrut, ...heuresSousTraitance] : heuresSapBrut;
+  const affectationsHeuresEff = { ...affectationsHeures, ...affectationsHeuresSt };
+  const repartirSousTraitance = async (cles, valeur) => {
+    const maj = { ...sousTraitance };
+    cles.forEach((c) => {
+      if (valeur) maj[c] = valeur;
+      else delete maj[c];
+    });
+    await updateDoc(doc(db, "sites", chantierId), { sousTraitance: maj });
+  };
   const affecterHeureSap = async (cleLigne, valeur) => {
     const maj = { ...affectationsHeures };
     if (valeur) maj[cleLigne] = valeur;
@@ -2413,13 +2537,16 @@ export default function ElectriciteSiteDetail() {
           affectations: affectationsSap,
           onAffecter: peutGerer ? affecterLigneSap : null,
           onAffecterLot: peutGerer ? affecterLignesSapLot : null,
+          onRepartir: peutGerer ? repartirSousTraitance : null,
+          repartitions: sousTraitance,
+          optionsMo: optionsAffectationHeures(d.id),
           options: optionsAffectationAchats(d.id),
           autoriseHorsBudget: false,
         }
       : recapActif === "mo" && heuresSap.length > 0
       ? {
           type: "mo",
-          heures: rapprocherHeures(recap.parType, heuresSap, affectationsHeures, d.id),
+          heures: rapprocherHeures(recap.parType, heuresSap, affectationsHeuresEff, d.id),
           affectations: affectationsHeures,
           onAffecter: peutGerer ? affecterHeureSap : null,
           onAffecterLot: peutGerer ? affecterHeuresSapLot : null,
@@ -2438,13 +2565,16 @@ export default function ElectriciteSiteDetail() {
         affectations: affectationsSap,
         onAffecter: peutGerer ? affecterLigneSap : null,
         onAffecterLot: peutGerer ? affecterLignesSapLot : null,
+        onRepartir: peutGerer ? repartirSousTraitance : null,
+        repartitions: sousTraitance,
+        optionsMo: optionsAffectationHeures(),
         options: optionsAffectationAchats(),
       };
     }
     if (recapActif === "mo" && heuresSap.length > 0) {
       return {
         type: "mo",
-        heures: rapprocherHeures(recapSynthese.parType, heuresSap, affectationsHeures),
+        heures: rapprocherHeures(recapSynthese.parType, heuresSap, affectationsHeuresEff),
         affectations: affectationsHeures,
         onAffecter: peutGerer ? affecterHeureSap : null,
           onAffecterLot: peutGerer ? affecterHeuresSapLot : null,
@@ -2853,8 +2983,8 @@ export default function ElectriciteSiteDetail() {
           {recapActif === "sap" && (
             <PanneauSap
               otp={otpSap}
-              achats={achatsSap}
-              heures={heuresSap}
+              achats={achatsSapBrut}
+              heures={heuresSapBrut}
               onEnvoyerTaches={peutGerer ? () => setAfficherEnvoiSap(true) : null}
             />
           )}
