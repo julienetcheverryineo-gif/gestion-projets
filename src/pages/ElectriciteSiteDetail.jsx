@@ -178,6 +178,15 @@ function comparerOrdreType(ordreTypes, a, b) {
 // (Le suivi Excel regroupe aussi les heures de main d'œuvre par Type de
 // FO, pas par Type de MO — repris ici à l'identique.)
 // Taux de chiffrage par défaut d'une affaire (saisi, sinon taux I205).
+function IconeFacture() {
+  return (
+    <svg width="1.15em" height="1.15em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: "-0.2em" }}>
+      <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z" />
+      <path d="M14.5 8.5a3 3 0 1 0 0 5M8.5 10.5h5M8.5 12.5h5" />
+    </svg>
+  );
+}
+
 function totalTauxDefaut(chantier, tauxHoraire) {
   return chantier?.tauxChiffrageMo ?? tauxHoraire("I205") ?? 0;
 }
@@ -2499,7 +2508,7 @@ export default function ElectriciteSiteDetail() {
               onClick={() => setRecapActif("situations")}
               title="Situations de travaux : avancement cumulé par ligne de la minute et export Excel pour la facturation"
             >
-              🧾 Facturation
+              <IconeFacture /> Facturation
             </button>
             <button
               className={recapActif === "fo" ? "btn-primary" : "btn-ghost"}
@@ -2538,22 +2547,22 @@ export default function ElectriciteSiteDetail() {
 
           {!recapActif && (
           <div className="chantier-actions-bar">
-            {devis.map((d) => (
-              <button
-                key={d.id}
-                className={
-                  !recapActif && devisOuvert?.id === d.id ? "btn-primary" : "btn-accent"
-                }
-                onClick={() => {
-                  setRecapActif(null);
-                  setDevisOuvertId(d.id);
-                  setModeSelection(false);
-                  setLignesSelectionnees(new Set());
-                }}
-              >
-                {d.nom}
-              </button>
-            ))}
+            <select
+              className="sit-select"
+              value={devisOuvert?.id || ""}
+              onChange={(e) => {
+                setRecapActif(null);
+                setDevisOuvertId(e.target.value);
+                setModeSelection(false);
+                setLignesSelectionnees(new Set());
+              }}
+            >
+              {devis.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nom}
+                </option>
+              ))}
+            </select>
           </div>
           )}
         </div>
