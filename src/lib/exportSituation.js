@@ -146,6 +146,12 @@ export async function genererFichierSituation({ chantier, rows, situations, inde
   sh.getCell("A7").font = fontBase({ size: 11 });
   sh.getCell(2, derniere).value = chantier?.client || "";
   sh.getCell(2, derniere).font = fontBase({ size: 14, bold: true });
+  const lignesAdresse = String(chantier?.adresse || "").split(/\r?\n/).map((t) => t.trim()).filter(Boolean).slice(0, 3);
+  lignesAdresse.forEach((t, k) => {
+    const c = sh.getCell(3 + k, derniere);
+    c.value = t;
+    c.font = fontBase({ size: 11 });
+  });
   sh.mergeCells(9, 1, 9, finCol);
   const titre = sh.getCell(9, 1);
   titre.value = chantier?.nom || "";
