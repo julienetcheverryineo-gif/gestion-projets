@@ -51,6 +51,8 @@ export default function BilanFinancier({
   onChangerCa,
   margeCibleEat,
   onChangerMargeCibleEat,
+  reelsEat,
+  onChangerReelsEat,
   foa: foaDefaut,
   pctSaisis,
   onChangerPct,
@@ -70,6 +72,7 @@ export default function BilanFinancier({
   const [saisieCa, setSaisieCa] = useState({});
   const [saisiePct, setSaisiePct] = useState({});
   // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
+  const [saisieReel, setSaisieReel] = useState({});
   const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
   const kAffiche =
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
@@ -162,15 +165,63 @@ export default function BilanFinancier({
 
   // ── EAT « pilotée » : on garde le réel et on réduit le reste à faire d'un
   // même facteur f (0 = plus rien de dépensé, 1 = reste à faire intégral).
-  const foLignes = detailFo || [];
+  // Réel comptable SAP (écran RàE : Cpta Cum + engagé) saisi à la main : il
+  // remplace le réel calculé (pointages / achats importés) dans les tableaux EAT.
+  const ov = reelsEat || {};
+  const aOv = (cle) => typeof ov[cle] === "number";
+  const detailMoE = detailMo.map((t) => {
+    const cle = "h:" + t.code;
+    const h = aOv(cle) ? ov[cle] : t.reelH;
+    const tx = taux(t.code) ?? 0;
+    const reelEuro = aOv(cle) ? h * tx : t.reel;
+    return { ...t, cle, ov: aOv(cle), reelHOrig: t.reelH, reelH: h, atterrH: h + t.prevuH * (1 - pctMo), atterr: reelEuro + t.prevu * (1 - pctMo), reelEuro };
+  });
+  const reelMoE = detailMoE.reduce((x, t) => x + t.reelEuro, 0);
+  const heuresMiReellesE =
+    heuresMiReelles +
+    detailMoE.filter((t) => t.ov && inclutMaterielInterne(t.code)).reduce((x, t) => x + (t.reelH - t.reelHOrig), 0);
+  const heuresMiAtterrE = heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo);
+  const foLignes = (detailFo || []).map((t) => {
+    const cle = "fo:" + t.libelle;
+    return { ...t, cle, ov: aOv(cle), reelOrig: t.reel, reel: aOv(cle) ? ov[cle] : t.reel };
+  });
+  const nbOv = Object.keys(ov).filter((k) => typeof ov[k] === "number").length;
+  const validerReel = (cle, orig) => {
+    if (saisieReel[cle] === undefined) return;
+    const t = String(saisieReel[cle]).replace(",", ".").replace(/\s/g, "").trim();
+    const n = t === "" ? null : Number(t);
+    setSaisieReel((p) => {
+      const { [cle]: _omis, ...reste } = p;
+      return reste;
+    });
+    if (n !== null && !(Number.isFinite(n) && n >= 0)) return;
+    const suite = { ...ov };
+    if (n === null || Math.abs(n - orig) < 0.005) delete suite[cle];
+    else suite[cle] = n;
+    onChangerReelsEat?.(suite);
+  };
+  const champReel = (cle, valeur, orig, unite) => (
+    <input
+      type="text"
+      inputMode="decimal"
+      disabled={!onChangerReelsEat}
+      title={"Réel comptable SAP (Cpta Cum + engagé) — modifiable. Valeur calculée par l'outil : " + (unite === "h" ? num(orig) + " h" : eur(orig))}
+      value={saisieReel[cle] !== undefined ? saisieReel[cle] : String(Math.round(valeur * 100) / 100).replace(".", ",") + (unite === "h" ? " h" : " €")}
+      onFocus={() => setSaisieReel((p) => ({ ...p, [cle]: String(Math.round(valeur * 100) / 100).replace(".", ",") }))}
+      onChange={(e) => setSaisieReel((p) => ({ ...p, [cle]: e.target.value }))}
+      onBlur={() => validerReel(cle, orig)}
+      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      style={{ width: "7.5em", padding: 0, margin: 0, height: "auto", border: "none", borderBottom: "1px dotted currentColor", borderRadius: 0, background: "transparent", boxShadow: "none", font: "inherit", textAlign: "right", color: aOv(cle) ? "var(--accent, inherit)" : "inherit" }}
+    />
+  );
   const reelFoLignes = foLignes.reduce((x, t) => x + t.reel, 0);
   const resteFoLignes = foLignes.reduce((x, t) => x + t.prevu * (1 - t.av), 0);
   const eatPourFacteur = (f) => {
     const col = colonne(
-      reelMo + budgetMo * (1 - pctMo) * f,
+      reelMoE + budgetMo * (1 - pctMo) * f,
       reelFoLignes + resteFoLignes * f,
       zoneReel + zonePrevu * (1 - pctMo) * f,
-      heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * f
+      heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * f
     );
     return col;
   };
@@ -355,8 +406,18 @@ export default function BilanFinancier({
       <div className="bf-eat" style={{ marginTop: 18 }}>
         <h3 style={{ margin: "0 0 4px" }}>🎯 Aide à la déclaration EAT (estimation à terme)</h3>
         <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
-          EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
+          EAT réaliste = réel + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
           prorata, aléas, négociation et matériel interne sont recalculés par la FOA à partir de ces saisies.
+          Le « Réel à date » est calculé à partir des pointages / achats importés ; s'il diffère de SAP (écran RàE :
+          Cpta Cum + engagé), cliquez dessus pour saisir la valeur SAP (en bleu = saisie manuelle).
+          {nbOv > 0 && onChangerReelsEat && (
+            <>
+              {" "}
+              <button type="button" className="btn-ghost" onClick={() => onChangerReelsEat({})}>
+                Revenir au réel calculé ({nbOv})
+              </button>
+            </>
+          )}
         </p>
         <div className="data-table-wrapper">
           <table className="data-table bf-table">
@@ -372,24 +433,24 @@ export default function BilanFinancier({
             </thead>
             <tbody>
               <tr className="bf-section bf-mo"><td colSpan={6}>Main d'œuvre par type (heures)</td></tr>
-              {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => (
+              {detailMoE.filter((t) => t.prevuH || t.reelH).map((t) => (
                 <tr key={t.code} className="bf-detail bf-mo">
                   <td style={{ paddingLeft: 24 }}>{t.nom}</td>
                   <td>{num(t.prevuH)} h</td>
-                  <td>{num(t.reelH)} h</td>
+                  <td>{champReel(t.cle, t.reelH, t.reelHOrig, "h")}</td>
                   <td style={{ fontWeight: 700 }}>{num(t.atterrH)} h <span className="simple-list-meta">({eur(t.atterr)})</span></td>
                   <td>{num(t.atterrH - t.reelH)} h</td>
                   <td style={classeNeg(t.prevuH - t.atterrH)}>{(t.atterrH - t.prevuH > 0 ? "+" : "") + num(t.atterrH - t.prevuH)} h</td>
                 </tr>
               ))}
               <tr className="bf-section bf-ach"><td colSpan={6}>Fournitures / sous-traitance par type (€)</td></tr>
-              {(detailFo || []).map((t) => {
+              {foLignes.map((t) => {
                 const e = t.reel + t.prevu * (1 - t.av);
                 return (
                   <tr key={t.libelle} className="bf-detail bf-ach">
                     <td style={{ paddingLeft: 24 }}>{t.libelle}</td>
                     <td>{eur(t.prevu)}</td>
-                    <td>{eur(t.reel)}</td>
+                    <td>{champReel(t.cle, t.reel, t.reelOrig, "€")}</td>
                     <td style={{ fontWeight: 700 }}>{eur(e)}</td>
                     <td>{eur(e - t.reel)}</td>
                     <td style={classeNeg(t.prevu - e)}>{(e - t.prevu > 0 ? "+" : "") + eur(e - t.prevu)}</td>
@@ -400,17 +461,18 @@ export default function BilanFinancier({
               <tr className="bf-detail bf-autres">
                 <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
                 <td>{num(heuresMatInternePrevues)} h</td>
-                <td>{num(heuresMiReelles)} h</td>
-                <td style={{ fontWeight: 700 }}>{num(heuresMiAtterr)} h <span className="simple-list-meta">({eur(atterr.C_mi)})</span></td>
-                <td>{num(heuresMiAtterr - heuresMiReelles)} h</td>
-                <td style={classeNeg(heuresMatInternePrevues - heuresMiAtterr)}>{(heuresMiAtterr - heuresMatInternePrevues > 0 ? "+" : "") + num(heuresMiAtterr - heuresMatInternePrevues)} h</td>
+                <td>{num(heuresMiReellesE)} h</td>
+                <td style={{ fontWeight: 700 }}>{num(heuresMiAtterrE)} h <span className="simple-list-meta">({eur(eatPourFacteur(1).C_mi)})</span></td>
+                <td>{num(heuresMiAtterrE - heuresMiReellesE)} h</td>
+                <td style={classeNeg(heuresMatInternePrevues - heuresMiAtterrE)}>{(heuresMiAtterrE - heuresMatInternePrevues > 0 ? "+" : "") + num(heuresMiAtterrE - heuresMatInternePrevues)} h</td>
               </tr>
             </tbody>
           </table>
         </div>
         {(() => {
-          const ecart = atterr.nette - prevu.nette;
-          const kPrevu = prevu.k, kAtt = atterr.k;
+          const reaE = eatPourFacteur(1);
+          const ecart = reaE.nette - prevu.nette;
+          const kPrevu = prevu.k, kAtt = reaE.k;
           // Surcoût direct (avant FRA et frais divers) à absorber pour revenir à la marge annoncée.
           const coefMarge = 1 + foa.fra;
           const aAbsorber = ecart < 0 ? -ecart / coefMarge : 0;
@@ -420,7 +482,7 @@ export default function BilanFinancier({
                 Marge annoncée (prévu) : <strong>{eur(prevu.nette)}</strong> · k {kPrevu === null ? "—" : num(kPrevu * 100, 1) + " %"}
               </div>
               <div>
-                Marge avec EAT réaliste : <strong style={classeNeg(atterr.nette)}>{eur(atterr.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
+                Marge avec EAT réaliste : <strong style={classeNeg(reaE.nette)}>{eur(reaE.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
                 {" "}
                 <span style={ecart < 0 ? { color: ROUGE, fontWeight: 600 } : { color: "var(--ok)", fontWeight: 600 }}>
                   ({(ecart > 0 ? "+" : "") + eur(ecart)})
@@ -462,7 +524,7 @@ export default function BilanFinancier({
                 </thead>
                 <tbody>
                   <tr className="bf-section bf-mo"><td colSpan={6}>Main d'œuvre par type (heures)</td></tr>
-                  {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => {
+                  {detailMoE.filter((t) => t.prevuH || t.reelH).map((t) => {
                     const h = t.reelH + t.prevuH * (1 - pctMo) * res.f;
                     return (
                       <tr key={t.code} className="bf-detail bf-mo">
@@ -493,11 +555,11 @@ export default function BilanFinancier({
                   <tr className="bf-section bf-autres"><td colSpan={6}>Matériel interne (heures porteuses)</td></tr>
                   <tr className="bf-detail bf-autres">
                     <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
-                    <td>{num(heuresMiReelles)} h</td>
-                    <td>{num(heuresMiAtterr)} h</td>
-                    <td style={{ fontWeight: 700 }}>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
+                    <td>{num(heuresMiReellesE)} h</td>
+                    <td>{num(heuresMiAtterrE)} h</td>
+                    <td style={{ fontWeight: 700 }}>{num(heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
                     <td>{num(heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
-                    <td>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterr)} h</td>
+                    <td>{num(heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterrE)} h</td>
                   </tr>
                 </tbody>
               </table>
