@@ -4045,6 +4045,16 @@ textarea:focus {
 .bf-detail td:first-child {
   border-left: 4px solid color-mix(in srgb, var(--bf-c) 30%, transparent);
 }
+.af-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.af-table th:nth-child(1),
+.af-table td:nth-child(1) { width: 190px; }
+.af-table th:nth-child(3),
+.af-table td:nth-child(3) { width: 190px; }
+.af-table th:nth-child(4),
+.af-table td:nth-child(4) { width: 150px; }
 .af-table th:nth-child(2),
 .af-table td:nth-child(2) {
   text-align: left;
