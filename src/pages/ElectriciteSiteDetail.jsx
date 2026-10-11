@@ -2835,6 +2835,13 @@ export default function ElectriciteSiteDetail() {
             >
               👷 Bilan Main d'œuvre
             </button>
+            <button
+              className={recapActif === "autresfrais" ? "btn-primary" : "btn-ghost"}
+              onClick={() => setRecapActif("autresfrais")}
+              title="Dépenses comptabilisées dans SAP hors main d'œuvre (CJI3)"
+            >
+              🧾 Bilan autres frais
+            </button>
             {/* Bilan Achats masqué pour le moment (module à retravailler) */}
             <button
               className={recapActif === "finance" ? "btn-primary" : "btn-ghost"}
@@ -2937,7 +2944,7 @@ export default function ElectriciteSiteDetail() {
             </>
           )}
 
-          {recapActif === "finance" &&
+          {(recapActif === "finance" || recapActif === "autresfrais") &&
             (() => {
               const totFo = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
               const recapMoSynthese = construireRecapMo(
@@ -2976,6 +2983,7 @@ export default function ElectriciteSiteDetail() {
                 detailFo.push({ libelle: "Achats hors budget", prevu: 0, reel: rapproFo.horsBudget.reel, av: 0 });
               return (
                 <BilanFinancier
+                  affichage={recapActif === "autresfrais" ? "autresFrais" : "finance"}
                   detailFo={detailFo}
                   achatsSap={achatsSap}
                   heuresMatInternePrevues={heuresMatInternePrevues}
