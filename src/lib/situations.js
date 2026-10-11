@@ -167,3 +167,54 @@ export function montantADeduire(rows, situations, i, acompte = 0) {
   const precedent = i > 0 ? totalCumule(rows, situations, i - 1) : 0;
   return arrondi2(Math.max(precedent, Number(acompte) || 0));
 }
+
+// Répartit un montant de travaux (HT) sur les lignes pour une nouvelle
+// situation : on avance d'abord les lignes vers leur avancement « logique »
+// (suivi réel), proportionnellement à leur retard ; si le montant dépasse ce
+// retard, le surplus est réparti au prorata du reste à facturer de chaque
+// ligne. Renvoie { avancements } (cumul % par ligne) ou { erreur }.
+export function repartirMontant(rows, avancementsPrecedents, montant, logiqueDe) {
+  const lignes = rows.filter((r) => r.type === "ligne" && r.total > 0);
+  const cible = arrondi2(montant);
+  if (!(cible > 0)) return { erreur: "Montant invalide." };
+  const av = { ...avancementsPrecedents };
+  const cumul = (id) => Number(av[id]) || 0;
+  const reste = lignes.reduce((t, r) => t + r.total * (1 - Math.min(100, cumul(r.id)) / 100), 0);
+  if (cible > arrondi2(reste) + 0.005)
+    return { erreur: "Montant supérieur au reste à facturer (" + arrondi2(reste) + " € HT)." };
+
+  const retards = lignes.map((r) => {
+    const p = Math.min(100, cumul(r.id));
+    const l = Math.max(p, Math.min(100, logiqueDe(r)));
+    return { r, p, l, retard: ((l - p) / 100) * r.total };
+  });
+  const totalRetard = retards.reduce((t, x) => t + x.retard, 0);
+  const phase1 = Math.min(cible, totalRetard);
+  if (totalRetard > 0) {
+    const f = phase1 / totalRetard;
+    retards.forEach((x) => {
+      av[x.r.id] = x.p + (x.l - x.p) * f;
+    });
+  }
+  let surplus = cible - phase1;
+  if (surplus > 0.005) {
+    const resteApres = lignes.reduce((t, r) => t + r.total * (1 - cumul(r.id) / 100), 0);
+    const f = surplus / resteApres;
+    lignes.forEach((r) => {
+      const p = cumul(r.id);
+      av[r.id] = p + (100 - p) * f;
+    });
+  }
+  lignes.forEach((r) => {
+    av[r.id] = Math.round(av[r.id] * 10000) / 10000;
+  });
+  // Ajustement des centimes sur la ligne qui a le plus de marge.
+  const total = (a) => lignes.reduce((t, r) => t + montantAvancement(r, a[r.id] ?? 0), 0);
+  const avant = lignes.reduce((t, r) => t + montantAvancement(r, avancementsPrecedents[r.id] ?? 0), 0);
+  const ecart = arrondi2(cible - (total(av) - avant));
+  if (Math.abs(ecart) >= 0.005) {
+    const l = [...lignes].sort((a, b) => b.total * (1 - av[b.id] / 100) - a.total * (1 - av[a.id] / 100))[0];
+    if (l) av[l.id] = Math.min(100, Math.max(0, Math.round((av[l.id] + (ecart / l.total) * 100) * 10000) / 10000));
+  }
+  return { avancements: av };
+}

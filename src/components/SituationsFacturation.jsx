@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
-import { construireLignesSituation, montantADeduire, montantAvancement, montantMarche, pctCumule, pctLogique, totalCumule, TVA_DEFAUT } from "../lib/situations";
+import { construireLignesSituation, montantADeduire, montantAvancement, montantMarche, pctCumule, pctLogique, repartirMontant, totalCumule, TVA_DEFAUT } from "../lib/situations";
 import { genererFichierSituation } from "../lib/exportSituation";
 import FacturationSap from "./FacturationSap";
 
@@ -48,6 +48,8 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
   const [choixIndex, setChoixIndex] = useState(null);
   const indexOuvert = situations.length === 0 ? -1 : Math.min(choixIndex ?? situations.length - 1, situations.length - 1);
   const [saisies, setSaisies] = useState({});
+  const [montantNouv, setMontantNouv] = useState(null); // null = formulaire fermé
+  const [erreurNouv, setErreurNouv] = useState("");
   const [export_, setExport] = useState(null);
   const tauxTva = chantier?.tauxTvaSituation ?? TVA_DEFAUT;
   const acompte = Number(chantier?.acompteData?.[cleDonnees]) || 0;
@@ -210,6 +212,28 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
     });
     return majSituation({ avancements: av });
   };
+  // Nouvelle situation d'un montant donné (ex. facturation SAP sans situation
+  // correspondante) : les % sont répartis pour atteindre ce montant.
+  const sapFactureTotal = (chantier?.sapFacturation?.commandes || []).reduce((t, c) => t + c.montantHt - c.resteHt, 0);
+  const suggestion = Math.round((sapFactureTotal - globalFact.facture) * 100) / 100;
+  const creerSituationMontant = async () => {
+    const n = Number(String(montantNouv).replace(/[\s\u00a0]/g, "").replace(",", "."));
+    const precedente = situations[situations.length - 1];
+    const res = repartirMontant(rows, precedente?.avancements || {}, n, logiqueDe);
+    if (res.erreur) return setErreurNouv(res.erreur);
+    setErreurNouv("");
+    await enregistrer([
+      ...situations,
+      {
+        numero: (precedente?.numero ?? 0) + 1,
+        date: aujourdhui(),
+        auteur: [profile?.prenom, profile?.nom].filter(Boolean).join(" ") || profile?.nom || "",
+        avancements: res.avancements,
+      },
+    ]);
+    setChoixIndex(situations.length);
+    setMontantNouv(null);
+  };
   const cumulPrec = indexOuvert > 0 ? totalCumule(rows, situations, indexOuvert - 1) : 0;
   const travauxPeriode = Math.round((cumulHt - cumulPrec) * 100) / 100;
   const pctGlobal = marche > 0 ? (cumulHt / marche) * 100 : 0;
@@ -274,7 +298,44 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                 + Nouvelle situation
               </button>
             )}
+            {peutGerer && (
+              <button
+                className="sit-chip sit-chip-ajout"
+                onClick={() => {
+                  setErreurNouv("");
+                  setMontantNouv(montantNouv === null ? (suggestion > 0 ? String(suggestion).replace(".", ",") : "") : null);
+                }}
+              >
+                + Nouvelle situation à … €
+              </button>
+            )}
           </div>
+          {peutGerer && montantNouv !== null && (
+            <div className="sit-nouv-montant">
+              <label>
+                Travaux de la période (HT)
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoFocus
+                  value={montantNouv}
+                  onChange={(e) => setMontantNouv(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && creerSituationMontant()}
+                />
+              </label>
+              <button className="btn-primary" onClick={creerSituationMontant}>
+                Créer et répartir les %
+              </button>
+              <button className="btn-ghost" onClick={() => setMontantNouv(null)}>
+                Annuler
+              </button>
+              <span className="simple-list-meta">
+                Les % sont répartis d'abord selon l'avancement suivi, puis au prorata du reste à facturer.
+                {suggestion > 0 ? " Écart SAP actuel : " + euro(suggestion) + " €." : ""}
+              </span>
+              {erreurNouv && <span className="form-error">{erreurNouv}</span>}
+            </div>
+          )}
 
           {sit ? (
             <>
