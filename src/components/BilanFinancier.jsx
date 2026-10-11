@@ -361,21 +361,23 @@ export default function BilanFinancier({
                 <th>Budget (prévu)</th>
                 <th>Réel à date</th>
                 <th>EAT réaliste</th>
+                <th>RAE (reste à déclarer)</th>
                 <th>Écart / budget</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="bf-section bf-mo"><td colSpan={5}>Main d'œuvre par type (heures)</td></tr>
+              <tr className="bf-section bf-mo"><td colSpan={6}>Main d'œuvre par type (heures)</td></tr>
               {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => (
                 <tr key={t.code} className="bf-detail bf-mo">
                   <td style={{ paddingLeft: 24 }}>{t.nom}</td>
                   <td>{num(t.prevuH)} h</td>
                   <td>{num(t.reelH)} h</td>
                   <td style={{ fontWeight: 700 }}>{num(t.atterrH)} h <span className="simple-list-meta">({eur(t.atterr)})</span></td>
+                  <td>{num(t.atterrH - t.reelH)} h</td>
                   <td style={classeNeg(t.prevuH - t.atterrH)}>{(t.atterrH - t.prevuH > 0 ? "+" : "") + num(t.atterrH - t.prevuH)} h</td>
                 </tr>
               ))}
-              <tr className="bf-section bf-ach"><td colSpan={5}>Fournitures / sous-traitance par type (€)</td></tr>
+              <tr className="bf-section bf-ach"><td colSpan={6}>Fournitures / sous-traitance par type (€)</td></tr>
               {(detailFo || []).map((t) => {
                 const e = t.reel + t.prevu * (1 - t.av);
                 return (
@@ -384,16 +386,18 @@ export default function BilanFinancier({
                     <td>{eur(t.prevu)}</td>
                     <td>{eur(t.reel)}</td>
                     <td style={{ fontWeight: 700 }}>{eur(e)}</td>
+                    <td>{eur(e - t.reel)}</td>
                     <td style={classeNeg(t.prevu - e)}>{(e - t.prevu > 0 ? "+" : "") + eur(e - t.prevu)}</td>
                   </tr>
                 );
               })}
-              <tr className="bf-section bf-autres"><td colSpan={5}>Matériel interne (heures porteuses)</td></tr>
+              <tr className="bf-section bf-autres"><td colSpan={6}>Matériel interne (heures porteuses)</td></tr>
               <tr className="bf-detail bf-autres">
                 <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
                 <td>{num(heuresMatInternePrevues)} h</td>
                 <td>{num(heuresMiReelles)} h</td>
                 <td style={{ fontWeight: 700 }}>{num(heuresMiAtterr)} h <span className="simple-list-meta">({eur(atterr.C_mi)})</span></td>
+                <td>{num(heuresMiAtterr - heuresMiReelles)} h</td>
                 <td style={classeNeg(heuresMatInternePrevues - heuresMiAtterr)}>{(heuresMiAtterr - heuresMatInternePrevues > 0 ? "+" : "") + num(heuresMiAtterr - heuresMatInternePrevues)} h</td>
               </tr>
             </tbody>
@@ -447,11 +451,12 @@ export default function BilanFinancier({
                     <th>Réel à date</th>
                     <th>EAT réaliste</th>
                     <th>EAT à déclarer</th>
+                    <th>RAE (reste à déclarer)</th>
                     <th>Écart / réaliste</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="bf-section bf-mo"><td colSpan={5}>Main d'œuvre par type (heures)</td></tr>
+                  <tr className="bf-section bf-mo"><td colSpan={6}>Main d'œuvre par type (heures)</td></tr>
                   {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => {
                     const h = t.reelH + t.prevuH * (1 - pctMo) * res.f;
                     return (
@@ -460,11 +465,12 @@ export default function BilanFinancier({
                         <td>{num(t.reelH)} h</td>
                         <td>{num(t.atterrH)} h</td>
                         <td style={{ fontWeight: 700 }}>{num(h)} h</td>
+                        <td>{num(h - t.reelH)} h</td>
                         <td>{num(h - t.atterrH)} h</td>
                       </tr>
                     );
                   })}
-                  <tr className="bf-section bf-ach"><td colSpan={5}>Fournitures / sous-traitance par type (€)</td></tr>
+                  <tr className="bf-section bf-ach"><td colSpan={6}>Fournitures / sous-traitance par type (€)</td></tr>
                   {foLignes.map((t) => {
                     const r = t.reel + t.prevu * (1 - t.av);
                     const e = t.reel + t.prevu * (1 - t.av) * res.f;
@@ -474,16 +480,18 @@ export default function BilanFinancier({
                         <td>{eur(t.reel)}</td>
                         <td>{eur(r)}</td>
                         <td style={{ fontWeight: 700 }}>{eur(e)}</td>
+                        <td>{eur(e - t.reel)}</td>
                         <td>{eur(e - r)}</td>
                       </tr>
                     );
                   })}
-                  <tr className="bf-section bf-autres"><td colSpan={5}>Matériel interne (heures porteuses)</td></tr>
+                  <tr className="bf-section bf-autres"><td colSpan={6}>Matériel interne (heures porteuses)</td></tr>
                   <tr className="bf-detail bf-autres">
                     <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
                     <td>{num(heuresMiReelles)} h</td>
                     <td>{num(heuresMiAtterr)} h</td>
                     <td style={{ fontWeight: 700 }}>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
+                    <td>{num(heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
                     <td>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterr)} h</td>
                   </tr>
                 </tbody>
