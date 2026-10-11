@@ -4168,3 +4168,32 @@ textarea:focus {
   background: color-mix(in srgb, var(--text) 12%, transparent);
   color: var(--text);
 }
+
+/* Barre d'outils des situations : champs bien visibles */
+.sit-barre-outils {
+  background: var(--panel);
+  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
+  box-shadow: var(--shadow);
+}
+.sit-barre-outils label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.sit-barre-outils input {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--text) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+.sit-barre-outils input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-color: var(--accent);
+}
+.sit-barre-outils input:disabled {
+  background: color-mix(in srgb, var(--text) 6%, #fff);
+  color: var(--text-muted);
+}
