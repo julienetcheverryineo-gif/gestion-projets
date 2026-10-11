@@ -27,6 +27,7 @@ import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectric
 import { lignesFournitureGoat, lignesMainOeuvreGoat } from "../lib/exportGoat";
 import { IconeAccess, IconeSap } from "../components/IconesLogiciels";
 import EnvoyerFournituresGoatModal from "../components/EnvoyerFournituresGoatModal";
+import iconeFacturation from "../assets/icone-facturation.png";
 import SituationsFacturation from "../components/SituationsFacturation";
 import {
   GENERAL,
@@ -179,12 +180,7 @@ function comparerOrdreType(ordreTypes, a, b) {
 // FO, pas par Type de MO — repris ici à l'identique.)
 // Taux de chiffrage par défaut d'une affaire (saisi, sinon taux I205).
 function IconeFacture() {
-  return (
-    <svg width="1.15em" height="1.15em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: "-0.2em" }}>
-      <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z" />
-      <path d="M14.5 8.5a3 3 0 1 0 0 5M8.5 10.5h5M8.5 12.5h5" />
-    </svg>
-  );
+  return <img src={iconeFacturation} alt="" aria-hidden="true" style={{ height: "1.4em", width: "auto", verticalAlign: "-0.35em" }} />;
 }
 
 function totalTauxDefaut(chantier, tauxHoraire) {

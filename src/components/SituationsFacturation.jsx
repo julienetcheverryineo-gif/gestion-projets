@@ -5,7 +5,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { construireLignesSituation, montantADeduire, montantAvancement, montantMarche, pctCumule, pctLogique, totalCumule, TVA_DEFAUT } from "../lib/situations";
 import { genererFichierSituation } from "../lib/exportSituation";
 
-const euro = (n) => Number(n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const euro = (n) =>
+  Number(n || 0)
+    .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .replace(/[\u202f\u00a0]/g, "\u00a0");
 const aujourdhui = () => {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -294,6 +297,9 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                   <span>Montant de la situation</span>
                   <strong>{euro(moisHt)} €</strong>
                   <em>HT · travaux de la période {euro(travauxPeriode)} €</em>
+                  <em className="sit-reste">
+                    TTC (TVA {String(tauxTva).replace(".", ",")} %) : <b>{euro(moisHt * (1 + tauxTva / 100))} €</b>
+                  </em>
                 </div>
                 {(() => {
                   const M = globalFact.marcheTotal;
