@@ -69,13 +69,22 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
     });
 
   return (
-    <details className="sit-sap" open>
+    <details className="sit-sap">
       <summary>
         <strong>Facturation SAP</strong>
         <span className="simple-list-meta">
           {" "}
           · transaction ZSD_ADV{data?.importeLe ? " · importée le " + new Date(data.importeLe).toLocaleDateString("fr-FR") : ""}
         </span>
+        {commandes.length > 0 && (
+          <span className={"sit-sap-flag " + (Math.abs(ecart) < 1 ? "ok" : "ecart")}>
+            {Math.abs(ecart) < 1
+              ? "👍 Cohérent avec les situations"
+              : ecart > 0
+                ? "⚠ SAP a facturé " + euro(ecart) + " € de plus que les situations"
+                : "⚠ Situations en avance de " + euro(-ecart) + " € sur SAP"}
+          </span>
+        )}
       </summary>
       <div className="sit-sap-corps">
         {peutGerer && (
