@@ -633,9 +633,9 @@ Sub ExtraireMo()
 End Sub
 
 
-' ---- Facturation : transaction ZDS_ADV (ecrans decouverts a l'execution) ----
-' Les ecrans de ZDS_ADV ne sont pas connus d'avance : le script les decrit dans
-' zds-adv-ecran-1.txt (selection) et zds-adv-ecran-2.txt (resultat) pour
+' ---- Facturation : transaction ZSD_ADV (ecrans decouverts a l'execution) ----
+' Les ecrans de ZSD_ADV ne sont pas connus d'avance : le script les decrit dans
+' zsd-adv-ecran-1.txt (selection) et zsd-adv-ecran-2.txt (resultat) pour
 ' pouvoir l'ajuster si besoin.
 Function ChampOtpAdv()
   Dim k, id, u
@@ -734,11 +734,11 @@ End Function
 
 Sub ExtraireAdv()
   Dim champ, bouton, nb, n
-  session.findById("wnd[0]/tbar[0]/okcd").Text = "ZDS_ADV"
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "ZSD_ADV"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
-  n = ScannerEcran("zds-adv-ecran-1.txt")
+  n = ScannerEcran("zsd-adv-ecran-1.txt")
   champ = ChampOtpAdv()
-  If champ = "" Then Fin "ZDS_ADV : champ affaire (OTP) introuvable sur l'ecran de selection (voir zds-adv-ecran-1.txt).", 48
+  If champ = "" Then Fin "ZSD_ADV : champ affaire (OTP) introuvable sur l'ecran de selection (voir zsd-adv-ecran-1.txt).", 48
 
   bouton = BoutonMultiple(champ)
   If Existe(bouton) Then
@@ -755,10 +755,10 @@ Sub ExtraireAdv()
   session.findById("wnd[0]/tbar[1]/btn[8]").press
   WScript.Sleep 1500
   If Existe(champ) Then FinVide "Aucune facturation pour ces affaires."
-  n = ScannerEcran("zds-adv-ecran-2.txt")
+  n = ScannerEcran("zsd-adv-ecran-2.txt")
   ExporterListeAdv
   RetourAccueil
-  Terminer "ZDS_ADV", ""
+  Terminer "ZSD_ADV", ""
 End Sub
 
 ' ---- Test d'ecriture : transaction ZCA_TACHES (saisie SANS enregistrement) ----

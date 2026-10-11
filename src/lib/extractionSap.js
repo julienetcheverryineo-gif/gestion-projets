@@ -253,12 +253,12 @@ export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, li
   if (!estAnnule()) onEtat({ phase: "erreur", message: "Délai dépassé (gestionnaire GOAT installé et à jour ?)." });
 }
 
-// Facturation SAP d'un chantier (ZDS_ADV) : lance l'extraction, attend le
+// Facturation SAP d'un chantier (ZSD_ADV) : lance l'extraction, attend le
 // compte rendu, lit l'export et l'enregistre dans le document du chantier
 // (sapFacturation). Doit être appelée depuis un clic.
 export async function extraireFacturationSap({ handle, chantierId, otp, params, onEtat, estAnnule }) {
   const t0 = Date.now();
-  onEtat({ phase: "attente", message: "Lancement de l'extraction ZDS_ADV…" });
+  onEtat({ phase: "attente", message: "Lancement de l'extraction ZSD_ADV…" });
   ouvrirLien(construireUrlLancement("adv", params, [otp], "", ""));
   const limite = t0 + 8 * 60 * 1000;
   let reponse = false;
@@ -273,7 +273,7 @@ export async function extraireFacturationSap({ handle, chantierId, otp, params, 
       if (c === "ERREUR") return onEtat({ phase: "erreur", message: detail || "L'extraction SAP a échoué." });
       if (c === "VIDE") return onEtat({ phase: "erreur", message: detail || "Aucune facturation trouvée dans SAP." });
       if (c === "OK") break;
-      onEtat({ phase: "attente", message: detail && detail !== "Lancement" ? detail : "Extraction ZDS_ADV en cours dans SAP…" });
+      onEtat({ phase: "attente", message: detail && detail !== "Lancement" ? detail : "Extraction ZSD_ADV en cours dans SAP…" });
     } else if (!reponse && Date.now() - t0 > 15000) {
       onEtat({
         phase: "attente",

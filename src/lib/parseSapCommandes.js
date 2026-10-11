@@ -1,5 +1,5 @@
 // Lecture de l'export SAP « commandes clients / facturation » (transaction
-// ZDS_ADV) : même principe que la table Facturation de GOAT. C'est un
+// ZSD_ADV) : même principe que la table Facturation de GOAT. C'est un
 // rapport imprimé à colonnes séparées par « | », une ligne par échéance ou
 // facture ; la ligne d'en-tête d'un poste porte « Mt post HT » (montant du
 // poste) et « Res fact P » (reste à facturer), les lignes de facture portent

@@ -10,7 +10,7 @@ const euro = (n) =>
     .replace(/[  ]/g, " ");
 const pct = (v) => String(Math.round((Number(v) || 0) * 10) / 10).replace(".", ",");
 
-// Facturation réellement enregistrée dans SAP (transaction ZDS_ADV), comme la
+// Facturation réellement enregistrée dans SAP (transaction ZSD_ADV), comme la
 // table Facturation de GOAT : commandes clients du chantier, montant du poste,
 // reste à facturer, factures émises — comparée au cumul de nos situations.
 // Stockage dans le document chantier : sapFacturation { importeLe, commandes,
@@ -74,7 +74,7 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
         <strong>Facturation SAP</strong>
         <span className="simple-list-meta">
           {" "}
-          · transaction ZDS_ADV{data?.importeLe ? " · importée le " + new Date(data.importeLe).toLocaleDateString("fr-FR") : ""}
+          · transaction ZSD_ADV{data?.importeLe ? " · importée le " + new Date(data.importeLe).toLocaleDateString("fr-FR") : ""}
         </span>
       </summary>
       <div className="sit-sap-corps">
@@ -89,7 +89,7 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
               </button>
             )}
             <span className="simple-list-meta">
-              {etat ? etat.message : "Extraction automatique de la transaction ZDS_ADV pour ce chantier."}
+              {etat ? etat.message : "Extraction automatique de la transaction ZSD_ADV pour ce chantier."}
             </span>
           </div>
         )}
