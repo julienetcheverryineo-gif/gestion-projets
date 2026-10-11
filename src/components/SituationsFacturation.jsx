@@ -32,7 +32,7 @@ function telecharger(blob, nom) {
 // ligne de la minute (prix de vente de la minute), puis export Excel.
 // Stockage : chantier.situationsMode ("ensemble" | "devis") et
 // chantier.situationsData = { "_all" | <devisId>: [situations] }.
-export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer, tauxHoraire, sap, otp }) {
+export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer, tauxHoraire, sap }) {
   const { profile } = useAuth();
   const mode = chantier?.situationsMode || null; // null = pas encore choisi
   const [devisChoisi, setDevisChoisi] = useState(null);
@@ -306,6 +306,17 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
             {peutGerer && (
               <button
                 className="sit-chip sit-chip-ajout"
+                onClick={() => {
+                  setErreurNouv("");
+                  setMontantNouv(montantNouv === null ? (suggestion > 0 ? String(suggestion).replace(".", ",") : "") : null);
+                }}
+              >
+                + Nouvelle situation à … €
+              </button>
+            )}
+            {peutGerer && (
+              <button
+                className="sit-chip sit-chip-ajout"
                 title="Un acompte facturé est déduit de la première situation"
                 onClick={() =>
                   setMontantAcompte(
@@ -320,17 +331,6 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                 }
               >
                 {acompte > 0 ? "✎ Acompte : " + euro(acompte) + " €" : "+ Déclarer un acompte"}
-              </button>
-            )}
-            {peutGerer && (
-              <button
-                className="sit-chip sit-chip-ajout"
-                onClick={() => {
-                  setErreurNouv("");
-                  setMontantNouv(montantNouv === null ? (suggestion > 0 ? String(suggestion).replace(".", ",") : "") : null);
-                }}
-              >
-                + Nouvelle situation à … €
               </button>
             )}
           </div>
