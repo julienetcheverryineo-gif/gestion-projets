@@ -4205,7 +4205,7 @@ textarea:focus {
 .sit-coh-ligne .sit-barre { margin: 0; }
 .sit-coh-ligne b { text-align: right; font-variant-numeric: tabular-nums; }
 .sit-coh-verdict { font-weight: 600; color: var(--accent); }
-.sit-coh-retard .sit-coh-verdict, .sit-coh-avance .sit-coh-verdict { color: var(--warn); }
+.sit-coh-retard .sit-coh-verdict { color: var(--warn); }
 .sit-coh-retard { border-color: var(--warn); }
-.sit-coh-avance { border-color: var(--danger); }
-.sit-coh-avance .sit-coh-verdict { color: var(--danger); }
+.sit-coh-verdict { line-height: 1.35; }
+.sit-coh-retard { border-width: 2px; }

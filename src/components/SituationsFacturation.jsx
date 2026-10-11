@@ -302,13 +302,13 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                   const ecartEuro = ((attendu - pF) / 100) * M;
                   const ecartPts = attendu - pF;
                   let etat = "ok";
-                  let verdict = "Facturation cohérente avec l'avancement et les dépenses SAP";
+                  let verdict = ["Facturation cohérente", "(avancement et dépenses SAP)"];
                   if (ecartPts > 2) {
                     etat = "retard";
-                    verdict = "Sous-facturé d'environ " + euro(ecartEuro) + " € HT" + (pSap !== null && pSap > pAv ? " (dépenses SAP en avance)" : " (avancement réel en avance)");
+                    verdict = ["Sous-facturé d'environ " + euro(ecartEuro) + " € HT", pSap !== null && pSap > pAv ? "(dépenses SAP en avance)" : "(avancement réel en avance)"];
                   } else if (ecartPts < -2) {
                     etat = "avance";
-                    verdict = "Sur-facturé d'environ " + euro(-ecartEuro) + " € HT par rapport au réel";
+                    verdict = ["Sur-facturé d'environ " + euro(-ecartEuro) + " € HT", "(par rapport au réel)"];
                   }
                   const barre = (nom, v, titre) => (
                     <div className="sit-coh-ligne" title={titre}>
@@ -323,7 +323,12 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                       {barre("Facturé", pF, "Facturé cumulé (toutes situations) / marché")}
                       {barre("Avancement", pAv, "Avancement réel saisi dans le suivi (FO + MO pondérés)")}
                       {pSap !== null ? barre("Dépenses SAP", pSap, "Réel SAP (achats + heures × taux) / budget chiffré") : <em>Aucun import SAP pour ce chantier</em>}
-                      <em className="sit-coh-verdict">{etat === "ok" ? "✓ " : "⚠ "}{verdict}</em>
+                      <em className="sit-coh-verdict">
+                        {etat === "retard" ? "⚠ " : "👍 "}
+                        {verdict[0]}
+                        <br />
+                        {verdict[1]}
+                      </em>
                     </div>
                   );
                 })()}
