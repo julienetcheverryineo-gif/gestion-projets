@@ -67,6 +67,7 @@ export default function BilanFinancier({
 }) {
   const [saisieCa, setSaisieCa] = useState({});
   const [saisiePct, setSaisiePct] = useState({});
+  const [kCible, setKCible] = useState("");
   // % de la rubrique C : valeur propre à l'affaire, sinon paramètre FOA.
   const foa = { ...foaDefaut };
   ["prorata", "fraisDivers", "aleas", "negociation"].forEach((k) => {
@@ -152,6 +153,33 @@ export default function BilanFinancier({
       }))
       .sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
   })();
+
+
+  // ── EAT « pilotée » : on garde le réel et on réduit le reste à faire d'un
+  // même facteur f (0 = plus rien de dépensé, 1 = reste à faire intégral).
+  const foLignes = detailFo || [];
+  const reelFoLignes = foLignes.reduce((x, t) => x + t.reel, 0);
+  const resteFoLignes = foLignes.reduce((x, t) => x + t.prevu * (1 - t.av), 0);
+  const eatPourFacteur = (f) => {
+    const col = colonne(
+      reelMo + budgetMo * (1 - pctMo) * f,
+      reelFoLignes + resteFoLignes * f,
+      zoneReel + zonePrevu * (1 - pctMo) * f,
+      heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * f
+    );
+    return col;
+  };
+  // Cherche f ∈ [0 ; 1] tel que la marge nette atteigne la cible (en €).
+  const resoudreEat = (cibleNette) => {
+    if (eatPourFacteur(1).nette >= cibleNette - 0.005) return { f: 1, atteignable: true, col: eatPourFacteur(1) };
+    if (eatPourFacteur(0).nette < cibleNette) return { f: 0, atteignable: false, col: eatPourFacteur(0) };
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 50; i++) {
+      const mid = (lo + hi) / 2;
+      if (eatPourFacteur(mid).nette >= cibleNette) lo = mid; else hi = mid;
+    }
+    return { f: lo, atteignable: true, col: eatPourFacteur(lo) };
+  };
 
   const validerPct = (cle) => {
     if (saisiePct[cle] === undefined) return;
@@ -404,6 +432,123 @@ export default function BilanFinancier({
           );
         })()}
       </div>
+
+
+      {(() => {
+        const tableauEat = (titre, explication, res, cible) => (
+          <div className="bf-eat" style={{ marginTop: 18 }}>
+            <h3 style={{ margin: "0 0 4px" }}>{titre}</h3>
+            <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>{explication}</p>
+            <div className="data-table-wrapper">
+              <table className="data-table bf-table">
+                <thead>
+                  <tr>
+                    <th>À déclarer</th>
+                    <th>Réel à date</th>
+                    <th>EAT réaliste</th>
+                    <th>EAT à déclarer</th>
+                    <th>Écart / réaliste</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="bf-section bf-mo"><td colSpan={5}>Main d'œuvre par type (heures)</td></tr>
+                  {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => {
+                    const h = t.reelH + t.prevuH * (1 - pctMo) * res.f;
+                    return (
+                      <tr key={t.code} className="bf-detail bf-mo">
+                        <td style={{ paddingLeft: 24 }}>{t.nom}</td>
+                        <td>{num(t.reelH)} h</td>
+                        <td>{num(t.atterrH)} h</td>
+                        <td style={{ fontWeight: 700 }}>{num(h)} h</td>
+                        <td>{num(h - t.atterrH)} h</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bf-section bf-ach"><td colSpan={5}>Fournitures / sous-traitance par type (€)</td></tr>
+                  {foLignes.map((t) => {
+                    const r = t.reel + t.prevu * (1 - t.av);
+                    const e = t.reel + t.prevu * (1 - t.av) * res.f;
+                    return (
+                      <tr key={t.libelle} className="bf-detail bf-ach">
+                        <td style={{ paddingLeft: 24 }}>{t.libelle}</td>
+                        <td>{eur(t.reel)}</td>
+                        <td>{eur(r)}</td>
+                        <td style={{ fontWeight: 700 }}>{eur(e)}</td>
+                        <td>{eur(e - r)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bf-section bf-autres"><td colSpan={5}>Matériel interne (heures porteuses)</td></tr>
+                  <tr className="bf-detail bf-autres">
+                    <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
+                    <td>{num(heuresMiReelles)} h</td>
+                    <td>{num(heuresMiAtterr)} h</td>
+                    <td style={{ fontWeight: 700 }}>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
+                    <td>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterr)} h</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <div>
+                Marge nette obtenue : <strong style={classeNeg(res.col.nette)}>{eur(res.col.nette)}</strong> · k{" "}
+                {res.col.k === null ? "—" : num(res.col.k * 100, 1) + " %"}
+                {cible !== null && <span className="simple-list-meta"> (cible : {eur(cible)})</span>}
+              </div>
+              {!res.atteignable ? (
+                <div style={{ color: ROUGE, marginTop: 4 }}>
+                  Objectif inatteignable : même sans aucune dépense supplémentaire, la marge maximale est de {eur(res.col.nette)}
+                  {res.col.k === null ? "" : " (" + num(res.col.k * 100, 1) + " %)"}. Il faudrait du CA en plus (avenant) ou revoir les paramètres FOA.
+                </div>
+              ) : res.f >= 0.9999 ? (
+                <div className="simple-list-meta" style={{ marginTop: 4 }}>L'EAT réaliste suffit à atteindre cette marge : déclarez-le tel quel.</div>
+              ) : (
+                <div className="simple-list-meta" style={{ marginTop: 4 }}>
+                  Cela suppose de ne dépenser que {num(res.f * 100, 1)} % du reste à faire au budget, sur toutes les lignes
+                  (réel déjà dépensé conservé). À défendre : chaque réduction doit correspondre à une économie réellement attendue.
+                </div>
+              )}
+            </div>
+          </div>
+        );
+        const resAnnonce = resoudreEat(prevu.nette);
+        const kSaisi = (() => {
+          const t = String(kCible).replace(",", ".").replace("%", "").trim();
+          const n = t === "" ? null : Number(t);
+          return n !== null && Number.isFinite(n) ? n / 100 : null;
+        })();
+        const resCible = kSaisi !== null ? resoudreEat(kSaisi * base) : null;
+        return (
+          <>
+            {tableauEat(
+              "🛡️ EAT à déclarer pour tenir la marge annoncée",
+              "Même marge nette que le prévu (" + eur(prevu.nette) + ", k " + (prevu.k === null ? "—" : num(prevu.k * 100, 1) + " %") + ") : l'outil calcule la part du reste à faire à ne pas dépasser, ligne par ligne, avec le FRA, les frais généraux et le matériel interne recalculés.",
+              resAnnonce,
+              prevu.nette
+            )}
+            <div style={{ marginTop: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0 }}>🎚️ Je veux annoncer</h3>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder={prevu.k === null ? "ex. 8" : num(prevu.k * 100, 1)}
+                value={kCible}
+                onChange={(e) => setKCible(e.target.value)}
+                style={{ width: "5em", textAlign: "right" }}
+              />
+              <span>% de marge nette (k de vente)</span>
+            </div>
+            {resCible
+              ? tableauEat(
+                  "🎯 EAT à déclarer pour " + num(kSaisi * 100, 1) + " % de marge nette",
+                  "Marge nette cible : " + eur(kSaisi * base) + " sur un CA de " + eur(base) + ".",
+                  resCible,
+                  kSaisi * base
+                )
+              : <p className="simple-list-meta" style={{ marginTop: 6 }}>Saisissez un pourcentage pour obtenir les valeurs à déclarer.</p>}
+          </>
+        );
+      })()}
 
       {heuresSansTaux > 0 && (
         <p style={{ color: ROUGE, margin: "8px 0" }}>
