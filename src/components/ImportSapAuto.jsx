@@ -15,14 +15,14 @@ import {
 // Import SAP automatique à la connexion des profils RA Électricité et admin :
 // achats (ME2J), heures (ZCAT3) puis facturation (ZSD_ADV) de tous les chantiers ayant un compte,
 // sur les 12 derniers mois pour les heures. Une fois par connexion (onglet)
-// et au plus toutes les 4 h par poste ; désactivable dans Import SAP >
+// et au plus toutes les 30 min par poste ; désactivable dans Import SAP >
 // Paramètres SAP > Réglages SAP.
 //
 // Le navigateur n'autorise la lecture du dossier d'export qu'après un clic
 // tant que l'autorisation n'est pas « persistante » (Chrome/Edge proposent
 // « Autoriser à chaque visite ») : dans ce cas un bandeau propose de lancer
 // l'import d'un clic au lieu de le démarrer seul.
-const DELAI_MINI = 4 * 60 * 60 * 1000;
+const DELAI_MINI = 30 * 60 * 1000;
 const CLE_DERNIERE = "sapAutoDerniere";
 
 // Le composant interne (qui charge les chantiers) n'est monté que pour les

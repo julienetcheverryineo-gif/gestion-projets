@@ -466,7 +466,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
                   />
                   <span>
                     Lancer l'import SAP (achats + heures + facturation, tous les chantiers) à la connexion — au plus une fois
-                    toutes les 4 h sur ce poste
+                    toutes les 30 min sur ce poste
                   </span>
                 </label>
               </div>
