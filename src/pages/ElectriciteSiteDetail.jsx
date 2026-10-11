@@ -544,6 +544,7 @@ function TableauRecap({
 
   // Détail des heures SAP d'une tâche (ou non affectées) : chaque pointage
   // peut être réaffecté à une tâche du budget.
+  const valeurSt = (h) => sap?.repartitions?.[h.id.slice(3)]?.tache || "";
   const detailSapMo = (lignes, portee) => {
     const lignesAffichees = appliquerTriFiltre(lignes, COLONNES_SAP_MO, triMo);
     const cles = lignesAffichees.map((h) => cleLigneHeure(h));
@@ -668,7 +669,7 @@ function TableauRecap({
                       <select
                           className="sap-aff"
                         value={valeursP.size === 1 ? [...valeursP][0] : "__mixte"}
-                        disabled={!sap?.onAffecterLot}
+                        disabled={!sap?.onAffecterLot || p.lignes.every((h) => h.sousTraitance)}
                         onChange={(e) => e.target.value !== "__mixte" && sap.onAffecterLot(clesP, e.target.value)}
                         title="Affecter tous les pointages de cette personne"
                       >
@@ -698,8 +699,14 @@ function TableauRecap({
                             </td>
                           ))}
                           <td data-label="Affecter à">
-                            <select className="sap-aff" value={valeur} disabled={!sap?.onAffecter || h.sousTraitance} title={h.sousTraitance ? "Part MO d'une commande sous-traitée : à modifier depuis le Bilan Fournitures" : undefined} onChange={(e) => sap.onAffecter(cleH, e.target.value)}>
-                              <option value="">Non affectée</option>
+                            <select
+                              className="sap-aff"
+                              value={h.sousTraitance ? valeurSt(h) : valeur}
+                              disabled={h.sousTraitance ? !sap?.onChangerTacheSt : !sap?.onAffecter}
+                              title={h.sousTraitance ? "Part MO d'une commande sous-traitée : choisissez la bonne tâche, ou annulez la répartition" : undefined}
+                              onChange={(e) => (h.sousTraitance ? sap.onChangerTacheSt(h.id.slice(3), e.target.value) : sap.onAffecter(cleH, e.target.value))}
+                            >
+                              <option value="">{h.sousTraitance ? "Annuler la répartition (100 % fourniture)" : "Non affectée"}</option>
                               {ancienne && <option value={manuel}>{formatTypeFo(manuel)} (devis non précisé)</option>}
                               {(sap?.options || []).map((g) =>
                                 g.taches.map((t) => (
@@ -937,8 +944,8 @@ function TableauRecap({
                     );
                   })()}
                 </tr>
-                {sapFo && ouverts.has(l.cle) && detailSapFo(sapFo.parCle.get(l.cle).lignes, l.cle)}
-                {sapMo && ouverts.has(l.cle) && detailSapMo(sapMo.parCle.get(l.cle).lignes, l.cle)}
+                {sapFo && ouverts.has(l.cle) && sapFo.parCle.get(l.cle).lignes.length > 0 && detailSapFo(sapFo.parCle.get(l.cle).lignes, l.cle)}
+                {sapMo && ouverts.has(l.cle) && sapMo.parCle.get(l.cle).lignes.length > 0 && detailSapMo(sapMo.parCle.get(l.cle).lignes, l.cle)}
                 </Fragment>
                 );
               })}
@@ -2473,6 +2480,12 @@ export default function ElectriciteSiteDetail() {
   });
   const heuresSap = heuresSousTraitance.length ? [...heuresSapBrut, ...heuresSousTraitance] : heuresSapBrut;
   const affectationsHeuresEff = { ...affectationsHeures, ...affectationsHeuresSt };
+  const changerTacheSousTraitance = async (cleA, tache) => {
+    const maj = { ...sousTraitance };
+    if (tache && maj[cleA]) maj[cleA] = { ...maj[cleA], tache };
+    else delete maj[cleA];
+    await updateDoc(doc(db, "sites", chantierId), { sousTraitance: maj });
+  };
   const repartirSousTraitance = async (cles, valeur) => {
     const maj = { ...sousTraitance };
     cles.forEach((c) => {
@@ -2551,6 +2564,8 @@ export default function ElectriciteSiteDetail() {
           onAffecter: peutGerer ? affecterHeureSap : null,
           onAffecterLot: peutGerer ? affecterHeuresSapLot : null,
           options: optionsAffectationHeures(d.id),
+          onChangerTacheSt: peutGerer ? changerTacheSousTraitance : null,
+          repartitions: sousTraitance,
         }
       : null;
 
@@ -2579,6 +2594,8 @@ export default function ElectriciteSiteDetail() {
         onAffecter: peutGerer ? affecterHeureSap : null,
           onAffecterLot: peutGerer ? affecterHeuresSapLot : null,
         options: optionsAffectationHeures(),
+        onChangerTacheSt: peutGerer ? changerTacheSousTraitance : null,
+        repartitions: sousTraitance,
       };
     }
     return null;
