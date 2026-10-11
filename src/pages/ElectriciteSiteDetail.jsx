@@ -2977,6 +2977,7 @@ export default function ElectriciteSiteDetail() {
               return (
                 <BilanFinancier
                   detailFo={detailFo}
+                  achatsSap={achatsSap}
                   heuresMatInternePrevues={heuresMatInternePrevues}
                   zone={chantier?.zone || ""}
                   montantZone={montantZone(chantier?.zone || "")}

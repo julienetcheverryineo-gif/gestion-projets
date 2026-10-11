@@ -74,6 +74,7 @@ export default function BilanFinancier({
   budgetMoEuro,
   prevuMoLignes,
   detailFo,
+  achatsSap,
   pctMo,
   achats,
   heures,
@@ -201,7 +202,19 @@ export default function BilanFinancier({
   const reelSapEffectif = cji3Eat ? cji3Eat.directTotal + (typeof engageSapEat === "number" ? engageSapEat : 0) : typeof reelSapEat === "number" ? reelSapEat : null;
   const calageSap = reelSapEffectif === null ? 0 : reelSapEffectif - reelOutilDirect;
   const txSap = (code) => TX_RETENU_SAP[code] ?? taux(code) ?? 0;
-  const engageE = typeof engageSapEat === "number" ? engageSapEat : 0;
+  // Engagé = commandes ME2J pas encore comptabilisées : par commande d'achat,
+  // montant ME2J − achats CJI3 de la même commande (jamais négatif).
+  const engageAuto = (() => {
+    if (!cji3Eat || !Array.isArray(achatsSap)) return 0;
+    const cmd = new Map();
+    achatsSap.forEach((a) => a.docAchat && cmd.set(a.docAchat, (cmd.get(a.docAchat) || 0) + (Number(a.valNette) || 0)));
+    const compta = new Map();
+    (cji3Eat.ecritures || []).forEach((e) => /^60/.test(e.nat) && e.docAchat && compta.set(e.docAchat, (compta.get(e.docAchat) || 0) + e.montant));
+    let t = 0;
+    cmd.forEach((m, k) => { t += Math.max(0, m - (compta.get(k) || 0)); });
+    return Math.round(t * 100) / 100;
+  })();
+  const engageE = typeof engageSapEat === "number" ? engageSapEat : engageAuto;
   const reelAchatsE = cji3Eat ? cji3Eat.achats : reelFoLignes;
   const reelAutresE = cji3Eat ? cji3Eat.autresFrais : heuresMiReellesE * foa.materielInterne;
   // Avec un CJI3 : on reproduit exactement l'écran RàE de SAP.
@@ -444,11 +457,11 @@ export default function BilanFinancier({
           <br />
           {cji3Eat ? (
             <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              Engagé SAP (sous-traitance interne, commandes non facturées…) :
+              Engagé SAP (commandes ME2J non comptabilisées ; calculé automatiquement, saisie = forçage) :
               <input
                 type="text"
                 inputMode="decimal"
-                placeholder="ex. 3 673"
+                placeholder={engageAuto ? String(engageAuto).replace(".", ",") : "ex. 3 673"}
                 disabled={!onChangerEngageSapEat}
                 value={saisieReelSap !== null ? saisieReelSap : typeof engageSapEat === "number" ? String(engageSapEat).replace(".", ",") : ""}
                 onChange={(e) => setSaisieReelSap(e.target.value)}
@@ -633,19 +646,19 @@ export default function BilanFinancier({
                       </tr>
                     );
                   })}
-                  {cji3Eat && Math.abs(cji3Eat.achats - reelFoLignes) > 0.5 && (
+                  {cji3Eat && Math.abs(cji3Eat.achats - reelFoLignes + engageE) > 0.5 && (
                     <tr className="bf-detail bf-ach">
                       <td style={{ paddingLeft: 24 }}>Achats comptabilisés hors commandes ME2J</td>
-                      <td>{eur(cji3Eat.achats - reelFoLignes)}</td>
-                      <td>{eur(cji3Eat.achats - reelFoLignes)}</td>
-                      <td style={{ fontWeight: 700 }}>{eur(cji3Eat.achats - reelFoLignes)}</td>
+                      <td>{eur(cji3Eat.achats - reelFoLignes + engageE)}</td>
+                      <td>{eur(cji3Eat.achats - reelFoLignes + engageE)}</td>
+                      <td style={{ fontWeight: 700 }}>{eur(cji3Eat.achats - reelFoLignes + engageE)}</td>
                       <td>{eur(0)}</td>
                       <td>{eur(0)}</td>
                     </tr>
                   )}
                   {cji3Eat && engageE > 0 && (
                     <tr className="bf-detail bf-ach">
-                      <td style={{ paddingLeft: 24 }}>Sous-traitance interne engagée (SAP)</td>
+                      <td style={{ paddingLeft: 24 }}>dont engagé SAP (commandé, pas encore comptabilisé)</td>
                       <td>{eur(engageE)}</td>
                       <td>{eur(engageE)}</td>
                       <td style={{ fontWeight: 700 }}>{eur(engageE)}</td>
@@ -668,8 +681,7 @@ export default function BilanFinancier({
             <div style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
               {cji3Eat && engageE === 0 && (
                 <div style={{ color: ROUGE, marginBottom: 4 }}>
-                  ⚠ « Engagé SAP » non renseigné (champ plus haut) : recopiez le total de la colonne « Engag Trv » de l'écran RàE
-                  (sous-traitance interne). Sans lui, SAP affichera une marge plus basse que celle calculée ici.
+                  ⚠ Aucun engagé détecté dans le ME2J. Si l'écran RàE affiche un montant en « Engag Trv », saisissez-le dans « Engagé SAP » (plus haut) : sans lui SAP affichera une marge plus basse.
                 </div>
               )}
               <div>
