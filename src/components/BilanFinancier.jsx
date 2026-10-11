@@ -88,6 +88,7 @@ export default function BilanFinancier({
   // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
   const [saisieReelSap, setSaisieReelSap] = useState(null);
   const [messageCji3, setMessageCji3] = useState("");
+  const [ouvertsAf, setOuvertsAf] = useState({}); // comptes dépliés du bilan autres frais
   const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
   const kAffiche =
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
@@ -346,6 +347,8 @@ export default function BilanFinancier({
     />
   );
 
+  const fournisseurParCommande = new Map();
+  (achatsSap || []).forEach((a) => a.docAchat && !fournisseurParCommande.has(a.docAchat) && fournisseurParCommande.set(a.docAchat, String(a.nomFournisseur || "").trim()));
   const blocAutresFrais = cji3Eat ? (() => {
         const lignes = cji3Eat.ecritures || [];
         const groupes = [
@@ -358,10 +361,11 @@ export default function BilanFinancier({
           const m = new Map();
           liste.forEach((e) => {
             const k = e.nat + "|" + e.designation;
-            if (!m.has(k)) m.set(k, { nat: e.nat, designation: e.designation, nb: 0, montant: 0 });
+            if (!m.has(k)) m.set(k, { nat: e.nat, designation: e.designation, nb: 0, montant: 0, ecr: [] });
             const g = m.get(k);
             g.nb++;
             g.montant += e.montant;
+            g.ecr.push(e);
           });
           return [...m.values()].sort((a, b) => a.nat.localeCompare(b.nat));
         };
@@ -371,8 +375,20 @@ export default function BilanFinancier({
           <div className="bf-eat" style={{ marginTop: 18 }}>
             <h3 style={{ margin: "0 0 4px" }}>🧾 Bilan autres frais — comptabilité SAP (CJI3 du {cji3Eat.importeLe ? new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR") : "—"})</h3>
             <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
-              Tout ce que SAP a comptabilisé hors main d'œuvre, par compte. Sert à caler l'EAT sur le réel comptable ; mise en page à retravailler.
+              Tout ce que SAP a comptabilisé hors main d'œuvre, par compte. Cliquez sur un compte pour voir ses écritures (date, pièce, libellé, fournisseur, n° de commande).
             </p>
+            <div style={{ margin: "0 0 8px" }}>
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  const cles = groupes.flatMap(([titre, test]) => parCompte(lignes.filter(test)).map((g) => titre + g.nat + g.designation));
+                  const toutOuvert = cles.length > 0 && cles.every((c) => ouvertsAf[c]);
+                  setOuvertsAf(toutOuvert ? {} : Object.fromEntries(cles.map((c) => [c, true])));
+                }}
+              >
+                ⇕ Tout déplier / replier
+              </button>
+            </div>
             <div className="data-table-wrapper">
               <table className="data-table bf-table">
                 <thead>
@@ -393,14 +409,40 @@ export default function BilanFinancier({
                         <td colSpan={3}>{titre}</td>
                         <td style={classeNeg(-total)}>{eur(total)}</td>
                       </tr>,
-                      ...parCompte(liste).map((g) => (
-                        <tr key={titre + g.nat + g.designation} className="bf-detail bf-autres">
-                          <td style={{ paddingLeft: 24 }}>{g.nat}</td>
-                          <td>{g.designation}</td>
-                          <td>{g.nb}</td>
-                          <td>{eur(g.montant)}</td>
-                        </tr>
-                      )),
+                      ...parCompte(liste).flatMap((g) => {
+                        const cle = titre + g.nat + g.designation;
+                        const ouvert = !!ouvertsAf[cle];
+                        const dateTri = (d) => String(d || "").split(".").reverse().join("");
+                        return [
+                          <tr
+                            key={cle}
+                            className="bf-detail bf-autres"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => setOuvertsAf((o) => ({ ...o, [cle]: !o[cle] }))}
+                          >
+                            <td style={{ paddingLeft: 24 }}>{ouvert ? "▾" : "▸"} {g.nat}</td>
+                            <td>{g.designation}</td>
+                            <td>{g.nb}</td>
+                            <td>{eur(g.montant)}</td>
+                          </tr>,
+                          ...(ouvert
+                            ? [...g.ecr]
+                                .sort((a, b) => dateTri(b.date).localeCompare(dateTri(a.date)))
+                                .map((e, i) => {
+                                  const four = e.docAchat ? fournisseurParCommande.get(e.docAchat) : "";
+                                  const libelle = [e.typePiece, e.texte, four].filter(Boolean).join(" · ");
+                                  return (
+                                    <tr key={cle + i} className="bf-detail" style={{ fontSize: "0.9em", opacity: 0.9 }}>
+                                      <td style={{ paddingLeft: 48 }}>{e.date}</td>
+                                      <td>{libelle || "—"}</td>
+                                      <td>{e.docAchat || ""}</td>
+                                      <td>{eur(e.montant)}</td>
+                                    </tr>
+                                  );
+                                })
+                            : []),
+                        ];
+                      }),
                     ];
                   })}
                 </tbody>
