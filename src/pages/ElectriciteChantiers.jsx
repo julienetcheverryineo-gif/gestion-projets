@@ -19,7 +19,10 @@ export default function ElectriciteChantiers() {
   const { documents: tousChantiers, chargement } = useCollection("sites");
   const { documents: tousDevis } = useCollection("elecDevis");
   const { documents: utilisateurs } = useCollection("users", "email");
-  const chantiers = tousChantiers.filter(estChantierElectricite);
+  const [tous, setTous] = useState(false);
+  const chantiersElec = tousChantiers.filter(estChantierElectricite);
+  // Par défaut : seulement les chantiers dont l'utilisateur est le RA.
+  const chantiers = tous ? chantiersElec : chantiersElec.filter((c) => (c.ra || "") === (profile?.nom || ""));
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
@@ -53,6 +56,13 @@ export default function ElectriciteChantiers() {
           <h1>Chantiers — Électricité</h1>
           <p className="page-subtitle">Vos chantiers électricité en cours.</p>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <label className="switch-filtre" title="Basculer entre mes chantiers et tous les chantiers">
+          <span className={!tous ? "actif" : ""}>Mes chantiers</span>
+          <input type="checkbox" checked={tous} onChange={(e) => setTous(e.target.checked)} />
+          <i aria-hidden="true" />
+          <span className={tous ? "actif" : ""}>Tous</span>
+        </label>
         {peutGerer && (
           <button
             className="btn-primary"
@@ -64,15 +74,18 @@ export default function ElectriciteChantiers() {
             Nouveau chantier
           </button>
         )}
+        </div>
       </header>
 
       {chargement ? (
         <div className="page-loading">Chargement…</div>
       ) : chantiers.length === 0 ? (
         <div className="empty-state">
-          <p className="empty-state-title">Aucun chantier</p>
+          <p className="empty-state-title">{chantiersElec.length > 0 && !tous ? "Aucun chantier dont vous êtes RA" : "Aucun chantier"}</p>
           <p className="empty-state-description">
-            Créez votre premier chantier électricité pour commencer à importer des devis.
+            {chantiersElec.length > 0 && !tous
+              ? "Passez en « Tous » pour voir l'ensemble des chantiers."
+              : "Créez votre premier chantier électricité pour commencer à importer des devis."}
           </p>
         </div>
       ) : (
@@ -84,7 +97,7 @@ export default function ElectriciteChantiers() {
                 <th>Chantier</th>
                 <th>Statut</th>
                 <th>Devis importés</th>
-                <th>Responsable</th>
+                <th>Responsable d'affaire</th>
                 <th></th>
               </tr>
             </thead>
@@ -113,10 +126,10 @@ export default function ElectriciteChantiers() {
                     {nbDevis(chantier.id) > 0 ? nbDevis(chantier.id) : "—"}
                   </td>
                   <td
-                    data-label="Responsable"
+                    data-label="Responsable d'affaire"
                     style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
                   >
-                    {chantier.responsableChantier || "—"}
+                    {chantier.ra || "—"}
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>

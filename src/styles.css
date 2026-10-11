@@ -4232,3 +4232,32 @@ textarea:focus {
   max-width: 112px;
 }
 .recap-groupe-ligne > td { background: color-mix(in srgb, var(--text) 5%, transparent); font-weight: 500; }
+
+/* Détails SAP (bilans FO / MO) : menu « Affecter à » discret, colonnes utiles élargies */
+.detail-sap-table { table-layout: fixed; width: 100%; }
+.detail-sap-table th, .detail-sap-table td { overflow-wrap: anywhere; }
+.detail-sap-table th:last-child, .detail-sap-table td:last-child { width: 150px; }
+.sap-aff {
+  width: 140px; max-width: 140px; padding: 2px 4px; font-size: 0.72rem; border-radius: 6px;
+  color: var(--text-muted); text-overflow: ellipsis; background-color: transparent;
+}
+.recap-groupe-ligne > td { white-space: nowrap; }
+.recap-groupe-ligne > td .simple-list-meta { white-space: nowrap; }
+/* FO : Date, Code SAP, Fournisseur, Désignation (large), Qté, Val. nette */
+.detail-sap-fo th:nth-child(1) { width: 92px; }
+.detail-sap-fo th:nth-child(2) { width: 70px; }
+.detail-sap-fo th:nth-child(3) { width: 16%; }
+.detail-sap-fo th:nth-child(5) { width: 60px; }
+.detail-sap-fo th:nth-child(6) { width: 100px; }
+/* MO : colonnes équilibrées */
+
+.switch-filtre { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted); user-select: none; }
+.switch-filtre .actif { color: var(--text); font-weight: 600; }
+.switch-filtre input { position: absolute; opacity: 0; pointer-events: none; }
+.switch-filtre i { position: relative; width: 38px; height: 22px; border-radius: 999px; background: color-mix(in srgb, var(--text) 25%, transparent); transition: background 0.15s; }
+.switch-filtre i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.15s; }
+.switch-filtre input:checked + i { background: var(--accent); }
+.switch-filtre input:checked + i::after { transform: translateX(16px); }
+.switch-filtre input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+.detail-sap-mo th.col-chk { width: 36px; }
+.detail-sap-mo th:not(.col-chk):not(:last-child) { width: 20%; }

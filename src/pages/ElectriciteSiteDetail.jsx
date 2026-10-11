@@ -386,7 +386,7 @@ function TableauRecap({
     return (
       <tr className="recap-detail-sap">
         <td colSpan={nbColonnes}>
-          <table className="data-table">
+          <table className="data-table detail-sap-table detail-sap-fo">
             <thead>
               <tr>
                 {COLONNES_SAP_FO.map((c) => (
@@ -418,6 +418,7 @@ function TableauRecap({
                       </td>
                       <td data-label="Affecter à">
                         <select
+                          className="sap-aff"
                           value={valeurs.size === 1 ? [...valeurs][0] : "__mixte"}
                           disabled={!sap?.onAffecterLot}
                           onChange={(e) => e.target.value !== "__mixte" && sap.onAffecterLot(cles, e.target.value)}
@@ -440,6 +441,7 @@ function TableauRecap({
                             ))}
                             <td data-label="Affecter à">
                               <select
+                          className="sap-aff"
                                 value={valeurAffectationAchat(cleA)}
                                 disabled={!sap?.onAffecter}
                                 onChange={(e) => sap.onAffecter(cleA, e.target.value)}
@@ -524,11 +526,11 @@ function TableauRecap({
             </button>
           </div>
         )}
-        <table className="data-table">
+        <table className="data-table detail-sap-table detail-sap-mo">
           <thead>
             <tr>
               {sap?.onAffecterLot && (
-                <th>
+                <th className="col-chk">
                   <input type="checkbox" checked={toutCoche} onChange={basculerTout} aria-label="Tout cocher" />
                 </th>
               )}
@@ -584,6 +586,7 @@ function TableauRecap({
                     </td>
                     <td data-label="Affecter à">
                       <select
+                          className="sap-aff"
                         value={valeursP.size === 1 ? [...valeursP][0] : "__mixte"}
                         disabled={!sap?.onAffecterLot}
                         onChange={(e) => e.target.value !== "__mixte" && sap.onAffecterLot(clesP, e.target.value)}
@@ -615,7 +618,7 @@ function TableauRecap({
                             </td>
                           ))}
                           <td data-label="Affecter à">
-                            <select value={valeur} disabled={!sap?.onAffecter} onChange={(e) => sap.onAffecter(cleH, e.target.value)}>
+                            <select className="sap-aff" value={valeur} disabled={!sap?.onAffecter} onChange={(e) => sap.onAffecter(cleH, e.target.value)}>
                               <option value="">Non affectée</option>
                               {ancienne && <option value={manuel}>{formatTypeFo(manuel)} (devis non précisé)</option>}
                               {(sap?.options || []).map((g) =>
@@ -1377,13 +1380,13 @@ function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
           className={onglet === "fo" ? "btn-primary" : "btn-ghost"}
           onClick={() => setOnglet("fo")}
         >
-          💰 Achats ({achats.length})
+          💰 Achats
         </button>
         <button
           className={onglet === "mo" ? "btn-primary" : "btn-ghost"}
           onClick={() => setOnglet("mo")}
         >
-          🕐 Heures ({heures.length})
+          🕐 Heures
         </button>
         {onEnvoyerTaches && (
           <button
@@ -1400,7 +1403,7 @@ function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
       ) : (
         <>
           <p className="page-subtitle" style={{ marginBottom: 8 }}>
-            {lignes.length} ligne(s) — {onglet === "fo" ? "Val. nette totale" : "Heures totales"} :{" "}
+            {onglet === "fo" ? "Val. nette totale" : "Heures totales"} :{" "}
             <strong>
               {formatValeurSap(total, true, onglet === "fo")}
               {onglet === "fo" ? " €" : " h"}
@@ -2666,12 +2669,7 @@ export default function ElectriciteSiteDetail() {
             >
               👷 Bilan Main d'œuvre
             </button>
-            <button
-              className={recapActif === "achats" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif("achats")}
-            >
-              💰 Bilan Achats
-            </button>
+            {/* Bilan Achats masqué pour le moment (module à retravailler) */}
             <button
               className={recapActif === "finance" ? "btn-primary" : "btn-ghost"}
               onClick={() => setRecapActif("finance")}

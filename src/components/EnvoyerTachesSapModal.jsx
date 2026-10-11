@@ -65,7 +65,7 @@ export default function EnvoyerTachesSapModal({ compte, taches, onClose }) {
                   checked={cochees.has(t.code)}
                   onChange={() => bascule(t.code)}
                 />
-                <span style={{ width: 60, display: "inline-block" }}>{t.code}</span>
+                <span style={{ width: 120, flexShrink: 0, display: "inline-block", marginRight: 8, fontFamily: "var(--font-mono)", fontSize: "0.82rem" }}>{t.code}</span>
                 {t.libelle}
                 {t.libelle.length > 40 ? " ⚠ tronqué" : ""}
               </label>
