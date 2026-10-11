@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { libelleTypeActivite, normaliserTypeActivite, inclutMaterielInterne } from "../lib/typesActiviteSap";
 import { HEURES_PAR_JOUR_ZONE } from "../lib/tauxHoraires";
+import { analyserCji3 } from "../lib/parseCji3";
 
 const eur = (v) =>
   (Number(v) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -57,6 +58,8 @@ export default function BilanFinancier({
   onChangerMargeCibleEat,
   reelSapEat,
   onChangerReelSapEat,
+  cji3Eat,
+  onChangerCji3Eat,
   foa: foaDefaut,
   pctSaisis,
   onChangerPct,
@@ -77,6 +80,7 @@ export default function BilanFinancier({
   const [saisiePct, setSaisiePct] = useState({});
   // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
   const [saisieReelSap, setSaisieReelSap] = useState(null);
+  const [messageCji3, setMessageCji3] = useState("");
   const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
   const kAffiche =
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
@@ -169,24 +173,38 @@ export default function BilanFinancier({
 
   // ── EAT « pilotée » : on garde le réel et on réduit le reste à faire d'un
   // même facteur f (0 = plus rien de dépensé, 1 = reste à faire intégral).
+  // Avec un CJI3 importé : le réel de la MO (heures et €) est le cumul
+  // comptabilisé dans SAP, pas les pointages (plus frais que la comptabilité).
+  const detailMoE = detailMo.map((t) => {
+    const c = cji3Eat?.mo?.[t.code];
+    if (!cji3Eat) return { ...t, reelEuro: t.reel };
+    const h = c ? c.h : 0;
+    const eur = c ? c.eur : 0;
+    return { ...t, reelH: h, reelEuro: eur, atterrH: h + t.prevuH * (1 - pctMo), atterr: eur + t.prevu * (1 - pctMo) };
+  });
+  const reelMoE = cji3Eat ? cji3Eat.moTotal : reelMo;
+  const heuresMiReellesE = cji3Eat
+    ? detailMoE.filter((t) => inclutMaterielInterne(t.code)).reduce((x, t) => x + t.reelH, 0)
+    : heuresMiReelles;
   const foLignes = detailFo || [];
   const reelFoLignes = foLignes.reduce((x, t) => x + t.reel, 0);
   const resteFoLignes = foLignes.reduce((x, t) => x + t.prevu * (1 - t.av), 0);
   // Calage sur le réel SAP : écart entre le réel comptable de l'écran RàE
   // (Cpta Cum + Engagé du « CD hors FRA ») et le réel que l'outil reconstitue
   // (pointages, achats ME2J, matériel interne théorique). Ajouté tel quel au coût.
-  const reelOutilDirect = reelMo + zoneReel + reelFoLignes + heuresMiReelles * foa.materielInterne;
+  const reelOutilDirect = reelMoE + zoneReel + reelFoLignes + heuresMiReellesE * foa.materielInterne;
   const calageSap = typeof reelSapEat === "number" ? reelSapEat - reelOutilDirect : 0;
   const eatPourFacteur = (f) => {
     const col = colonne(
-      reelMo + budgetMo * (1 - pctMo) * f,
+      reelMoE + budgetMo * (1 - pctMo) * f,
       reelFoLignes + resteFoLignes * f + calageSap,
       zoneReel + zonePrevu * (1 - pctMo) * f,
-      heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * f,
+      heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * f,
       FG_EAT
     );
     return col;
   };
+  const heuresMiAtterrE = heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo);
   const prevuEat = colonne(budgetMo, budgetFo, zonePrevu, heuresMatInternePrevues, FG_EAT);
   // Cherche f ∈ [0 ; 1] tel que la marge nette atteigne la cible (en €).
   const resoudreEat = (cibleNette) => {
@@ -372,6 +390,32 @@ export default function BilanFinancier({
           EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
           prorata, aléas, négociation et matériel interne sont recalculés par la FOA à partir de ces saisies.
           <br />
+          <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <label className="btn-ghost" style={{ cursor: onChangerCji3Eat ? "pointer" : "not-allowed" }}>
+              ⤓ Importer le CJI3 du chantier
+              <input
+                type="file"
+                accept=".txt,.csv"
+                style={{ display: "none" }}
+                disabled={!onChangerCji3Eat}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  try {
+                    const texte = new TextDecoder("windows-1252").decode(await f.arrayBuffer());
+                    const r = analyserCji3(texte);
+                    await onChangerCji3Eat({ ...r, importeLe: new Date().toISOString() });
+                    setMessageCji3("CJI3 importé : " + r.nbEcritures + " écritures, réel direct " + eur(r.directTotal));
+                  } catch (err) {
+                    setMessageCji3(err.message || "Import impossible.");
+                  }
+                }}
+              />
+            </label>
+            {messageCji3 ? <span>{messageCji3}</span> : cji3Eat?.importeLe ? <span>CJI3 du {new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR")} · réel direct {eur(cji3Eat.directTotal)}</span> : <span>(cumul comptable SAP : heures par type, achats, autres frais)</span>}
+          </span>
+          <br />
           <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             Réel SAP cumulé + engagé (écran RàE, « CD hors FRA ») :
             <input
@@ -419,7 +463,7 @@ export default function BilanFinancier({
             </thead>
             <tbody>
               <tr className="bf-section bf-mo"><td colSpan={6}>Main d'œuvre par type (heures)</td></tr>
-              {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => (
+              {detailMoE.filter((t) => t.prevuH || t.reelH).map((t) => (
                 <tr key={t.code} className="bf-detail bf-mo">
                   <td style={{ paddingLeft: 24 }}>{t.nom}</td>
                   <td>{num(t.prevuH)} h</td>
@@ -447,10 +491,10 @@ export default function BilanFinancier({
               <tr className="bf-detail bf-autres">
                 <td style={{ paddingLeft: 24 }}>Autres frais <span className="simple-list-meta">({num(foa.materielInterne, 2)} €/h sur les heures porteuses)</span></td>
                 <td>{eur(prevu.C_mi)}</td>
-                <td>{eur(heuresMiReelles * foa.materielInterne)}</td>
-                <td style={{ fontWeight: 700 }}>{eur(heuresMiAtterr * foa.materielInterne)}</td>
-                <td>{eur((heuresMiAtterr - heuresMiReelles) * foa.materielInterne)}</td>
-                <td style={classeNeg(prevu.C_mi - heuresMiAtterr * foa.materielInterne)}>{(heuresMiAtterr * foa.materielInterne - prevu.C_mi > 0 ? "+" : "") + eur(heuresMiAtterr * foa.materielInterne - prevu.C_mi)}</td>
+                <td>{eur(heuresMiReellesE * foa.materielInterne)}</td>
+                <td style={{ fontWeight: 700 }}>{eur(heuresMiAtterrE * foa.materielInterne)}</td>
+                <td>{eur((heuresMiAtterrE - heuresMiReellesE) * foa.materielInterne)}</td>
+                <td style={classeNeg(prevu.C_mi - heuresMiAtterrE * foa.materielInterne)}>{(heuresMiAtterrE * foa.materielInterne - prevu.C_mi > 0 ? "+" : "") + eur(heuresMiAtterrE * foa.materielInterne - prevu.C_mi)}</td>
               </tr>
             </tbody>
           </table>
@@ -510,7 +554,7 @@ export default function BilanFinancier({
                 </thead>
                 <tbody>
                   <tr className="bf-section bf-mo"><td colSpan={6}>Main d'œuvre par type (heures)</td></tr>
-                  {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => {
+                  {detailMoE.filter((t) => t.prevuH || t.reelH).map((t) => {
                     const h = t.reelH + t.prevuH * (1 - pctMo) * res.f;
                     return (
                       <tr key={t.code} className="bf-detail bf-mo">
@@ -541,11 +585,11 @@ export default function BilanFinancier({
                   <tr className="bf-section bf-autres"><td colSpan={6}>Autres frais (€)</td></tr>
                   <tr className="bf-detail bf-autres">
                     <td style={{ paddingLeft: 24 }}>Autres frais</td>
-                    <td>{eur(heuresMiReelles * foa.materielInterne)}</td>
-                    <td>{eur(heuresMiAtterr * foa.materielInterne)}</td>
-                    <td style={{ fontWeight: 700 }}>{eur((heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f) * foa.materielInterne)}</td>
+                    <td>{eur(heuresMiReellesE * foa.materielInterne)}</td>
+                    <td>{eur(heuresMiAtterrE * foa.materielInterne)}</td>
+                    <td style={{ fontWeight: 700 }}>{eur((heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * res.f) * foa.materielInterne)}</td>
                     <td>{eur(heuresMatInternePrevues * (1 - pctMo) * res.f * foa.materielInterne)}</td>
-                    <td>{eur((heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterr) * foa.materielInterne)}</td>
+                    <td>{eur((heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterrE) * foa.materielInterne)}</td>
                   </tr>
                 </tbody>
               </table>

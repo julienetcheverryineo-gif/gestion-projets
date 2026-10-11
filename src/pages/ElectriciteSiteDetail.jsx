@@ -2990,6 +2990,12 @@ export default function ElectriciteSiteDetail() {
                   caSaisi={chantier?.caHt ?? null}
                   caNonSoumis={0}
                   margeCibleEat={chantier?.eatMargeCible ?? null}
+                  cji3Eat={chantier?.eatCji3 ?? null}
+                  onChangerCji3Eat={
+                    peutGerer
+                      ? (v) => updateDoc(doc(db, "sites", chantierId), { eatCji3: v, eatReelSap: (v?.directTotal ?? 0) + (chantier?.eatEngageSap || 0) })
+                      : null
+                  }
                   reelSapEat={chantier?.eatReelSap ?? null}
                   onChangerReelSapEat={
                     peutGerer
