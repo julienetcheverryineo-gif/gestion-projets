@@ -396,14 +396,14 @@ export default function BilanFinancier({
                   </tr>
                 );
               })}
-              <tr className="bf-section bf-autres"><td colSpan={6}>Matériel interne (heures porteuses)</td></tr>
+              <tr className="bf-section bf-autres"><td colSpan={6}>Autres frais (€)</td></tr>
               <tr className="bf-detail bf-autres">
-                <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
-                <td>{num(heuresMatInternePrevues)} h</td>
-                <td>{num(heuresMiReelles)} h</td>
-                <td style={{ fontWeight: 700 }}>{num(heuresMiAtterr)} h <span className="simple-list-meta">({eur(atterr.C_mi)})</span></td>
-                <td>{num(heuresMiAtterr - heuresMiReelles)} h</td>
-                <td style={classeNeg(heuresMatInternePrevues - heuresMiAtterr)}>{(heuresMiAtterr - heuresMatInternePrevues > 0 ? "+" : "") + num(heuresMiAtterr - heuresMatInternePrevues)} h</td>
+                <td style={{ paddingLeft: 24 }}>Autres frais <span className="simple-list-meta">({num(foa.materielInterne, 2)} €/h sur les heures porteuses)</span></td>
+                <td>{eur(prevu.C_mi)}</td>
+                <td>{eur(heuresMiReelles * foa.materielInterne)}</td>
+                <td style={{ fontWeight: 700 }}>{eur(heuresMiAtterr * foa.materielInterne)}</td>
+                <td>{eur((heuresMiAtterr - heuresMiReelles) * foa.materielInterne)}</td>
+                <td style={classeNeg(prevu.C_mi - heuresMiAtterr * foa.materielInterne)}>{(heuresMiAtterr * foa.materielInterne - prevu.C_mi > 0 ? "+" : "") + eur(heuresMiAtterr * foa.materielInterne - prevu.C_mi)}</td>
               </tr>
             </tbody>
           </table>
@@ -490,14 +490,14 @@ export default function BilanFinancier({
                       </tr>
                     );
                   })}
-                  <tr className="bf-section bf-autres"><td colSpan={6}>Matériel interne (heures porteuses)</td></tr>
+                  <tr className="bf-section bf-autres"><td colSpan={6}>Autres frais (€)</td></tr>
                   <tr className="bf-detail bf-autres">
-                    <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
-                    <td>{num(heuresMiReelles)} h</td>
-                    <td>{num(heuresMiAtterr)} h</td>
-                    <td style={{ fontWeight: 700 }}>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
-                    <td>{num(heuresMatInternePrevues * (1 - pctMo) * res.f)} h</td>
-                    <td>{num(heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterr)} h</td>
+                    <td style={{ paddingLeft: 24 }}>Autres frais</td>
+                    <td>{eur(heuresMiReelles * foa.materielInterne)}</td>
+                    <td>{eur(heuresMiAtterr * foa.materielInterne)}</td>
+                    <td style={{ fontWeight: 700 }}>{eur((heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f) * foa.materielInterne)}</td>
+                    <td>{eur(heuresMatInternePrevues * (1 - pctMo) * res.f * foa.materielInterne)}</td>
+                    <td>{eur((heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterr) * foa.materielInterne)}</td>
                   </tr>
                 </tbody>
               </table>
