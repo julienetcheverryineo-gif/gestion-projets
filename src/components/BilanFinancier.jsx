@@ -14,7 +14,7 @@ const ROUGE = "#c0392b";
 const FG_EAT = 0.154;
 // Taux retenus par l'écran RàE de SAP pour valoriser les heures du reste à
 // déclarer (≠ taux de chiffrage de l'outil). À compléter si SAP en affiche d'autres.
-const TX_RETENU_SAP = { I205: 49, I107: 69.5, I111: 37, I209: 64.5, I311: 36, I306: 20.53 };
+const TX_RETENU_SAP = { I205: 49, I107: 69.5, I111: 37, I209: 64.5, I311: 36, I306: 36 };
 
 // Bilan financier d'une affaire : matériel et main d'œuvre en euros.
 // Budget MO = heures chiffrées × taux de chiffrage ; réel MO = heures
@@ -666,6 +666,12 @@ export default function BilanFinancier({
               </table>
             </div>
             <div style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
+              {cji3Eat && engageE === 0 && (
+                <div style={{ color: ROUGE, marginBottom: 4 }}>
+                  ⚠ « Engagé SAP » non renseigné (champ plus haut) : recopiez le total de la colonne « Engag Trv » de l'écran RàE
+                  (sous-traitance interne). Sans lui, SAP affichera une marge plus basse que celle calculée ici.
+                </div>
+              )}
               <div>
                 Marge nette obtenue : <strong style={classeNeg(res.col.nette)}>{eur(res.col.nette)}</strong> · k{" "}
                 {res.col.k === null ? "—" : num(res.col.k * 100, 1) + " %"}
