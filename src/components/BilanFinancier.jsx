@@ -214,7 +214,7 @@ export default function BilanFinancier({
       cmd.set(a.docAchat, g);
     });
     const compta = new Map();
-    (cji3Eat.ecritures || []).forEach((e) => /^60/.test(e.nat) && e.docAchat && compta.set(e.docAchat, (compta.get(e.docAchat) || 0) + e.montant));
+    (cji3Eat.ecritures || []).forEach((e) => /^(60|62|64|9000)/.test(e.nat) && e.docAchat && compta.set(e.docAchat, (compta.get(e.docAchat) || 0) + e.montant));
     // Sans numéro de commande dans les écritures CJI3 (variante sans « Doc achat »), pas de rapprochement.
     if (compta.size === 0) return [];
     return [...cmd.values()]
