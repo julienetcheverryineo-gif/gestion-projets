@@ -2845,32 +2845,11 @@ export default function ElectriciteSiteDetail() {
             </button>
             {/* Bilan Achats masqué pour le moment (module à retravailler) */}
             <button
-              className={recapActif === "finance" ? "btn-primary" : "btn-ghost"}
+              className={["finance", "eat", "eatAnnonce", "eatPilotage"].includes(recapActif) ? "btn-primary" : "btn-ghost"}
               onClick={() => setRecapActif("finance")}
-              title="Budget, réel et atterrissage en euros (taux horaires par type d'activité)"
+              title="Bilan de l'affaire et EAT"
             >
-              💶 Bilan affaire
-            </button>
-            <button
-              className={recapActif === "eat" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif("eat")}
-              title="Import CJI3, engagé SAP et EAT réaliste"
-            >
-              🎯 EAT
-            </button>
-            <button
-              className={recapActif === "eatAnnonce" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif("eatAnnonce")}
-              title="EAT à déclarer pour tenir la marge annoncée"
-            >
-              🛡️ EAT pour marge annoncée
-            </button>
-            <button
-              className={recapActif === "eatPilotage" ? "btn-primary" : "btn-ghost"}
-              onClick={() => setRecapActif("eatPilotage")}
-              title="EAT à déclarer pour une marge nette choisie"
-            >
-              🎚️ EAT pilotage à la marge
+              💶 Bilan
             </button>
             {(achatsSap.length > 0 || heuresSap.length > 0) && (
               <button
@@ -2881,6 +2860,26 @@ export default function ElectriciteSiteDetail() {
               </button>
             )}
           </div>
+
+          {["finance", "eat", "eatAnnonce", "eatPilotage"].includes(recapActif) && (
+            <div className="chantier-actions-bar chantier-actions-bar-recap" style={{ marginTop: 6 }}>
+              {[
+                ["finance", "💶 Bilan affaire", "Budget, réel et atterrissage en euros"],
+                ["eat", "🎯 EAT", "Import CJI3, engagé SAP et EAT réaliste"],
+                ["eatAnnonce", "🛡️ EAT pour marge annoncée", "EAT à déclarer pour tenir la marge annoncée"],
+                ["eatPilotage", "🎚️ EAT pilotage à la marge", "EAT à déclarer pour une marge nette choisie"],
+              ].map(([cle, libelle, titre]) => (
+                <button
+                  key={cle}
+                  className={recapActif === cle ? "btn-primary" : "btn-ghost"}
+                  onClick={() => setRecapActif(cle)}
+                  title={titre}
+                >
+                  {libelle}
+                </button>
+              ))}
+            </div>
+          )}
 
           {!recapActif && (
           <div className="chantier-actions-bar">
