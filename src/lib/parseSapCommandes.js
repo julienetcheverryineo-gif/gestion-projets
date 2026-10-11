@@ -8,7 +8,7 @@
 // Les colonnes sont lues par position (identique d'un export à l'autre) ;
 // les libellés d'en-tête arrivent parfois avec des accents corrompus, donc
 // on ne s'y fie pas.
-const COL = {
+const COL_DEFAUT = {
   otp: 1,
   docVente: 2,
   reference: 5,
@@ -40,10 +40,46 @@ function nombreSap(texte) {
 
 export const normaliserOtp = (v) => String(v ?? "").toUpperCase().replace(/[\s.]/g, "");
 
+// Positions des colonnes lues dans la ligne d'en-tête quand elle est présente
+// (les accents arrivent parfois corrompus : on tolère 1 à 4 caractères). Sans
+// en-tête reconnu, on retombe sur les positions fixes de COL.
+function colonnesDepuisEntete(lignes) {
+  const entete = lignes.find((l) => l.startsWith("|") && /doc\. vente/i.test(l) && /elt d'otp/i.test(l));
+  if (!entete) return COL_DEFAUT;
+  const h = entete.split("|").map((x) => x.trim().toLowerCase());
+  const trouve = (re, defaut, depuis = 0) => {
+    const i = h.findIndex((x, k) => k >= depuis && re.test(x));
+    return i >= 0 ? i : defaut;
+  };
+  const desig = h.map((x, k) => (/^d.{1,4}signation$/.test(x) ? k : -1)).filter((k) => k >= 0);
+  const typeFacture = trouve(/^tyfac$/, COL_DEFAUT.typeFacture);
+  return {
+    otp: trouve(/^elt d'otp$/, COL_DEFAUT.otp),
+    docVente: trouve(/^doc\. vente$/, COL_DEFAUT.docVente),
+    reference: trouve(/^r.{1,4}f.{1,4}rence$/, COL_DEFAUT.reference),
+    motif: trouve(/^motif/, COL_DEFAUT.motif),
+    designation: desig.length ? desig[0] : COL_DEFAUT.designation,
+    designation3: desig.length > 2 ? desig[desig.length - 1] : COL_DEFAUT.designation3,
+    nomDo: trouve(/^nom do$/, COL_DEFAUT.nomDo),
+    montantPoste: trouve(/^mt post ht$/, COL_DEFAUT.montantPoste),
+    resteFacturer: trouve(/^res fact p$/, COL_DEFAUT.resteFacturer),
+    poste: trouve(/^poste$/, COL_DEFAUT.poste),
+    montantFacture: trouve(/^mt fact ht$/, COL_DEFAUT.montantFacture),
+    typeFacture,
+    libelleFacture: typeFacture + 1,
+    dateFacture: trouve(/^date fact\.$/, COL_DEFAUT.dateFacture),
+    montantTtc: trouve(/^mt facttc$/, COL_DEFAUT.montantTtc),
+    numeroFacture: trouve(/^facture$/, COL_DEFAUT.numeroFacture),
+    creeLe: trouve(/^cr.{1,4}\s*le$/, COL_DEFAUT.creeLe),
+  };
+}
+
 export function analyserSapCommandes(texte) {
   const commandes = new Map();
   const factures = [];
-  texte.split(/\r\n|\r|\n/).forEach((ligne) => {
+  const toutes = texte.split(/\r\n|\r|\n/);
+  const COL = colonnesDepuisEntete(toutes);
+  toutes.forEach((ligne) => {
     if (!ligne.startsWith("|")) return;
     const c = ligne.split("|");
     if (c.length < 29) return;
