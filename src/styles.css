@@ -4341,3 +4341,21 @@ textarea:focus {
   .fsap-ligne { grid-template-columns: 1fr; }
   .fsap-tete { display: none; }
 }
+
+.fsap-scroll { overflow-x: auto; }
+.fsap-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 1100px; }
+.fsap-table th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; padding: 8px 6px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.fsap-table td { padding: 6px; vertical-align: top; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.fsap-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fsap-table .nowrap { white-space: nowrap; }
+.fsap-col-desig { min-width: 240px; width: 26%; }
+.fsap-col-devis { width: 96px; }
+.fsap-col-comm { min-width: 160px; width: 16%; }
+.fsap-table .fsap-comm { padding: 2px 3px; }
+.fsap-table .fsap-meta { margin-top: 1px; }
+.fsap-table .fsap-etat { width: auto; min-width: 118px; }
+.fsap-etat-chantier { min-width: 92px; font-weight: 500; }
+.fsap-barre { height: 3px; margin-top: 4px; }
+.fsap-total td { font-weight: 600; background: color-mix(in srgb, var(--accent) 6%, transparent); border-bottom: 0; }
+.fsap-sep td { padding-top: 14px; font-size: 0.74rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+.fsap-libre td { background: color-mix(in srgb, var(--text-muted) 4%, transparent); }

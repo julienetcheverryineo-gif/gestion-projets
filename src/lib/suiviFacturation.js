@@ -9,8 +9,10 @@ export const ETATS_FACTURATION = [
   "À facturer",
   "Facturation partielle",
   "Soldé",
-  "Archivé",
 ];
+
+// Liste « Etat chantier » du fichier de suivi (feuille Paramétrage).
+export const ETATS_CHANTIER = ["A valider", "En attente", "A faire", "Dépannage", "En cours", "Terminé", "Perdu"];
 
 const sansAccent = (t) =>
   String(t ?? "")
@@ -24,7 +26,7 @@ const sansAccent = (t) =>
 export function normaliserEtat(brut) {
   const t = sansAccent(brut);
   if (!t) return "";
-  if (t.startsWith("archive")) return "Archivé";
+  if (t.startsWith("archive")) return "Soldé";
   if (t.includes("attente commande")) return "Attente commande";
   if (t.includes("attente pv")) return "Attente PV";
   if (t.includes("pv sign")) return "PV signé";
@@ -107,10 +109,10 @@ export function rattacherSuivi(lignesFichier, otp, commandes) {
     const cur = lignes[cle];
     const com = l.commentaire ? (l.devis ? l.devis + " : " : "") + l.commentaire : "";
     if (!cur) {
-      lignes[cle] = { etat: l.etat, cmdClient: l.commande, devis: l.devis, commentaire: com };
+      lignes[cle] = { etat: l.etat, etatChantier: l.etatChantier, cmdClient: l.commande, devis: l.devis, commentaire: com };
       return;
     }
-    if (!cur.etat || cur.etat === "Archivé") cur.etat = l.etat || cur.etat;
+    if (!cur.etat) cur.etat = l.etat;
     cur.devis = [cur.devis, l.devis].filter(Boolean).join(", ");
     cur.commentaire = [cur.commentaire, com].filter(Boolean).join(" · ");
   };

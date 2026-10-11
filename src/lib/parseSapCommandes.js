@@ -23,6 +23,9 @@ const COL = {
   libelleFacture: 26,
   dateFacture: 27,
   montantTtc: 28,
+  numeroFacture: 60,
+  designation3: 57,
+  creeLe: 58,
 };
 
 // "170.000,00" -> 170000 ; "4.339,36-" (signe à droite) -> -4339.36
@@ -62,6 +65,8 @@ export function analyserSapCommandes(texte) {
         motif: (c[COL.motif] || "").trim(),
         designation: (c[COL.designation] || "").trim(),
         nomDo: (c[COL.nomDo] || "").trim(),
+        designation3: (c[COL.designation3] || "").trim(),
+        creeLe: (c[COL.creeLe] || "").trim(),
         montantHt: montant,
         resteHt: reste,
       });
@@ -76,6 +81,7 @@ export function analyserSapCommandes(texte) {
         poste,
         type,
         libelle: (c[COL.libelleFacture] || "").trim(),
+        numero: (c[COL.numeroFacture] || "").trim(),
         date: (c[COL.dateFacture] || "").trim(),
         montantHt: factureHt,
         montantTtc: nombreSap(c[COL.montantTtc]),
