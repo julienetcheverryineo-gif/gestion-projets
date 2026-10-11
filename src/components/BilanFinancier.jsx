@@ -829,6 +829,11 @@ export default function BilanFinancier({
                   {sansCommande.map((e) => `${e.date} ${e.typePiece || "pièce"} ${e.texte || ""} ${eur(e.montant)}`).join(" ; ")}
                 </div>
               )}
+              <div className="simple-list-meta" style={{ marginTop: 4 }}>
+                Rapprochement ME2J ↔ comptabilité : {lignes.filter((e) => /^60/.test(e.nat) && e.docAchat).length} / {lignes.filter((e) => /^60/.test(e.nat)).length} écritures
+                d'achats portent un n° de commande — engagé calculé : {eur(engageAuto)}
+                {lignes.some((e) => /^60/.test(e.nat) && e.docAchat) ? "" : " (colonne « Doc achat » absente du CJI3 : engagé à saisir à la main)"}
+              </div>
               <div style={{ marginTop: 4 }}>
                 Autres frais comptabilisés : <strong>{eur(cji3Eat.autresFrais)}</strong> · matériel interne théorique de l'outil :{" "}
                 <strong>{eur(heuresMiReellesE * foa.materielInterne)}</strong>
