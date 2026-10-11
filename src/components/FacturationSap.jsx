@@ -126,7 +126,6 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
     <details className="fsap">
       <summary>
         <strong>Suivi de facturation</strong>
-        <span className="fsap-src">SAP ZSD_ADV{data?.importeLe ? " · " + new Date(data.importeLe).toLocaleDateString("fr-FR") : ""}</span>
         {commandes.length > 0 && (
           <span className={"sit-sap-flag " + (coherent ? "ok" : "ecart")}>
             {coherent
@@ -293,14 +292,12 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
           </>
         )}
 
-        {peutGerer && (
-          <div className="fsap-pied">
-            <span className="fsap-legende">
-              <i className="st-payee">●</i> payée <i className="st-attente">●</i> à régler <i className="st-retard">●</i> échéance dépassée
-            </span>
-            {suivi.importeLe && <span className="fsap-meta">importé le {new Date(suivi.importeLe).toLocaleDateString("fr-FR")}</span>}
-          </div>
-        )}
+        <div className="fsap-pied">
+          <span className="fsap-legende">
+            <i className="st-payee">●</i> payée <i className="st-attente">●</i> à régler <i className="st-retard">●</i> échéance dépassée
+          </span>
+          <span className="fsap-src">SAP ZSD_ADV{data?.importeLe ? " · " + new Date(data.importeLe).toLocaleDateString("fr-FR") : ""}</span>
+        </div>
       </div>
     </details>
   );
