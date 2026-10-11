@@ -55,6 +55,8 @@ export default function BilanFinancier({
   onChangerCa,
   margeCibleEat,
   onChangerMargeCibleEat,
+  reelSapEat,
+  onChangerReelSapEat,
   foa: foaDefaut,
   pctSaisis,
   onChangerPct,
@@ -74,6 +76,7 @@ export default function BilanFinancier({
   const [saisieCa, setSaisieCa] = useState({});
   const [saisiePct, setSaisiePct] = useState({});
   // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
+  const [saisieReelSap, setSaisieReelSap] = useState(null);
   const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
   const kAffiche =
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
@@ -169,10 +172,15 @@ export default function BilanFinancier({
   const foLignes = detailFo || [];
   const reelFoLignes = foLignes.reduce((x, t) => x + t.reel, 0);
   const resteFoLignes = foLignes.reduce((x, t) => x + t.prevu * (1 - t.av), 0);
+  // Calage sur le réel SAP : écart entre le réel comptable de l'écran RàE
+  // (Cpta Cum + Engagé du « CD hors FRA ») et le réel que l'outil reconstitue
+  // (pointages, achats ME2J, matériel interne théorique). Ajouté tel quel au coût.
+  const reelOutilDirect = reelMo + zoneReel + reelFoLignes + heuresMiReelles * foa.materielInterne;
+  const calageSap = typeof reelSapEat === "number" ? reelSapEat - reelOutilDirect : 0;
   const eatPourFacteur = (f) => {
     const col = colonne(
       reelMo + budgetMo * (1 - pctMo) * f,
-      reelFoLignes + resteFoLignes * f,
+      reelFoLignes + resteFoLignes * f + calageSap,
       zoneReel + zonePrevu * (1 - pctMo) * f,
       heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * f,
       FG_EAT
@@ -363,6 +371,34 @@ export default function BilanFinancier({
         <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
           EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
           prorata, aléas, négociation et matériel interne sont recalculés par la FOA à partir de ces saisies.
+          <br />
+          <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            Réel SAP cumulé + engagé (écran RàE, « CD hors FRA ») :
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="ex. 131 059"
+              disabled={!onChangerReelSapEat}
+              value={saisieReelSap !== null ? saisieReelSap : typeof reelSapEat === "number" ? String(Math.round(reelSapEat * 100) / 100).replace(".", ",") : ""}
+              onChange={(e) => setSaisieReelSap(e.target.value)}
+              onBlur={() => {
+                if (saisieReelSap === null) return;
+                const t = String(saisieReelSap).replace(",", ".").replace(/\s/g, "").trim();
+                const n = t === "" ? null : Number(t);
+                setSaisieReelSap(null);
+                if (n === null || (Number.isFinite(n) && n >= 0)) onChangerReelSapEat?.(n);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              style={{ width: "7em", textAlign: "right" }}
+            />
+            €
+            {typeof reelSapEat === "number" && (
+              <span>
+                → calage {calageSap >= 0 ? "+" : ""}
+                {eur(calageSap)} (réel outil : {eur(reelOutilDirect)})
+              </span>
+            )}
+          </span>
           <br />
           <em>
             Calage SAP : frais généraux à {num(FG_EAT * 100, 1)} % du CA (valeur de l'écran RàE) au lieu de {num(foa.fg * 100, 1)} % (FOA) pour
