@@ -210,7 +210,7 @@ export default function BilanFinancier({
     achatsSap.forEach((a) => {
       if (!a.docAchat) return;
       const g = cmd.get(a.docAchat) || { po: a.docAchat, fournisseur: a.nomFournisseur || "", cmd: 0 };
-      g.cmd += Number(a.valNette) || 0;
+      g.cmd += Number(a.valNetteBrute ?? a.valNette) || 0;
       cmd.set(a.docAchat, g);
     });
     const compta = new Map();
