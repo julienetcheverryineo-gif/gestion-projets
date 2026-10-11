@@ -2522,8 +2522,27 @@ export default function ElectriciteSiteDetail() {
 
   // Cibles possibles d'une heure SAP : (devis, tâche), pour la synthèse
   // comme pour le tableau d'un devis.
+  // Depuis le Bilan Fournitures (part MO d'une commande sous-traitée), les
+  // tâches MO de chaque devis sont recalculées : le récap affiché est alors FO.
+  const recapMoParDevis =
+    recapActif === "mo"
+      ? recapParDevis
+      : devis.map((d) => ({
+          devis: d,
+          recap: construireRecapMo(
+            calculerRecap(
+              lignesChantier.filter((l) => l.devisId === d.id),
+              "tempsTotalHeures",
+              "avancementMo",
+              {}
+            ),
+            chantier,
+            d.id,
+            devis
+          ),
+        }));
   const optionsAffectationHeures = (devisId = null) => [
-    ...recapParDevis
+    ...recapMoParDevis
       .filter(({ devis: d }) => devisId === null || d.id === devisId)
       .map(({ devis: d, recap }) => ({
         devisId: d.id,
