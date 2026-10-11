@@ -787,8 +787,18 @@ Sub ExtraireCji3()
   End If
   n = ScannerEcran("cji3-ecran-1.txt")
 
-  ' Toutes les dates : on vide les eventuelles bornes proposees par defaut.
+  ' Toutes les dates, et on vide le projet / reseau / activite que la variante
+  ' de selection de l'utilisateur peut avoir memorises (ex. un autre projet).
   On Error Resume Next
+  session.findById("wnd[0]/usr/ctxtCN_PROJN-LOW").Text = ""
+  session.findById("wnd[0]/usr/ctxtCN_PROJN-HIGH").Text = ""
+  session.findById("wnd[0]/usr/ctxtCN_NETNR-LOW").Text = ""
+  session.findById("wnd[0]/usr/ctxtCN_NETNR-HIGH").Text = ""
+  session.findById("wnd[0]/usr/ctxtCN_ACTVT-LOW").Text = ""
+  session.findById("wnd[0]/usr/ctxtCN_ACTVT-HIGH").Text = ""
+  session.findById("wnd[0]/usr/ctxtR_KSTAR-LOW").Text = ""
+  session.findById("wnd[0]/usr/ctxtR_KSTAR-HIGH").Text = ""
+  session.findById("wnd[0]/usr/ctxtKOAGR").Text = ""
   session.findById("wnd[0]/usr/ctxtR_BUDAT-LOW").Text = ""
   session.findById("wnd[0]/usr/ctxtR_BUDAT-HIGH").Text = ""
   session.findById("wnd[0]/usr/ctxtR_PERBL-LOW").Text = ""
@@ -809,20 +819,18 @@ Sub ExtraireCji3()
   If Existe("wnd[0]/usr/btn%_CN_PSPNR_%_APP_%-VALU_PUSH") Then FinVide "Aucune ecriture comptable pour ces affaires."
 
   n = ScannerEcran("cji3-ecran-2.txt")
-  Set grille = Nothing
-  If Existe("wnd[0]/usr/cntlGRID1/shellcont/shell") Then
-    Set grille = session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell")
+  ' Liste dans un controle ALV : export par le menu Liste > Exporter > Fichier local
+  ' (le meme format texte non converti que l'export manuel).
+  If Existe("wnd[0]/mbar/menu[0]/menu[3]/menu[2]") Then
+    session.findById("wnd[0]/mbar/menu[0]/menu[3]/menu[2]").select
   Else
-    Set grille = TrouverGrille(session.findById("wnd[0]/usr"), 0)
-  End If
-  If Not grille Is Nothing Then
-    grille.pressToolbarContextButton "&MB_EXPORT"
-    grille.selectContextMenuItem "&PC"
-  Else
-    ' Liste classique (edition de liste dynamique) : export local %pc
     session.findById("wnd[0]/tbar[0]/okcd").Text = "%pc"
     session.findById("wnd[0]/tbar[0]/btn[0]").press
   End If
+  On Error Resume Next
+  session.findById("wnd[1]/usr/subSUBSCREEN_STEPLOOP:SAPLSPO5:0150/sub:SAPLSPO5:0150/radSPOPLI-SELFLAG[0,0]").Select
+  Err.Clear
+  On Error GoTo 0
   If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
   If Not Existe("wnd[1]/usr/ctxtDY_PATH") Then
     n = ScannerEcran("cji3-ecran-3.txt")
