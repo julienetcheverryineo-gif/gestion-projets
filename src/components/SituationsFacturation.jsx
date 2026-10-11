@@ -349,7 +349,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                   {retardHt > 0.5 ? (
                     <>
                       {" "}
-                      · <strong>retard de facturation : {euro(retardHt)} € HT</strong>
+                      · <strong>retard de facturation par rapport à l'avancement : {euro(retardHt)} € HT</strong>
                     </>
                   ) : (
                     " · facturation à jour"

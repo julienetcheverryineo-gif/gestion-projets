@@ -41,7 +41,7 @@ export function cleLigneAchat(a) {
   return String(base).replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
-export function rapprocherAchats(parType, achatsSap, affectations = {}) {
+export function rapprocherAchats(parType, achatsSap, affectations = {}, devisId = null) {
   const codes = parType.map((t) => codeTypeFo(t.cle));
   const parCle = new Map(parType.map((t) => [t.cle, { reel: 0, lignes: [] }]));
   const horsBudget = { reel: 0, lignes: [] };
@@ -52,13 +52,21 @@ export function rapprocherAchats(parType, achatsSap, affectations = {}) {
     return i === -1 ? null : parType[i].cle;
   };
 
+  // Une affectation vaut « __hors », « <idDevis>||<Type de FO> » (dépense
+  // rattachée à un devis précis) ou « <Type de FO> » seul (tous devis).
+  // Avec `devisId` (tableau d'un devis), seules les dépenses rattachées à ce
+  // devis sont retenues ; la synthèse compte tout.
   achatsSap.forEach((a) => {
     const manuel = affectations[cleLigneAchat(a)];
     let cle;
-    if (manuel === AFFECTATION_HORS_BUDGET) {
+    if (devisId !== null) {
+      const { devisId: dev, cle: c } = lireAffectationHeure(manuel);
+      if (manuel === AFFECTATION_HORS_BUDGET || dev !== devisId || c === null || !parCle.has(c)) return;
+      cle = c;
+    } else if (manuel === AFFECTATION_HORS_BUDGET) {
       cle = null;
-    } else if (manuel && parCle.has(manuel)) {
-      cle = manuel;
+    } else if (manuel && parCle.has(lireAffectationHeure(manuel).cle)) {
+      cle = lireAffectationHeure(manuel).cle;
     } else {
       const codeQdv = QDV_PAR_CODE_SAP.get((a.grOr || "").trim().toUpperCase());
       cle = codeQdv ? cleDuType(codeQdv) : null;

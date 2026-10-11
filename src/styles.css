@@ -4213,3 +4213,22 @@ textarea:focus {
 .sit-marche strong { font-weight: 700; font-size: 1.15rem; }
 .sit-reste { color: var(--text) !important; font-size: 0.84rem !important; margin-top: 2px; }
 .sit-reste b { font-weight: 700; }
+
+/* Bilan MO : colonnes chiffrées (vendues, prévues, réel, restant, SAP, reste) de même largeur */
+.table-recap-mo > thead > tr > th:nth-child(2),
+.table-recap-mo > thead > tr > th:nth-child(3),
+.table-recap-mo > thead > tr > th:nth-child(4),
+.table-recap-mo > thead > tr > th:nth-child(6),
+.table-recap-mo > thead > tr > th:nth-child(7),
+.table-recap-mo > thead > tr > th:nth-child(8),
+.table-recap-mo > tbody > tr > td:nth-child(2),
+.table-recap-mo > tbody > tr > td:nth-child(3),
+.table-recap-mo > tbody > tr > td:nth-child(4),
+.table-recap-mo > tbody > tr > td:nth-child(6),
+.table-recap-mo > tbody > tr > td:nth-child(7),
+.table-recap-mo > tbody > tr > td:nth-child(8) {
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+}
+.recap-groupe-ligne > td { background: color-mix(in srgb, var(--text) 5%, transparent); font-weight: 500; }
