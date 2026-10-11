@@ -479,7 +479,7 @@ export default function BilanFinancier({
 
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
-      {affichage !== "eat" && <div className="panel-header">
+      {affichage === "finance" && <div className="panel-header">
         <h2>
           {affichage === "eatAnnonce" ? "🛡️ EAT pour marge annoncée" : affichage === "eatPilotage" ? "🎚️ EAT pilotage à la marge" : "💶 Bilan de l'affaire"}
         </h2>
