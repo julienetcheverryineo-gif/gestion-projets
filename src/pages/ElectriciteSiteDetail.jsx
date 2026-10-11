@@ -2951,7 +2951,7 @@ export default function ElectriciteSiteDetail() {
               const prevuMoLignes = recapMoSynthese.parType.map((l) => {
                 const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
                 const t = profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
-                return { code: profil || "I205", euro: (l.budget || 0) * t };
+                return { code: profil || "I205", euro: (l.budget || 0) * t, heures: l.budget || 0 };
               });
               const budgetMoEuro = prevuMoLignes.reduce((sm, l) => sm + l.euro, 0);
               // Heures prévues de production (profil I3xx / E) : base des

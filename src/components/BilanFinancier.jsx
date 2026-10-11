@@ -132,20 +132,23 @@ export default function BilanFinancier({
   const detailMo = (() => {
     const m = new Map();
     const ligne = (code) => {
-      if (!m.has(code)) m.set(code, { code, prevu: 0, reel: 0 });
+      if (!m.has(code)) m.set(code, { code, prevu: 0, reel: 0, prevuH: 0, reelH: 0 });
       return m.get(code);
     };
     (prevuMoLignes || []).forEach((l) => {
       if (l.euro) ligne(l.code).prevu += l.euro;
+      if (l.heures) ligne(l.code).prevuH += l.heures;
     });
     parType.forEach((t) => {
       if (t.cout) ligne(t.code).reel += t.cout;
+      if (t.heures && t.code !== "—") ligne(t.code).reelH += t.heures;
     });
     return [...m.values()]
       .map((t) => ({
         ...t,
         nom: libelleTypeActivite(t.code),
         atterr: t.reel + t.prevu * (1 - pctMo),
+        atterrH: t.reelH + t.prevuH * (1 - pctMo),
       }))
       .sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
   })();
@@ -314,6 +317,93 @@ export default function BilanFinancier({
         <br />
         Réglage des taux dans « Import SAP » (commun à toutes les affaires).
       </p>
+
+
+      <div className="bf-eat" style={{ marginTop: 18 }}>
+        <h3 style={{ margin: "0 0 4px" }}>🎯 Aide à la déclaration EAT (estimation à terme)</h3>
+        <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
+          EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
+          prorata, aléas, négociation et matériel interne sont recalculés par la FOA à partir de ces saisies.
+        </p>
+        <div className="data-table-wrapper">
+          <table className="data-table bf-table">
+            <thead>
+              <tr>
+                <th>À déclarer</th>
+                <th>Budget (prévu)</th>
+                <th>Réel à date</th>
+                <th>EAT réaliste</th>
+                <th>Écart / budget</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bf-section bf-mo"><td colSpan={5}>Main d'œuvre par type (heures)</td></tr>
+              {detailMo.filter((t) => t.prevuH || t.reelH).map((t) => (
+                <tr key={t.code} className="bf-detail bf-mo">
+                  <td style={{ paddingLeft: 24 }}>{t.nom}</td>
+                  <td>{num(t.prevuH)} h</td>
+                  <td>{num(t.reelH)} h</td>
+                  <td style={{ fontWeight: 700 }}>{num(t.atterrH)} h <span className="simple-list-meta">({eur(t.atterr)})</span></td>
+                  <td style={classeNeg(t.prevuH - t.atterrH)}>{(t.atterrH - t.prevuH > 0 ? "+" : "") + num(t.atterrH - t.prevuH)} h</td>
+                </tr>
+              ))}
+              <tr className="bf-section bf-ach"><td colSpan={5}>Fournitures / sous-traitance par type (€)</td></tr>
+              {(detailFo || []).map((t) => {
+                const e = t.reel + t.prevu * (1 - t.av);
+                return (
+                  <tr key={t.libelle} className="bf-detail bf-ach">
+                    <td style={{ paddingLeft: 24 }}>{t.libelle}</td>
+                    <td>{eur(t.prevu)}</td>
+                    <td>{eur(t.reel)}</td>
+                    <td style={{ fontWeight: 700 }}>{eur(e)}</td>
+                    <td style={classeNeg(t.prevu - e)}>{(e - t.prevu > 0 ? "+" : "") + eur(e - t.prevu)}</td>
+                  </tr>
+                );
+              })}
+              <tr className="bf-section bf-autres"><td colSpan={5}>Matériel interne (heures porteuses)</td></tr>
+              <tr className="bf-detail bf-autres">
+                <td style={{ paddingLeft: 24 }}>Heures avec matériel interne</td>
+                <td>{num(heuresMatInternePrevues)} h</td>
+                <td>{num(heuresMiReelles)} h</td>
+                <td style={{ fontWeight: 700 }}>{num(heuresMiAtterr)} h <span className="simple-list-meta">({eur(atterr.C_mi)})</span></td>
+                <td style={classeNeg(heuresMatInternePrevues - heuresMiAtterr)}>{(heuresMiAtterr - heuresMatInternePrevues > 0 ? "+" : "") + num(heuresMiAtterr - heuresMatInternePrevues)} h</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {(() => {
+          const ecart = atterr.nette - prevu.nette;
+          const kPrevu = prevu.k, kAtt = atterr.k;
+          // Surcoût direct (avant FRA et frais divers) à absorber pour revenir à la marge annoncée.
+          const coefMarge = 1 + foa.fra;
+          const aAbsorber = ecart < 0 ? -ecart / coefMarge : 0;
+          return (
+            <div className="bf-eat-synthese" style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <div>
+                Marge annoncée (prévu) : <strong>{eur(prevu.nette)}</strong> · k {kPrevu === null ? "—" : num(kPrevu * 100, 1) + " %"}
+              </div>
+              <div>
+                Marge avec EAT réaliste : <strong style={classeNeg(atterr.nette)}>{eur(atterr.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
+                {" "}
+                <span style={ecart < 0 ? { color: ROUGE, fontWeight: 600 } : { color: "var(--ok)", fontWeight: 600 }}>
+                  ({(ecart > 0 ? "+" : "") + eur(ecart)})
+                </span>
+              </div>
+              {ecart < -1 ? (
+                <div className="simple-list-meta" style={{ marginTop: 4 }}>
+                  Déclarer l'EAT réaliste dégrade la marge de {eur(-ecart)}. Pour la tenir, il faudrait trouver environ{" "}
+                  {eur(aAbsorber)} d'économies directes (MO / FO) sur le reste à faire — à partir des lignes en dépassement
+                  ci-dessus — ou obtenir du CA supplémentaire (avenant). Le budget prévu ne peut pas être déclaré en dessous du réel déjà dépensé.
+                </div>
+              ) : (
+                <div className="simple-list-meta" style={{ marginTop: 4 }}>
+                  L'EAT réaliste ne dégrade pas la marge annoncée : vous pouvez le déclarer tel quel.
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
 
       {heuresSansTaux > 0 && (
         <p style={{ color: ROUGE, margin: "8px 0" }}>
