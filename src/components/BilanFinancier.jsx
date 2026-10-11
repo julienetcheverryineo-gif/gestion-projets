@@ -465,6 +465,54 @@ export default function BilanFinancier({
         );
       })() : null;
 
+  // Justificatif : dépense déclarée (facteur f du reste à faire) vs prévu, poste par poste.
+  const justificatif = (f, col, titre) => {
+    const lignes = [];
+    detailMoE.forEach((t) => {
+      const h = t.reelH + t.prevuH * (1 - pctMo) * f;
+      const d = (h - t.prevuH) * txSap(t.code);
+      if (Math.abs(d) >= 1) lignes.push({ lib: "MO — " + t.nom, d });
+    });
+    foLignes.forEach((t) => {
+      const d = t.reel + t.prevu * (1 - t.av) * f - t.prevu;
+      if (Math.abs(d) >= 1) lignes.push({ lib: "Fournitures — " + t.libelle, d });
+    });
+    const dAutres = reelAutresE + resteMi * f - prevu.C_mi;
+    if (Math.abs(dAutres) >= 1) lignes.push({ lib: "Autres frais", d: dAutres });
+    const totalPlus = prevuEat.nette - col.nette;
+    const reste = totalPlus - lignes.reduce((x, i) => x + i.d, 0);
+    if (Math.abs(reste) >= 1) lignes.push({ lib: "FRA, achats hors commandes, engagé et divers", d: reste });
+    if (!lignes.length) return null;
+    lignes.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+    const coul = (d) => (d > 0 ? { color: ROUGE } : { color: "var(--ok)" });
+    const signe = (d) => (d > 0 ? "+" : "") + eur(d);
+    return (
+      <div style={{ marginTop: 10 }}>
+        <strong>{titre}</strong>
+        <table className="data-table bf-table" style={{ marginTop: 4, maxWidth: 640 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left" }}>Poste</th>
+              <th>Dépense vs prévu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((i) => (
+              <tr key={i.lib}>
+                <td style={{ textAlign: "left", whiteSpace: "normal" }}>{i.lib}</td>
+                <td style={coul(i.d)}>{signe(i.d)}</td>
+              </tr>
+            ))}
+            <tr className="bf-total">
+              <td style={{ textAlign: "left" }}>{totalPlus >= 0 ? "Total dépenses en plus" : "Total dépenses en moins"}</td>
+              <td style={{ ...coul(totalPlus), fontWeight: 700 }}>{signe(totalPlus)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   if (affichage === "autresFrais") {
     return (
       <div className="panel" style={{ marginBottom: 16 }}>
@@ -571,7 +619,7 @@ export default function BilanFinancier({
 
 
       {affichage === "eat" && (
-      <div className="bf-eat" style={{ marginTop: 18 }}>
+      <div className="bf-eat" style={{ marginTop: 0 }}>
         <h3 style={{ margin: "0 0 4px" }}>🎯 Aide à la déclaration EAT (estimation à terme)</h3>
         <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
           EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
@@ -640,51 +688,7 @@ export default function BilanFinancier({
               <div>
                 Marge avec EAT réaliste : <strong style={classeNeg(atterrEat.nette)}>{eur(atterrEat.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
               </div>
-              {Math.abs(ecart) > 1 && (() => {
-                // Dépense en plus (+) ou en moins (−) par rapport au prévu, ligne par ligne.
-                const lignes = [];
-                detailMoE.forEach((t) => {
-                  const d = (t.atterrH - t.prevuH) * txSap(t.code);
-                  if (Math.abs(d) >= 1) lignes.push({ lib: "MO — " + t.nom, d });
-                });
-                foLignes.forEach((t) => {
-                  const d = t.reel + t.prevu * (1 - t.av) - t.prevu;
-                  if (Math.abs(d) >= 1) lignes.push({ lib: "Fournitures — " + t.libelle, d });
-                });
-                const dAutres = reelAutresE + resteMi - prevu.C_mi;
-                if (Math.abs(dAutres) >= 1) lignes.push({ lib: "Autres frais", d: dAutres });
-                const totalPlus = -ecart;
-                const reste = totalPlus - lignes.reduce((x, i) => x + i.d, 0);
-                if (Math.abs(reste) >= 1) lignes.push({ lib: "FRA, achats hors commandes, engagé et divers", d: reste });
-                lignes.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
-                const coul = (d) => (d > 0 ? { color: ROUGE } : { color: "var(--ok)" });
-                const signe = (d) => (d > 0 ? "+" : "") + eur(d);
-                return (
-                  <div style={{ marginTop: 10 }}>
-                    <strong>{ecart < 0 ? "Pourquoi la marge se dégrade" : "Pourquoi la marge s'améliore"}</strong>
-                    <table className="data-table bf-table" style={{ marginTop: 4, maxWidth: 640 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: "left" }}>Poste</th>
-                          <th>Dépense vs prévu</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lignes.map((i) => (
-                          <tr key={i.lib}>
-                            <td style={{ textAlign: "left", whiteSpace: "normal" }}>{i.lib}</td>
-                            <td style={coul(i.d)}>{signe(i.d)}</td>
-                          </tr>
-                        ))}
-                        <tr className="bf-total">
-                          <td style={{ textAlign: "left" }}>{totalPlus >= 0 ? "Total dépenses en plus" : "Total dépenses en moins"}</td>
-                          <td style={{ ...coul(totalPlus), fontWeight: 700 }}>{signe(totalPlus)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })()}
+              {justificatif(1, atterrEat, ecart < 0 ? "Pourquoi la marge se dégrade" : "Pourquoi la marge s'améliore")}
             </div>
           );
         })()}
@@ -694,7 +698,7 @@ export default function BilanFinancier({
 
       {(() => {
         const tableauEat = (titre, explication, res, cible) => (
-          <div className="bf-eat" style={{ marginTop: 18 }}>
+          <div className="bf-eat" style={{ marginTop: 0 }}>
             <h3 style={{ margin: "0 0 4px" }}>{titre}</h3>
             <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>{explication}</p>
             <div className="data-table-wrapper">
@@ -796,6 +800,7 @@ export default function BilanFinancier({
                 </div>
               )}
             </div>
+            {justificatif(res.f, res.col, "Justificatif : dépenses déclarées par rapport au prévu (marge annoncée)")}
           </div>
         );
         const resAnnonce = resoudreEat(prevuEat.nette);
@@ -814,7 +819,7 @@ export default function BilanFinancier({
               prevuEat.nette
             )}
             {affichage === "eatPilotage" && (<>
-            <div style={{ marginTop: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ marginTop: 0, marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <h3 style={{ margin: 0 }}>🎚️ Je veux annoncer</h3>
               <input
                 type="text"
