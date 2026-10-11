@@ -428,8 +428,9 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                         </div>
                       ) : (
                         <div key={r.id} className="sit-ligne">
-                          <div className="sit-desc" title={r.texte}>
+                          <div className="sit-desc">
                             {r.texte.split("\n")[0]}
+                            {r.texte.includes("\n") && <div className="sit-desc-detail">{r.texte.slice(r.texte.indexOf("\n") + 1).trim()}</div>}
                             <small>
                               {r.quantite} {r.unite} × {euro(r.pu)} €
                               {r.compensation ? " · dont compensation " + euro(r.compensation) + " €" : ""}

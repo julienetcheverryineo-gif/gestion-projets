@@ -4197,3 +4197,4 @@ textarea:focus {
   background: color-mix(in srgb, var(--text) 6%, #fff);
   color: var(--text-muted);
 }
+.sit-desc-detail { white-space: pre-line; margin-top: 3px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.35; overflow-wrap: anywhere; }
