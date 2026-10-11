@@ -350,7 +350,12 @@ export default function BilanFinancier({
   const fournisseurParCommande = new Map();
   (achatsSap || []).forEach((a) => a.docAchat && !fournisseurParCommande.has(a.docAchat) && fournisseurParCommande.set(a.docAchat, String(a.nomFournisseur || "").trim()));
   const blocAutresFrais = cji3Eat ? (() => {
-        const lignes = cji3Eat.ecritures || [];
+        const lignesTout = cji3Eat.ecritures || [];
+        // Les écritures rattachées à une commande déjà listée dans le bilan Fournitures (ME2J) sont masquées : doublon.
+        const commandesFo = new Set((achatsSap || []).map((a) => a.docAchat).filter(Boolean));
+        const dansFo = (e) => !!e.docAchat && commandesFo.has(e.docAchat);
+        const lignes = lignesTout.filter((e) => !dansFo(e));
+        const masquees = lignesTout.filter(dansFo);
         const groupes = [
           ["Achats (classe 60)", (e) => /^60/.test(e.nat)],
           ["Autres frais (62, 64, 9000)", (e) => /^(62|64|9000)/.test(e.nat)],
@@ -376,6 +381,12 @@ export default function BilanFinancier({
             <h3 style={{ margin: "0 0 4px" }}>🧾 Bilan autres frais — comptabilité SAP (CJI3 du {cji3Eat.importeLe ? new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR") : "—"})</h3>
             <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
               Tout ce que SAP a comptabilisé hors main d'œuvre, par compte. Cliquez sur un compte pour voir ses écritures (date, pièce, libellé, fournisseur, n° de commande).
+              {masquees.length > 0 && (
+                <>
+                  <br />
+                  {masquees.length} écritures ({eur(masquees.reduce((x, e) => x + e.montant, 0))}) rattachées à une commande déjà présente dans « Bilan Fournitures » ne sont pas répétées ici.
+                </>
+              )}
             </p>
             <div style={{ margin: "0 0 8px" }}>
               <button
@@ -460,9 +471,9 @@ export default function BilanFinancier({
                 </div>
               )}
               <div className="simple-list-meta" style={{ marginTop: 4 }}>
-                Rapprochement ME2J ↔ comptabilité : {lignes.filter((e) => /^60/.test(e.nat) && e.docAchat).length} / {lignes.filter((e) => /^60/.test(e.nat)).length} écritures
+                Rapprochement ME2J ↔ comptabilité : {lignesTout.filter((e) => /^60/.test(e.nat) && e.docAchat).length} / {lignesTout.filter((e) => /^60/.test(e.nat)).length} écritures
                 d'achats portent un n° de commande — engagé calculé : {eur(engageAuto)}
-                {lignes.some((e) => /^60/.test(e.nat) && e.docAchat) ? "" : " (colonne « Doc achat » absente du CJI3 : engagé à saisir à la main)"}
+                {lignesTout.some((e) => /^60/.test(e.nat) && e.docAchat) ? "" : " (colonne « Doc achat » absente du CJI3 : engagé à saisir à la main)"}
               </div>
               {engageDetail.length > 0 && (
                 <div className="simple-list-meta" style={{ marginTop: 4 }}>
