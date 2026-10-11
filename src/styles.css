@@ -4199,3 +4199,13 @@ textarea:focus {
 }
 .sit-desc-detail { white-space: pre-line; margin-top: 3px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.35; overflow-wrap: anywhere; }
 .sit-desc small { color: var(--tache); font-weight: 600; font-size: 0.78rem; margin-top: 3px; }
+.sit-coh { gap: 4px; }
+.sit-coh-ligne { display: grid; grid-template-columns: 92px 1fr 52px; align-items: center; gap: 8px; font-size: 0.78rem; }
+.sit-coh-ligne span { text-transform: none; letter-spacing: 0; font-size: 0.78rem; }
+.sit-coh-ligne .sit-barre { margin: 0; }
+.sit-coh-ligne b { text-align: right; font-variant-numeric: tabular-nums; }
+.sit-coh-verdict { font-weight: 600; color: var(--accent); }
+.sit-coh-retard .sit-coh-verdict, .sit-coh-avance .sit-coh-verdict { color: var(--warn); }
+.sit-coh-retard { border-color: var(--warn); }
+.sit-coh-avance { border-color: var(--danger); }
+.sit-coh-avance .sit-coh-verdict { color: var(--danger); }

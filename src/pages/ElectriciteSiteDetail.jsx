@@ -2558,8 +2558,38 @@ export default function ElectriciteSiteDetail() {
           )}
         </div>
 
-          {recapActif === "situations" && (
+          {recapActif === "situations" &&
+            (() => {
+              // Réel SAP du chantier (achats nets + heures × taux) face au budget
+              // chiffré, et avancement réel moyen pondéré : sert à vérifier que la
+              // facturation est cohérente avec le terrain.
+              const totFoS = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
+              const recapMoS = construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", {}), chantier, GENERAL, devis);
+              const tauxDefautS = totalTauxDefaut(chantier, tauxHoraire);
+              let budgetMoS = 0;
+              recapMoS.parType.forEach((l) => {
+                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
+                budgetMoS += (l.budget || 0) * (profil ? tauxHoraire(profil) ?? tauxDefautS : tauxDefautS);
+              });
+              const budgetFoS = totFoS.budget || 0;
+              const budgetS = budgetFoS + budgetMoS;
+              const reelFoS = achatsSap.reduce((sm, a) => sm + (Number(a.valNette) || 0), 0);
+              const reelMoS = heuresSap.reduce((sm, h) => {
+                const tx = tauxHoraire(normaliserTypeActivite(h.typAct) || "I205");
+                return sm + (Number(h.heures) || 0) * (tx ?? tauxDefautS);
+              }, 0);
+              const sap =
+                budgetS > 0
+                  ? {
+                      budget: budgetS,
+                      reel: reelFoS + reelMoS,
+                      disponible: achatsSap.length > 0 || heuresSap.length > 0,
+                      avancementPct: ((budgetFoS * (totFoS.pctAvancement || 0) + budgetMoS * (recapMoS.total.pctAvancement || 0)) / budgetS) * 100,
+                    }
+                  : null;
+              return (
             <SituationsFacturation
+              sap={sap}
               chantierId={chantierId}
               chantier={chantier}
               devis={devis}
@@ -2568,7 +2598,8 @@ export default function ElectriciteSiteDetail() {
               peutGerer={peutGerer}
               tauxHoraire={tauxHoraire}
             />
-          )}
+              );
+            })()}
 
           {recapActif === "achats" && (
             <>

@@ -28,7 +28,7 @@ function telecharger(blob, nom) {
 // ligne de la minute (prix de vente de la minute), puis export Excel.
 // Stockage : chantier.situationsMode ("ensemble" | "devis") et
 // chantier.situationsData = { "_all" | <devisId>: [situations] }.
-export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer, tauxHoraire }) {
+export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer, tauxHoraire, sap }) {
   const { profile } = useAuth();
   const mode = chantier?.situationsMode || null; // null = pas encore choisi
   const [devisChoisi, setDevisChoisi] = useState(null);
@@ -54,6 +54,22 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
   };
 
   const marche = montantMarche(rows);
+
+  // Facturé cumulé sur tout le chantier (toutes les clés de situations) face au
+  // marché complet : base de comparaison avec le réel SAP, qui est global.
+  const globalFact = useMemo(() => {
+    const data = chantier?.situationsData || {};
+    const groupes = mode === "devis" ? devis.map((d) => [d.id, [d]]) : [[CLE_ENSEMBLE, devis]];
+    let facture = 0;
+    groupes.forEach(([k, ds]) => {
+      const sits = data[k];
+      if (!sits?.length) return;
+      facture += totalCumule(construireLignesSituation(ds, toutesLignes, chantierId, tousGroupes || []), sits, sits.length - 1);
+    });
+    const marcheTotal = montantMarche(construireLignesSituation(devis, toutesLignes, chantierId, tousGroupes || []));
+    return { facture, marcheTotal };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chantier?.situationsData, mode, devis, toutesLignes, chantierId, tousGroupes]);
   const sit = indexOuvert >= 0 ? situations[indexOuvert] : null;
   const estDerniere = indexOuvert === situations.length - 1;
   const verrouillee = !!sit?.validee;
@@ -151,7 +167,6 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
   const cumulHt = sit ? totalCumule(rows, situations, indexOuvert) : 0;
   const precedentHt = sit ? montantADeduire(rows, situations, indexOuvert, acompte) : 0;
   const moisHt = Math.round((cumulHt - precedentHt) * 100) / 100;
-  const tva = Math.round(moisHt * (tauxTva / 100) * 100) / 100;
 
   // Première situation : choix du périmètre (ensemble de l'affaire ou par devis).
   if (!mode && devis.length > 1 && peutGerer) {
@@ -277,11 +292,41 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                   <strong>{euro(moisHt)} €</strong>
                   <em>HT · travaux de la période {euro(travauxPeriode)} €</em>
                 </div>
-                <div className="sit-kpi">
-                  <span>TTC (TVA {String(tauxTva).replace(".", ",")} %)</span>
-                  <strong>{euro(moisHt + tva)} €</strong>
-                  <em>TVA {euro(tva)} €</em>
-                </div>
+                {(() => {
+                  const M = globalFact.marcheTotal;
+                  if (!sap || !(M > 0)) return null;
+                  const pF = (globalFact.facture / M) * 100;
+                  const pAv = sap.avancementPct;
+                  const pSap = sap.disponible ? (sap.reel / sap.budget) * 100 : null;
+                  const attendu = Math.max(pAv, pSap ?? 0);
+                  const ecartEuro = ((attendu - pF) / 100) * M;
+                  const ecartPts = attendu - pF;
+                  let etat = "ok";
+                  let verdict = "Facturation cohérente avec l'avancement et les dépenses SAP";
+                  if (ecartPts > 2) {
+                    etat = "retard";
+                    verdict = "Sous-facturé d'environ " + euro(ecartEuro) + " € HT" + (pSap !== null && pSap > pAv ? " (dépenses SAP en avance)" : " (avancement réel en avance)");
+                  } else if (ecartPts < -2) {
+                    etat = "avance";
+                    verdict = "Sur-facturé d'environ " + euro(-ecartEuro) + " € HT par rapport au réel";
+                  }
+                  const barre = (nom, v, titre) => (
+                    <div className="sit-coh-ligne" title={titre}>
+                      <span>{nom}</span>
+                      <div className="sit-barre"><i style={{ width: Math.min(100, Math.max(0, v)) + "%" }} /></div>
+                      <b>{v === null ? "—" : pctTexte(v) + " %"}</b>
+                    </div>
+                  );
+                  return (
+                    <div className={"sit-kpi sit-coh sit-coh-" + etat}>
+                      <span>Facturation vs réel</span>
+                      {barre("Facturé", pF, "Facturé cumulé (toutes situations) / marché")}
+                      {barre("Avancement", pAv, "Avancement réel saisi dans le suivi (FO + MO pondérés)")}
+                      {pSap !== null ? barre("Dépenses SAP", pSap, "Réel SAP (achats + heures × taux) / budget chiffré") : <em>Aucun import SAP pour ce chantier</em>}
+                      <em className="sit-coh-verdict">{etat === "ok" ? "✓ " : "⚠ "}{verdict}</em>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className={"sit-retard" + (retardHt > 0.5 ? " en-retard" : "")}>
