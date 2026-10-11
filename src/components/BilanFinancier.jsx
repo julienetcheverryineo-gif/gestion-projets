@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { libelleTypeActivite, normaliserTypeActivite, inclutMaterielInterne } from "../lib/typesActiviteSap";
 import { HEURES_PAR_JOUR_ZONE } from "../lib/tauxHoraires";
 import iconeAutresFrais from "../assets/icone-autres-frais.png";
-import { analyserCji3 } from "../lib/parseCji3";
 
 const eur = (v) =>
   (Number(v) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -87,8 +86,6 @@ export default function BilanFinancier({
   const [saisieCa, setSaisieCa] = useState({});
   const [saisiePct, setSaisiePct] = useState({});
   // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
-  const [saisieReelSap, setSaisieReelSap] = useState(null);
-  const [messageCji3, setMessageCji3] = useState("");
   const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
   const kAffiche =
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
@@ -482,11 +479,11 @@ export default function BilanFinancier({
 
   return (
     <div className="panel" style={{ marginBottom: 16 }}>
-      <div className="panel-header">
+      {affichage !== "eat" && <div className="panel-header">
         <h2>
-          {affichage === "eat" ? "🎯 EAT — aide à la déclaration" : affichage === "eatAnnonce" ? "🛡️ EAT pour marge annoncée" : affichage === "eatPilotage" ? "🎚️ EAT pilotage à la marge" : "💶 Bilan de l'affaire"}
+          {affichage === "eatAnnonce" ? "🛡️ EAT pour marge annoncée" : affichage === "eatPilotage" ? "🎚️ EAT pilotage à la marge" : "💶 Bilan de l'affaire"}
         </h2>
-      </div>
+      </div>}
 
       {affichage === "finance" && (
       <>
@@ -576,94 +573,6 @@ export default function BilanFinancier({
       {affichage === "eat" && (
       <div className="bf-eat" style={{ marginTop: 18 }}>
         <h3 style={{ margin: "0 0 4px" }}>🎯 Aide à la déclaration EAT (estimation à terme)</h3>
-        <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
-          EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
-          prorata, aléas, négociation et matériel interne sont recalculés par la FOA à partir de ces saisies.
-          <br />
-          <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <label className="btn-ghost" style={{ cursor: onChangerCji3Eat ? "pointer" : "not-allowed" }}>
-              ⤓ Importer le CJI3 du chantier
-              <input
-                type="file"
-                accept=".txt,.csv"
-                style={{ display: "none" }}
-                disabled={!onChangerCji3Eat}
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!f) return;
-                  try {
-                    const texte = new TextDecoder("windows-1252").decode(await f.arrayBuffer());
-                    const r = analyserCji3(texte);
-                    await onChangerCji3Eat({ ...r, importeLe: new Date().toISOString() });
-                    setMessageCji3("CJI3 importé : " + r.nbEcritures + " écritures, réel direct " + eur(r.directTotal));
-                  } catch (err) {
-                    setMessageCji3(err.message || "Import impossible.");
-                  }
-                }}
-              />
-            </label>
-            {messageCji3 ? <span>{messageCji3}</span> : cji3Eat?.importeLe ? <span>CJI3 du {new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR")} · réel direct {eur(cji3Eat.directTotal)}</span> : <span>(cumul comptable SAP : heures par type, achats, autres frais)</span>}
-          </span>
-          <br />
-          {cji3Eat ? (
-            <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              Engagé SAP (commandes ME2J non comptabilisées ; calculé automatiquement, saisie = forçage) :
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder={engageAuto ? String(engageAuto).replace(".", ",") : "ex. 3 673"}
-                disabled={!onChangerEngageSapEat}
-                value={saisieReelSap !== null ? saisieReelSap : typeof engageSapEat === "number" ? String(engageSapEat).replace(".", ",") : ""}
-                onChange={(e) => setSaisieReelSap(e.target.value)}
-                onBlur={() => {
-                  if (saisieReelSap === null) return;
-                  const t = String(saisieReelSap).replace(",", ".").replace(/\s/g, "").trim();
-                  const n = t === "" ? null : Number(t);
-                  setSaisieReelSap(null);
-                  if (n === null || (Number.isFinite(n) && n >= 0)) onChangerEngageSapEat?.(n);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                style={{ width: "7em", textAlign: "right" }}
-              />
-              € → réel SAP {eur(reelSapEffectif)} · calage {calageSap >= 0 ? "+" : ""}
-              {eur(calageSap)} (réel outil : {eur(reelOutilDirect)})
-            </span>
-          ) : (
-          <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            Réel SAP cumulé + engagé (écran RàE, « CD hors FRA ») :
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="ex. 131 059"
-              disabled={!onChangerReelSapEat}
-              value={saisieReelSap !== null ? saisieReelSap : typeof reelSapEat === "number" ? String(Math.round(reelSapEat * 100) / 100).replace(".", ",") : ""}
-              onChange={(e) => setSaisieReelSap(e.target.value)}
-              onBlur={() => {
-                if (saisieReelSap === null) return;
-                const t = String(saisieReelSap).replace(",", ".").replace(/\s/g, "").trim();
-                const n = t === "" ? null : Number(t);
-                setSaisieReelSap(null);
-                if (n === null || (Number.isFinite(n) && n >= 0)) onChangerReelSapEat?.(n);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-              style={{ width: "7em", textAlign: "right" }}
-            />
-            €
-            {typeof reelSapEat === "number" && (
-              <span>
-                → calage {calageSap >= 0 ? "+" : ""}
-                {eur(calageSap)} (réel outil : {eur(reelOutilDirect)})
-              </span>
-            )}
-          </span>
-          )}
-          <br />
-          <em>
-            {cji3Eat ? "Calcul identique à l'écran RàE de SAP : CD hors FRA = cumul comptable (CJI3) + engagé + RAE (heures au taux retenu SAP, FO, autres frais) ; FRA sur CD hors FRA moins l'engagé ; pas de provisions FOA (prorata, aléas, négo). " : ""}Calage SAP : frais généraux à {num(FG_EAT * 100, 1)} % du CA (valeur de l'écran RàE) au lieu de {num(foa.fg * 100, 1)} % (FOA) pour
-            ces trois tableaux ; FRA {num(foa.fra * 100, 3)} %, identique à SAP.
-          </em>
-        </p>
         <div className="data-table-wrapper">
           <table className="data-table bf-table">
             <thead>
@@ -719,8 +628,6 @@ export default function BilanFinancier({
           const ecart = atterrEat.nette - prevuEat.nette;
           const kPrevu = prevuEat.k, kAtt = atterrEat.k;
           // Surcoût direct (avant FRA et frais divers) à absorber pour revenir à la marge annoncée.
-          const coefMarge = 1 + foa.fra;
-          const aAbsorber = ecart < 0 ? -ecart / coefMarge : 0;
           return (
             <div className="bf-eat-synthese" style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
               <div>
@@ -733,17 +640,6 @@ export default function BilanFinancier({
                   ({(ecart > 0 ? "+" : "") + eur(ecart)})
                 </span>
               </div>
-              {ecart < -1 ? (
-                <div className="simple-list-meta" style={{ marginTop: 4 }}>
-                  Déclarer l'EAT réaliste dégrade la marge de {eur(-ecart)}. Pour la tenir, il faudrait trouver environ{" "}
-                  {eur(aAbsorber)} d'économies directes (MO / FO) sur le reste à faire — à partir des lignes en dépassement
-                  ci-dessus — ou obtenir du CA supplémentaire (avenant). Le budget prévu ne peut pas être déclaré en dessous du réel déjà dépensé.
-                </div>
-              ) : (
-                <div className="simple-list-meta" style={{ marginTop: 4 }}>
-                  L'EAT réaliste ne dégrade pas la marge annoncée : vous pouvez le déclarer tel quel.
-                </div>
-              )}
             </div>
           );
         })()}
