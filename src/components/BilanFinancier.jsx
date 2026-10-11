@@ -204,19 +204,25 @@ export default function BilanFinancier({
   const txSap = (code) => TX_RETENU_SAP[code] ?? taux(code) ?? 0;
   // Engagé = commandes ME2J pas encore comptabilisées : par commande d'achat,
   // montant ME2J − achats CJI3 de la même commande (jamais négatif).
-  const engageAuto = (() => {
-    if (!cji3Eat || !Array.isArray(achatsSap)) return 0;
+  const engageDetail = (() => {
+    if (!cji3Eat || !Array.isArray(achatsSap)) return [];
     const cmd = new Map();
-    achatsSap.forEach((a) => a.docAchat && cmd.set(a.docAchat, (cmd.get(a.docAchat) || 0) + (Number(a.valNette) || 0)));
+    achatsSap.forEach((a) => {
+      if (!a.docAchat) return;
+      const g = cmd.get(a.docAchat) || { po: a.docAchat, fournisseur: a.nomFournisseur || "", cmd: 0 };
+      g.cmd += Number(a.valNette) || 0;
+      cmd.set(a.docAchat, g);
+    });
     const compta = new Map();
     (cji3Eat.ecritures || []).forEach((e) => /^60/.test(e.nat) && e.docAchat && compta.set(e.docAchat, (compta.get(e.docAchat) || 0) + e.montant));
-    // Sans numéro de commande dans les écritures CJI3 (variante d'affichage sans
-    // la colonne « Doc achat »), le rapprochement est impossible : pas d'engagé auto.
-    if (compta.size === 0) return 0;
-    let t = 0;
-    cmd.forEach((m, k) => { t += Math.max(0, m - (compta.get(k) || 0)); });
-    return Math.round(t * 100) / 100;
+    // Sans numéro de commande dans les écritures CJI3 (variante sans « Doc achat »), pas de rapprochement.
+    if (compta.size === 0) return [];
+    return [...cmd.values()]
+      .map((g) => ({ ...g, compta: compta.get(g.po) || 0, ecart: g.cmd - (compta.get(g.po) || 0) }))
+      .filter((g) => Math.abs(g.ecart) > 0.5)
+      .sort((x, y) => y.ecart - x.ecart);
   })();
+  const engageAuto = Math.round(engageDetail.reduce((t, g) => t + Math.max(0, g.ecart), 0) * 100) / 100;
   const engageE = typeof engageSapEat === "number" ? engageSapEat : engageAuto;
   const reelAchatsE = cji3Eat ? cji3Eat.achats : reelFoLignes;
   const reelAutresE = cji3Eat ? cji3Eat.autresFrais : heuresMiReellesE * foa.materielInterne;
@@ -834,6 +840,12 @@ export default function BilanFinancier({
                 d'achats portent un n° de commande — engagé calculé : {eur(engageAuto)}
                 {lignes.some((e) => /^60/.test(e.nat) && e.docAchat) ? "" : " (colonne « Doc achat » absente du CJI3 : engagé à saisir à la main)"}
               </div>
+              {engageDetail.length > 0 && (
+                <div className="simple-list-meta" style={{ marginTop: 4 }}>
+                  Commandes dont le ME2J et la comptabilité diffèrent (écart &gt; 0 = engagé) :{" "}
+                  {engageDetail.map((g) => `${g.po} ${g.fournisseur.trim()} : commandé ${eur(g.cmd)}, comptabilisé ${eur(g.compta)}, écart ${eur(g.ecart)}`).join(" ; ")}
+                </div>
+              )}
               <div style={{ marginTop: 4 }}>
                 Autres frais comptabilisés : <strong>{eur(cji3Eat.autresFrais)}</strong> · matériel interne théorique de l'outil :{" "}
                 <strong>{eur(heuresMiReellesE * foa.materielInterne)}</strong>
