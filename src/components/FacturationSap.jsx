@@ -1,7 +1,6 @@
-import { useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { ETATS_CHANTIER, ETATS_FACTURATION, etatAutoSap, lireFichierSuivi, rattacherSuivi } from "../lib/suiviFacturation";
+import { ETATS_CHANTIER, ETATS_FACTURATION, etatAutoSap } from "../lib/suiviFacturation";
 
 const euro = (n) =>
   Number(n || 0)
@@ -42,9 +41,7 @@ const dateTri = (d) => String(d).split(".").reverse().join("");
 // suiviFacturation { importeLe, lignes: { <cle commande>: { etat, cmdClient,
 // devis, commentaire } }, libres: [...] }. commentairesFacturationSap = ancien
 // emplacement des commentaires (toujours lu).
-export default function FacturationSap({ chantierId, chantier, otp, peutGerer, factureSituations }) {
-  const entree = useRef(null);
-  const [message, setMessage] = useState(null);
+export default function FacturationSap({ chantierId, chantier, peutGerer, factureSituations }) {
   const data = chantier?.sapFacturation || null;
   const suivi = chantier?.suiviFacturation || {};
   const anciensCommentaires = chantier?.commentairesFacturationSap || {};
@@ -57,30 +54,6 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
   const majLigne = (cle, patch) =>
     enregistrerSuivi({ lignes: { ...(suivi.lignes || {}), [cle]: { ...(suivi.lignes?.[cle] || {}), ...patch } } });
   const majLibre = (i, patch) => enregistrerSuivi({ libres: libres.map((l, k) => (k === i ? { ...l, ...patch } : l)) });
-
-  const importerSuivi = async (fichier) => {
-    if (!fichier) return;
-    setMessage(null);
-    try {
-      if (!otp) throw new Error("renseignez d'abord le champ « Compte » du chantier (code OTP).");
-      const lignes = lireFichierSuivi(await fichier.arrayBuffer());
-      const res = rattacherSuivi(lignes, otp, commandes);
-      if (res.nbChantier === 0) {
-        setMessage({ type: "erreur", texte: "Aucune ligne du fichier ne porte le compte " + otp + " (" + res.nbLignesFichier + " lignes lues)." });
-        return;
-      }
-      await enregistrerSuivi({ importeLe: new Date().toISOString(), lignes: res.lignes, libres: res.libres });
-      setMessage({
-        type: "ok",
-        texte:
-          res.nbChantier + " devis du compte " + otp + " : " + Object.keys(res.lignes).length + " rattaché(s) aux commandes SAP, " + res.libres.length + " ajouté(s) aux autres devis.",
-      });
-    } catch (e) {
-      setMessage({ type: "erreur", texte: "Import impossible : " + (e?.message || e) });
-    } finally {
-      if (entree.current) entree.current.value = "";
-    }
-  };
 
   const totalMontant = commandes.reduce((s, c) => s + c.montantHt, 0);
   const totalReste = commandes.reduce((s, c) => s + c.resteHt, 0);
@@ -322,15 +295,10 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
 
         {peutGerer && (
           <div className="fsap-pied">
-            <input ref={entree} type="file" accept=".xlsx,.xlsm,.xls" hidden onChange={(e) => importerSuivi(e.target.files?.[0])} />
-            <button type="button" className="btn-ghost fsap-import" onClick={() => entree.current?.click()}>
-              ⤓ Importer le fichier de suivi (Excel)
-            </button>
             <span className="fsap-legende">
               <i className="st-payee">●</i> payée <i className="st-attente">●</i> à régler <i className="st-retard">●</i> échéance dépassée
             </span>
             {suivi.importeLe && <span className="fsap-meta">importé le {new Date(suivi.importeLe).toLocaleDateString("fr-FR")}</span>}
-            {message && <span className={message.type === "ok" ? "form-success" : "form-error"}>{message.texte}</span>}
           </div>
         )}
       </div>

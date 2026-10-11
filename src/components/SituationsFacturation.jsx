@@ -245,7 +245,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
 
   return (
     <div className="sit">
-      <FacturationSap chantierId={chantierId} chantier={chantier} otp={otp} peutGerer={peutGerer} factureSituations={globalFact.facture} />
+      <FacturationSap chantierId={chantierId} chantier={chantier} peutGerer={peutGerer} factureSituations={globalFact.facture} />
       <div className="sit-top">
         <div>
           <h2 className="sit-titre">Situations de travaux{mode === "devis" ? " · par devis" : ""}</h2>
