@@ -639,11 +639,41 @@ export default function BilanFinancier({
               </div>
               <div>
                 Marge avec EAT réaliste : <strong style={classeNeg(atterrEat.nette)}>{eur(atterrEat.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
-                {" "}
-                <span style={ecart < 0 ? { color: ROUGE, fontWeight: 600 } : { color: "var(--ok)", fontWeight: 600 }}>
-                  ({(ecart > 0 ? "+" : "") + eur(ecart)})
-                </span>
               </div>
+              {Math.abs(ecart) > 1 && (() => {
+                // Impact sur la marge = −(coût à terme − coût prévu), ligne par ligne.
+                const impacts = [];
+                detailMoE.forEach((t) => {
+                  const d = -(t.atterrH - t.prevuH) * txSap(t.code);
+                  if (Math.abs(d) >= 1) impacts.push({ lib: "MO — " + t.nom, d });
+                });
+                foLignes.forEach((t) => {
+                  const d = -(t.reel + t.prevu * (1 - t.av) - t.prevu);
+                  if (Math.abs(d) >= 1) impacts.push({ lib: "Fournitures — " + t.libelle, d });
+                });
+                const dAutres = -(reelAutresE + resteMi - prevu.C_mi);
+                if (Math.abs(dAutres) >= 1) impacts.push({ lib: "Autres frais", d: dAutres });
+                const reste = ecart - impacts.reduce((x, i) => x + i.d, 0);
+                if (Math.abs(reste) >= 1) impacts.push({ lib: "FRA, achats hors commandes, engagé et divers", d: reste });
+                impacts.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+                return (
+                  <div style={{ marginTop: 8 }}>
+                    <strong>{ecart < 0 ? "Pourquoi la marge se dégrade" : "Pourquoi la marge s'améliore"}</strong>
+                    {impacts.map((i) => (
+                      <div key={i.lib} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
+                        <span>{i.lib}</span>
+                        <span style={{ color: i.d < 0 ? ROUGE : "var(--ok)", fontVariantNumeric: "tabular-nums" }}>
+                          {(i.d > 0 ? "+" : "") + eur(i.d)}
+                        </span>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontWeight: 700, borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 4 }}>
+                      <span>Total</span>
+                      <span style={{ color: ecart < 0 ? ROUGE : "var(--ok)", fontVariantNumeric: "tabular-nums" }}>{(ecart > 0 ? "+" : "") + eur(ecart)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
