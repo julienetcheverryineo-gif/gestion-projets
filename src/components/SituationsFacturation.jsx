@@ -50,6 +50,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
   const [saisies, setSaisies] = useState({});
   const [montantNouv, setMontantNouv] = useState(null); // null = formulaire fermé
   const [erreurNouv, setErreurNouv] = useState("");
+  const [montantAcompte, setMontantAcompte] = useState(null); // null = formulaire fermé
   const [export_, setExport] = useState(null);
   const tauxTva = chantier?.tauxTvaSituation ?? TVA_DEFAUT;
   const acompte = Number(chantier?.acompteData?.[cleDonnees]) || 0;
@@ -69,13 +70,17 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
     let facture = 0;
     groupes.forEach(([k, ds]) => {
       const sits = data[k];
-      if (!sits?.length) return;
-      facture += totalCumule(construireLignesSituation(ds, toutesLignes, chantierId, tousGroupes || []), sits, sits.length - 1);
+      const ac = Number(chantier?.acompteData?.[k]) || 0;
+      if (!sits?.length) {
+        facture += ac; // acompte facturé, pas encore de situation
+        return;
+      }
+      facture += Math.max(ac, totalCumule(construireLignesSituation(ds, toutesLignes, chantierId, tousGroupes || []), sits, sits.length - 1));
     });
     const marcheTotal = montantMarche(construireLignesSituation(devis, toutesLignes, chantierId, tousGroupes || []));
     return { facture, marcheTotal };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chantier?.situationsData, mode, devis, toutesLignes, chantierId, tousGroupes]);
+  }, [chantier?.situationsData, chantier?.acompteData, mode, devis, toutesLignes, chantierId, tousGroupes]);
   const sit = indexOuvert >= 0 ? situations[indexOuvert] : null;
   const estDerniere = indexOuvert === situations.length - 1;
   const verrouillee = !!sit?.validee;
@@ -301,6 +306,25 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
             {peutGerer && (
               <button
                 className="sit-chip sit-chip-ajout"
+                title="Un acompte facturé est déduit de la première situation"
+                onClick={() =>
+                  setMontantAcompte(
+                    montantAcompte === null
+                      ? acompte > 0
+                        ? String(acompte).replace(".", ",")
+                        : suggestion > 0
+                          ? String(suggestion).replace(".", ",")
+                          : ""
+                      : null
+                  )
+                }
+              >
+                {acompte > 0 ? "✎ Acompte : " + euro(acompte) + " €" : "+ Déclarer un acompte"}
+              </button>
+            )}
+            {peutGerer && (
+              <button
+                className="sit-chip sit-chip-ajout"
                 onClick={() => {
                   setErreurNouv("");
                   setMontantNouv(montantNouv === null ? (suggestion > 0 ? String(suggestion).replace(".", ",") : "") : null);
@@ -310,6 +334,37 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
               </button>
             )}
           </div>
+          {peutGerer && montantAcompte !== null && (
+            <div className="sit-nouv-montant">
+              <label>
+                Acompte facturé (HT)
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoFocus
+                  value={montantAcompte}
+                  onChange={(e) => setMontantAcompte(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (enregistrerAcompte(montantAcompte || "0"), setMontantAcompte(null))}
+                />
+              </label>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  enregistrerAcompte(montantAcompte || "0");
+                  setMontantAcompte(null);
+                }}
+              >
+                Enregistrer l'acompte
+              </button>
+              <button className="btn-ghost" onClick={() => setMontantAcompte(null)}>
+                Annuler
+              </button>
+              <span className="simple-list-meta">
+                Il sera déduit de la première situation (mettre 0 pour le retirer).
+                {suggestion > 0 ? " Écart SAP actuel : " + euro(suggestion) + " €." : ""}
+              </span>
+            </div>
+          )}
           {peutGerer && montantNouv !== null && (
             <div className="sit-nouv-montant">
               <label>
