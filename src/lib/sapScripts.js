@@ -819,6 +819,35 @@ Sub ExtraireCji3()
   If Existe("wnd[0]/usr/btn%_CN_PSPNR_%_APP_%-VALU_PUSH") Then FinVide "Aucune ecriture comptable pour ces affaires."
 
   n = ScannerEcran("cji3-ecran-2.txt")
+  ' Toutes les colonnes (comme ZSD_ADV / GOAT) : la mise en forme de l'utilisateur
+  ' peut masquer des colonnes utiles (ex. Doc achat, necessaire a l'engage).
+  Dim gC, CJ_COL
+  CJ_COL = "wnd[1]/usr/tabsG_TS_ALV/tabpALV_M_R1/ssubSUB_CONFIGURATION:SAPLSALV_CUL_COLUMN_SELECTION:0620/"
+  Set gC = Nothing
+  If Existe("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell") Then
+    Set gC = session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell")
+  ElseIf Existe("wnd[0]/usr/cntlGRID1/shellcont/shell") Then
+    Set gC = session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell")
+  Else
+    Set gC = TrouverGrille(session.findById("wnd[0]/usr"), 0)
+  End If
+  If Not gC Is Nothing Then
+    On Error Resume Next
+    gC.pressToolbarContextButton "&MB_VARIANT"
+    gC.selectContextMenuItem "&COL0"
+    session.findById(CJ_COL & "cntlCONTAINER2_LAYO/shellcont/shell").SelectAll
+    session.findById(CJ_COL & "btnAPP_FL_SING").press
+    session.findById(CJ_COL & "cntlCONTAINER1_LAYO/shellcont/shell").SelectAll
+    session.findById(CJ_COL & "btnAPP_WL_SING").press
+    session.findById("wnd[1]/tbar[0]/btn[0]").press
+    If Err.Number <> 0 Then
+      Err.Clear
+      n = ScannerEcran("cji3-ecran-colonnes.txt")
+      If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
+    End If
+    Err.Clear
+    On Error GoTo 0
+  End If
   ' Liste dans un controle ALV : export par le menu Liste > Exporter > Fichier local
   ' (le meme format texte non converti que l'export manuel).
   If Existe("wnd[0]/mbar/menu[0]/menu[3]/menu[2]") Then
