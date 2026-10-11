@@ -184,6 +184,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
       debut,
       fin,
       params,
+      chantiers,
       onEtat: setEtat,
       estAnnule: () => annule.current,
     });
@@ -281,8 +282,11 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
         <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["mo"])}>
           ▶ Heures (ZCAT3)
         </button>
-        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo", "mo"])}>
-          ▶ Achats + Heures
+        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["adv"])}>
+          ▶ Facturation (ZSD_ADV)
+        </button>
+        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo", "mo", "adv"])}>
+          ▶ Tout (achats + heures + facturation)
         </button>
         <button type="button" className="btn" onClick={() => setOuvert((o) => !o)}>
           {ouvert ? "Fermer les paramètres" : "⚙ Paramètres SAP"}
@@ -461,7 +465,7 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
                     }}
                   />
                   <span>
-                    Lancer l'import SAP (achats + heures, tous les chantiers) à la connexion — au plus une fois
+                    Lancer l'import SAP (achats + heures + facturation, tous les chantiers) à la connexion — au plus une fois
                     toutes les 4 h sur ce poste
                   </span>
                 </label>

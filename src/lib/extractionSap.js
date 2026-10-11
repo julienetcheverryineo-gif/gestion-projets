@@ -9,6 +9,7 @@ import {
 import { lireFichier, ouvrirLien } from "./dossierExportSap";
 import { construireUrlGoat } from "./goatScripts";
 import { importerExportSap } from "./importSapAuto";
+import { otpDepuisCompte } from "./parseSapExports";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { analyserSapCommandes, normaliserOtp } from "./parseSapCommandes";
@@ -40,14 +41,44 @@ export function isoAujourdhui(decalageAnnees = 0) {
 }
 
 export function optionsValidation(type, debut, fin, chemins = false) {
-  return type === "fo" ? { fo: true, chemins } : { mo: true, dates: true, debut, fin, chemins };
+  if (type === "fo") return { fo: true, chemins };
+  if (type === "adv") return { chemins };
+  return { mo: true, dates: true, debut, fin, chemins };
 }
 
 // Une passe = une extraction (ME2J ou ZCAT3) pour les affaires d'UNE agence :
 // lance SAP via le gestionnaire installé sur le poste, attend la fin, lit le
 // fichier exporté et l'importe.
-async function executerPasse({ handle, type, codes, titre, params, debut, fin, onEtat, estAnnule }) {
-  const libelle = type === "fo" ? "achats (ME2J)" : "heures (ZCAT3)";
+const LIBELLES = { fo: "achats (ME2J)", mo: "heures (ZCAT3)", adv: "facturation (ZSD_ADV)" };
+const NOMS = { fo: "Achats", mo: "Heures", adv: "Facturation" };
+
+// Enregistre, pour chaque chantier ayant un compte, ses commandes/factures
+// extraites de ZSD_ADV (document chantier : sapFacturation).
+async function importerFacturationChantiers(texte, chantiers) {
+  const tout = analyserSapCommandes(texte);
+  let nb = 0;
+  for (const c of chantiers || []) {
+    const otp = otpDepuisCompte(c.compte);
+    if (!otp || !c.id) continue;
+    const cible = normaliserOtp(otp);
+    const mesCommandes = tout.commandes.filter((x) => x.otp === cible || x.otp.startsWith(cible));
+    if (mesCommandes.length === 0) continue;
+    const cles = new Set(mesCommandes.map((x) => x.cle));
+    await updateDoc(doc(db, "sites", c.id), {
+      sapFacturation: {
+        importeLe: new Date().toISOString(),
+        otp: cible,
+        commandes: mesCommandes,
+        factures: tout.factures.filter((f) => cles.has(f.cle)),
+      },
+    });
+    nb++;
+  }
+  return nb;
+}
+
+async function executerPasse({ handle, type, codes, titre, params, debut, fin, chantiers, onEtat, estAnnule }) {
+  const libelle = LIBELLES[type];
   const t0 = Date.now();
   onEtat({ phase: "attente", type, message: `${titre}Lancement de l'extraction ${libelle}…` });
   ouvrirLien(construireUrlLancement(type, params, codes, debut, fin));
@@ -63,7 +94,7 @@ async function executerPasse({ handle, type, codes, titre, params, debut, fin, o
       const [code, ...reste] = st.texte.split(/\r?\n/);
       const detail = reste.join(" ").trim();
       if (code.trim() === "ERREUR") return { ok: false, message: detail || "L'extraction SAP a échoué." };
-      if (code.trim() === "VIDE") return { ok: true, resume: `${type === "fo" ? "Achats" : "Heures"} : aucune ligne` };
+      if (code.trim() === "VIDE") return { ok: true, resume: `${NOMS[type]} : aucune ligne` };
       if (code.trim() === "OK") {
         fini = true;
         break;
@@ -90,6 +121,10 @@ async function executerPasse({ handle, type, codes, titre, params, debut, fin, o
     const nomFichier = `export-${type}-sap.txt`;
     const fichier = await lireFichier(handle, nomFichier);
     if (!fichier) throw new Error("Fichier d'export introuvable dans le dossier choisi.");
+    if (type === "adv") {
+      const nbCh = await importerFacturationChantiers(fichier.texte, chantiers);
+      return { ok: true, resume: `Facturation : ${nbCh} chantier(s) mis à jour` };
+    }
     const res = await importerExportSap({
       type,
       texte: fichier.texte,
@@ -101,7 +136,7 @@ async function executerPasse({ handle, type, codes, titre, params, debut, fin, o
     return {
       ok: true,
       resume:
-        `${type === "fo" ? "Achats" : "Heures"} : ` +
+        `${NOMS[type]} : ` +
         (res.nbLignes === 0 ? "aucune ligne" : `${res.nbLignes} ligne(s)`) +
         (res.nbRemplacees > 0 ? ` (${res.nbRemplacees} remplacée(s))` : ""),
     };
@@ -114,17 +149,17 @@ async function executerPasse({ handle, type, codes, titre, params, debut, fin, o
 // découpée par agence (AAQ5, AAQ2… ne se saisissent pas ensemble dans SAP),
 // exécutées l'une après l'autre. Appelle onEtat({phase, message}) au fil de
 // l'eau ; phase finale : "ok" ou "erreur" (rien si annulé).
-export async function executerExtraction({ handle, types, otp, debut, fin, params, onEtat, estAnnule }) {
+export async function executerExtraction({ handle, types, otp, debut, fin, params, chantiers, onEtat, estAnnule }) {
   const groupes = grouperParAgence(otp);
   const passes = groupes.flatMap((g) => types.map((type) => ({ type, ...g })));
   const resumes = [];
   const echecs = [];
   for (let i = 0; i < passes.length; i++) {
     const { type, prefixe, codes } = passes[i];
-    const nom = (groupes.length > 1 ? `${prefixe} ` : "") + (type === "fo" ? "Achats" : "Heures");
+    const nom = (groupes.length > 1 ? `${prefixe} ` : "") + NOMS[type];
     const titre =
       (passes.length > 1 ? `[${i + 1}/${passes.length}] ` : "") + (groupes.length > 1 ? `${prefixe} — ` : "");
-    const r = await executerPasse({ handle, type, codes, titre, params, debut, fin, onEtat, estAnnule });
+    const r = await executerPasse({ handle, type, codes, titre, params, debut, fin, chantiers, onEtat, estAnnule });
     if (r.annule) return { ok: false, annule: true };
     // Une passe en échec (ou sans donnée) ne bloque pas les suivantes : on
     // avance et on récapitule à la fin.

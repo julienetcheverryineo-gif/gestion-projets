@@ -13,7 +13,7 @@ import {
 } from "../lib/extractionSap";
 
 // Import SAP automatique à la connexion des profils RA Électricité et admin :
-// achats (ME2J) puis heures (ZCAT3) de tous les chantiers ayant un compte,
+// achats (ME2J), heures (ZCAT3) puis facturation (ZSD_ADV) de tous les chantiers ayant un compte,
 // sur les 12 derniers mois pour les heures. Une fois par connexion (onglet)
 // et au plus toutes les 4 h par poste ; désactivable dans Import SAP >
 // Paramètres SAP > Réglages SAP.
@@ -45,14 +45,15 @@ function ImportSapAutoInterne({ user }) {
     const debut = isoAujourdhui(-1);
     const fin = isoAujourdhui();
     const params = lireParamsSap();
-    const problemes = ["fo", "mo"].flatMap((t) =>
+    const problemes = ["fo", "mo", "adv"].flatMap((t) =>
       validerParametres(params, otp, optionsValidation(t, debut, fin))
     );
     if (problemes.length > 0) return;
     annule.current = false;
     const res = await executerExtraction({
       handle,
-      types: ["fo", "mo"],
+      types: ["fo", "mo", "adv"],
+      chantiers,
       otp,
       debut,
       fin,
@@ -113,7 +114,7 @@ function ImportSapAutoInterne({ user }) {
   if (enAttenteClic) {
     return (
       <div className="sap-auto-toast" role="status">
-        <span>Import SAP automatique prêt (achats et heures).</span>
+        <span>Import SAP automatique prêt (achats, heures et facturation).</span>
         <div className="sap-auto-actions">
           <button
             type="button"
