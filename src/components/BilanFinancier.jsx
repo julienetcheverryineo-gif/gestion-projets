@@ -12,6 +12,9 @@ const ROUGE = "#c0392b";
 // après FG : 15,4 % du CA), au lieu du paramètre FOA (16 %). Ne concerne que
 // les tableaux d'aide à la déclaration EAT.
 const FG_EAT = 0.154;
+// Taux retenus par l'écran RàE de SAP pour valoriser les heures du reste à
+// déclarer (≠ taux de chiffrage de l'outil). À compléter si SAP en affiche d'autres.
+const TX_RETENU_SAP = { I205: 49, I107: 69.5, I111: 37, I209: 64.5, I311: 36, I306: 20.53 };
 
 // Bilan financier d'une affaire : matériel et main d'œuvre en euros.
 // Budget MO = heures chiffrées × taux de chiffrage ; réel MO = heures
@@ -197,16 +200,36 @@ export default function BilanFinancier({
   const reelOutilDirect = reelMoE + zoneReel + reelFoLignes + heuresMiReellesE * foa.materielInterne;
   const reelSapEffectif = cji3Eat ? cji3Eat.directTotal + (typeof engageSapEat === "number" ? engageSapEat : 0) : typeof reelSapEat === "number" ? reelSapEat : null;
   const calageSap = reelSapEffectif === null ? 0 : reelSapEffectif - reelOutilDirect;
+  const txSap = (code) => TX_RETENU_SAP[code] ?? taux(code) ?? 0;
+  const engageE = typeof engageSapEat === "number" ? engageSapEat : 0;
+  const reelAchatsE = cji3Eat ? cji3Eat.achats : reelFoLignes;
+  const reelAutresE = cji3Eat ? cji3Eat.autresFrais : heuresMiReellesE * foa.materielInterne;
+  // Avec un CJI3 : on reproduit exactement l'écran RàE de SAP.
+  //   CD hors FRA = cumul comptable + engagé + RAE (MO au taux retenu, FO, autres frais)
+  //   FRA = taux × (CD hors FRA − sous-traitance engagée) ; MN = (CA − CD − FG) / CA
+  const eatSap = (f) => {
+    const raeMo = detailMoE.reduce((x, t) => x + t.prevuH * (1 - pctMo) * f * txSap(t.code), 0);
+    const raeFo = resteFoLignes * f;
+    const raeAutres = heuresMatInternePrevues * (1 - pctMo) * f * foa.materielInterne;
+    const hors = cji3Eat.directTotal + engageE + raeMo + raeFo + raeAutres;
+    const D = foa.fra * (hors - engageE);
+    const dep = hors + D;
+    const brute = base - dep;
+    const fg = FG_EAT * base;
+    const nette = brute - fg;
+    return { raeMo, raeFo, raeAutres, hors, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
+  };
   const eatPourFacteur = (f) => {
-    const col = colonne(
+    if (cji3Eat) return eatSap(f);
+    return colonne(
       reelMoE + budgetMo * (1 - pctMo) * f,
       reelFoLignes + resteFoLignes * f + calageSap,
       zoneReel + zonePrevu * (1 - pctMo) * f,
       heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * f,
       FG_EAT
     );
-    return col;
   };
+  const resteMi = heuresMatInternePrevues * (1 - pctMo) * foa.materielInterne;
   const heuresMiAtterrE = heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo);
   const prevuEat = colonne(budgetMo, budgetFo, zonePrevu, heuresMatInternePrevues, FG_EAT);
   // Cherche f ∈ [0 ; 1] tel que la marge nette atteigne la cible (en €).
@@ -473,7 +496,7 @@ export default function BilanFinancier({
           )}
           <br />
           <em>
-            Calage SAP : frais généraux à {num(FG_EAT * 100, 1)} % du CA (valeur de l'écran RàE) au lieu de {num(foa.fg * 100, 1)} % (FOA) pour
+            {cji3Eat ? "Calcul identique à l'écran RàE de SAP : CD hors FRA = cumul comptable (CJI3) + engagé + RAE (heures au taux retenu SAP, FO, autres frais) ; FRA sur CD hors FRA moins l'engagé ; pas de provisions FOA (prorata, aléas, négo). " : ""}Calage SAP : frais généraux à {num(FG_EAT * 100, 1)} % du CA (valeur de l'écran RàE) au lieu de {num(foa.fg * 100, 1)} % (FOA) pour
             ces trois tableaux ; FRA {num(foa.fra * 100, 3)} %, identique à SAP.
           </em>
         </p>
@@ -519,10 +542,10 @@ export default function BilanFinancier({
               <tr className="bf-detail bf-autres">
                 <td style={{ paddingLeft: 24 }}>Autres frais <span className="simple-list-meta">({num(foa.materielInterne, 2)} €/h sur les heures porteuses)</span></td>
                 <td>{eur(prevu.C_mi)}</td>
-                <td>{eur(heuresMiReellesE * foa.materielInterne)}</td>
-                <td style={{ fontWeight: 700 }}>{eur(heuresMiAtterrE * foa.materielInterne)}</td>
-                <td>{eur((heuresMiAtterrE - heuresMiReellesE) * foa.materielInterne)}</td>
-                <td style={classeNeg(prevu.C_mi - heuresMiAtterrE * foa.materielInterne)}>{(heuresMiAtterrE * foa.materielInterne - prevu.C_mi > 0 ? "+" : "") + eur(heuresMiAtterrE * foa.materielInterne - prevu.C_mi)}</td>
+                <td>{eur(reelAutresE)}</td>
+                <td style={{ fontWeight: 700 }}>{eur(reelAutresE + resteMi)}</td>
+                <td>{eur(resteMi)}</td>
+                <td style={classeNeg(prevu.C_mi - reelAutresE - resteMi)}>{(reelAutresE + resteMi - prevu.C_mi > 0 ? "+" : "") + eur(reelAutresE + resteMi - prevu.C_mi)}</td>
               </tr>
             </tbody>
           </table>
@@ -590,7 +613,7 @@ export default function BilanFinancier({
                         <td>{num(t.reelH)} h</td>
                         <td>{num(t.atterrH)} h</td>
                         <td style={{ fontWeight: 700 }}>{num(h)} h</td>
-                        <td>{num(h - t.reelH)} h</td>
+                        <td>{num(h - t.reelH)} h <span className="simple-list-meta">({eur((h - t.reelH) * txSap(t.code))})</span></td>
                         <td>{num(h - t.atterrH)} h</td>
                       </tr>
                     );
@@ -610,14 +633,34 @@ export default function BilanFinancier({
                       </tr>
                     );
                   })}
+                  {cji3Eat && Math.abs(cji3Eat.achats - reelFoLignes) > 0.5 && (
+                    <tr className="bf-detail bf-ach">
+                      <td style={{ paddingLeft: 24 }}>Achats comptabilisés hors commandes ME2J</td>
+                      <td>{eur(cji3Eat.achats - reelFoLignes)}</td>
+                      <td>{eur(cji3Eat.achats - reelFoLignes)}</td>
+                      <td style={{ fontWeight: 700 }}>{eur(cji3Eat.achats - reelFoLignes)}</td>
+                      <td>{eur(0)}</td>
+                      <td>{eur(0)}</td>
+                    </tr>
+                  )}
+                  {cji3Eat && engageE > 0 && (
+                    <tr className="bf-detail bf-ach">
+                      <td style={{ paddingLeft: 24 }}>Sous-traitance interne engagée (SAP)</td>
+                      <td>{eur(engageE)}</td>
+                      <td>{eur(engageE)}</td>
+                      <td style={{ fontWeight: 700 }}>{eur(engageE)}</td>
+                      <td>{eur(0)}</td>
+                      <td>{eur(0)}</td>
+                    </tr>
+                  )}
                   <tr className="bf-section bf-autres"><td colSpan={6}>Autres frais (€)</td></tr>
                   <tr className="bf-detail bf-autres">
                     <td style={{ paddingLeft: 24 }}>Autres frais</td>
-                    <td>{eur(heuresMiReellesE * foa.materielInterne)}</td>
-                    <td>{eur(heuresMiAtterrE * foa.materielInterne)}</td>
-                    <td style={{ fontWeight: 700 }}>{eur((heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * res.f) * foa.materielInterne)}</td>
-                    <td>{eur(heuresMatInternePrevues * (1 - pctMo) * res.f * foa.materielInterne)}</td>
-                    <td>{eur((heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo) * res.f - heuresMiAtterrE) * foa.materielInterne)}</td>
+                    <td>{eur(reelAutresE)}</td>
+                    <td>{eur(reelAutresE + resteMi)}</td>
+                    <td style={{ fontWeight: 700 }}>{eur(reelAutresE + resteMi * res.f)}</td>
+                    <td>{eur(resteMi * res.f)}</td>
+                    <td>{eur(resteMi * (res.f - 1))}</td>
                   </tr>
                 </tbody>
               </table>
