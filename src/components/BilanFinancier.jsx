@@ -377,16 +377,7 @@ export default function BilanFinancier({
         const totalSansCommande = sansCommande.reduce((x, e) => x + e.montant, 0);
         return (
           <div className="bf-eat" style={{ marginTop: 18 }}>
-            <h3 style={{ margin: "0 0 4px" }}><img src={iconeAutresFrais} alt="" style={{ height: "1.2em", width: "auto", verticalAlign: "-0.2em" }} /> Bilan autres frais — comptabilité SAP (CJI3 du {cji3Eat.importeLe ? new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR") : "—"})</h3>
-            <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
-              Tout ce que SAP a comptabilisé hors main d'œuvre, par thème et par compte, avec le détail des écritures (date, pièce, libellé, fournisseur, n° de commande).
-              {masquees.length > 0 && (
-                <>
-                  <br />
-                  {masquees.length} écritures ({eur(masquees.reduce((x, e) => x + e.montant, 0))}) rattachées à une commande déjà présente dans « Bilan Fournitures » ne sont pas répétées ici.
-                </>
-              )}
-            </p>
+            <h3 style={{ margin: "0 0 8px" }}><img src={iconeAutresFrais} alt="" style={{ height: "1.2em", width: "auto", verticalAlign: "-0.2em" }} /> Bilan autres frais — comptabilité SAP (CJI3 du {cji3Eat.importeLe ? new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR") : "—"})</h3>
             <div className="data-table-wrapper">
               <table className="data-table table-recap bf-table af-table">
                 <thead>
@@ -480,9 +471,6 @@ export default function BilanFinancier({
   if (affichage === "autresFrais") {
     return (
       <div className="panel" style={{ marginBottom: 16 }}>
-        <div className="panel-header">
-          <h2><img src={iconeAutresFrais} alt="" style={{ height: "1.2em", width: "auto", verticalAlign: "-0.2em" }} /> Bilan autres frais</h2>
-        </div>
         {blocAutresFrais || (
           <p className="simple-list-meta">
             Aucune comptabilité SAP importée pour cette affaire : lancez « ▶ Comptabilité (CJI3) » dans Import SAP.
