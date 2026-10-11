@@ -7,6 +7,10 @@ const eur = (v) =>
 const num = (v, d = 1) =>
   (Number(v) || 0).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const ROUGE = "#c0392b";
+// Frais généraux appliqués par l'écran RàE de SAP (constaté sur la marge avant /
+// après FG : 15,4 % du CA), au lieu du paramètre FOA (16 %). Ne concerne que
+// les tableaux d'aide à la déclaration EAT.
+const FG_EAT = 0.154;
 
 // Bilan financier d'une affaire : matériel et main d'œuvre en euros.
 // Budget MO = heures chiffrées × taux de chiffrage ; réel MO = heures
@@ -106,7 +110,7 @@ export default function BilanFinancier({
   // (réel + reste à faire au budget).
   const ca = caSaisi ?? caCalcule;
   const base = ca - (caNonSoumis || 0);
-  const colonne = (aBrut, b, zoneEuro, heuresMi) => {
+  const colonne = (aBrut, b, zoneEuro, heuresMi, fgTaux = foa.fg) => {
     const a = aBrut; // MO hors zone : base des frais divers
     const C_prorata = foa.prorata * ca;
     const C_divers = foa.fraisDivers * a;
@@ -117,7 +121,7 @@ export default function BilanFinancier({
     const D = foa.fra * (a + zoneEuro + b + C);
     const dep = a + zoneEuro + b + C + D;
     const brute = base - dep;
-    const fg = foa.fg * base;
+    const fg = fgTaux * base;
     const nette = brute - fg;
     return { a: a + zoneEuro, aHorsZone: a, zoneEuro, b, C, C_prorata, C_divers, C_aleas, C_nego, C_mi, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
   };
@@ -170,10 +174,12 @@ export default function BilanFinancier({
       reelMo + budgetMo * (1 - pctMo) * f,
       reelFoLignes + resteFoLignes * f,
       zoneReel + zonePrevu * (1 - pctMo) * f,
-      heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * f
+      heuresMiReelles + heuresMatInternePrevues * (1 - pctMo) * f,
+      FG_EAT
     );
     return col;
   };
+  const prevuEat = colonne(budgetMo, budgetFo, zonePrevu, heuresMatInternePrevues, FG_EAT);
   // Cherche f ∈ [0 ; 1] tel que la marge nette atteigne la cible (en €).
   const resoudreEat = (cibleNette) => {
     if (eatPourFacteur(1).nette >= cibleNette - 0.005) return { f: 1, atteignable: true, col: eatPourFacteur(1) };
@@ -357,6 +363,11 @@ export default function BilanFinancier({
         <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
           EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
           prorata, aléas, négociation et matériel interne sont recalculés par la FOA à partir de ces saisies.
+          <br />
+          <em>
+            Calage SAP : frais généraux à {num(FG_EAT * 100, 1)} % du CA (valeur de l'écran RàE) au lieu de {num(foa.fg * 100, 1)} % (FOA) pour
+            ces trois tableaux ; FRA {num(foa.fra * 100, 3)} %, identique à SAP.
+          </em>
         </p>
         <div className="data-table-wrapper">
           <table className="data-table bf-table">
@@ -409,18 +420,19 @@ export default function BilanFinancier({
           </table>
         </div>
         {(() => {
-          const ecart = atterr.nette - prevu.nette;
-          const kPrevu = prevu.k, kAtt = atterr.k;
+          const atterrEat = eatPourFacteur(1);
+          const ecart = atterrEat.nette - prevuEat.nette;
+          const kPrevu = prevuEat.k, kAtt = atterrEat.k;
           // Surcoût direct (avant FRA et frais divers) à absorber pour revenir à la marge annoncée.
           const coefMarge = 1 + foa.fra;
           const aAbsorber = ecart < 0 ? -ecart / coefMarge : 0;
           return (
             <div className="bf-eat-synthese" style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
               <div>
-                Marge annoncée (prévu) : <strong>{eur(prevu.nette)}</strong> · k {kPrevu === null ? "—" : num(kPrevu * 100, 1) + " %"}
+                Marge annoncée (prévu) : <strong>{eur(prevuEat.nette)}</strong> · k {kPrevu === null ? "—" : num(kPrevu * 100, 1) + " %"}
               </div>
               <div>
-                Marge avec EAT réaliste : <strong style={classeNeg(atterr.nette)}>{eur(atterr.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
+                Marge avec EAT réaliste : <strong style={classeNeg(atterrEat.nette)}>{eur(atterrEat.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
                 {" "}
                 <span style={ecart < 0 ? { color: ROUGE, fontWeight: 600 } : { color: "var(--ok)", fontWeight: 600 }}>
                   ({(ecart > 0 ? "+" : "") + eur(ecart)})
@@ -524,7 +536,7 @@ export default function BilanFinancier({
             </div>
           </div>
         );
-        const resAnnonce = resoudreEat(prevu.nette);
+        const resAnnonce = resoudreEat(prevuEat.nette);
         const kSaisi = (() => {
           const t = String(kAffiche).replace(",", ".").replace("%", "").trim();
           const n = t === "" ? null : Number(t);
@@ -535,16 +547,16 @@ export default function BilanFinancier({
           <>
             {tableauEat(
               "🛡️ EAT à déclarer pour tenir la marge annoncée",
-              "Même marge nette que le prévu (" + eur(prevu.nette) + ", k " + (prevu.k === null ? "—" : num(prevu.k * 100, 1) + " %") + ") : l'outil calcule la part du reste à faire à ne pas dépasser, ligne par ligne, avec le FRA, les frais généraux et le matériel interne recalculés.",
+              "Même marge nette que le prévu (" + eur(prevuEat.nette) + ", k " + (prevuEat.k === null ? "—" : num(prevuEat.k * 100, 1) + " %") + ") : l'outil calcule la part du reste à faire à ne pas dépasser, ligne par ligne, avec le FRA, les frais généraux et le matériel interne recalculés.",
               resAnnonce,
-              prevu.nette
+              prevuEat.nette
             )}
             <div style={{ marginTop: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <h3 style={{ margin: 0 }}>🎚️ Je veux annoncer</h3>
               <input
                 type="text"
                 inputMode="decimal"
-                placeholder={prevu.k === null ? "ex. 8" : num(prevu.k * 100, 1)}
+                placeholder={prevuEat.k === null ? "ex. 8" : num(prevuEat.k * 100, 1)}
                 value={kAffiche}
                 disabled={!onChangerMargeCibleEat}
                 onChange={(e) => setKCible(e.target.value)}
