@@ -9,6 +9,9 @@ import {
 import { lireFichier, ouvrirLien } from "./dossierExportSap";
 import { construireUrlGoat } from "./goatScripts";
 import { importerExportSap } from "./importSapAuto";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import { analyserSapCommandes, normaliserOtp } from "./parseSapCommandes";
 
 const CLE_PARAMS = "scriptsSapParams";
 
@@ -248,4 +251,66 @@ export async function envoyerFournituresGoat({ handle, cheminBase, affaireId, li
     }
   }
   if (!estAnnule()) onEtat({ phase: "erreur", message: "Délai dépassé (gestionnaire GOAT installé et à jour ?)." });
+}
+
+// Facturation SAP d'un chantier (ZDS_ADV) : lance l'extraction, attend le
+// compte rendu, lit l'export et l'enregistre dans le document du chantier
+// (sapFacturation). Doit être appelée depuis un clic.
+export async function extraireFacturationSap({ handle, chantierId, otp, params, onEtat, estAnnule }) {
+  const t0 = Date.now();
+  onEtat({ phase: "attente", message: "Lancement de l'extraction ZDS_ADV…" });
+  ouvrirLien(construireUrlLancement("adv", params, [otp], "", ""));
+  const limite = t0 + 8 * 60 * 1000;
+  let reponse = false;
+  while (!estAnnule() && Date.now() < limite) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const st = await lireFichier(handle, "statut-adv.txt");
+    if (st && st.modifieLe >= t0 - 2000) {
+      reponse = true;
+      const [code, ...reste] = st.texte.split(/\r?\n/);
+      const detail = reste.join(" ").trim();
+      const c = code.trim();
+      if (c === "ERREUR") return onEtat({ phase: "erreur", message: detail || "L'extraction SAP a échoué." });
+      if (c === "VIDE") return onEtat({ phase: "erreur", message: detail || "Aucune facturation trouvée dans SAP." });
+      if (c === "OK") break;
+      onEtat({ phase: "attente", message: detail && detail !== "Lancement" ? detail : "Extraction ZDS_ADV en cours dans SAP…" });
+    } else if (!reponse && Date.now() - t0 > 15000) {
+      onEtat({
+        phase: "attente",
+        message: "Aucune réponse du poste. Gestionnaire SAP installé à jour (Paramètres SAP > Installation) ?",
+      });
+    }
+  }
+  if (estAnnule()) return;
+  if (!reponse || Date.now() >= limite) return onEtat({ phase: "erreur", message: "Délai dépassé : l'extraction SAP n'a pas abouti." });
+  onEtat({ phase: "import", message: "Lecture et import de l'export…" });
+  try {
+    const fichier = await lireFichier(handle, "export-adv-sap.txt");
+    if (!fichier) throw new Error("fichier d'export introuvable dans le dossier choisi.");
+    const tout = analyserSapCommandes(fichier.texte);
+    const cible = normaliserOtp(otp);
+    const mesCommandes = tout.commandes.filter((c) => c.otp === cible || c.otp.startsWith(cible));
+    if (mesCommandes.length === 0) {
+      const trouves = [...new Set(tout.commandes.map((c) => c.otp))].slice(0, 8).join(", ");
+      return onEtat({
+        phase: "erreur",
+        message:
+          tout.commandes.length === 0
+            ? "Export non reconnu (aucune commande lue)."
+            : "Aucune commande pour " + cible + " (OTP présents : " + trouves + ").",
+      });
+    }
+    const cles = new Set(mesCommandes.map((c) => c.cle));
+    await updateDoc(doc(db, "sites", chantierId), {
+      sapFacturation: {
+        importeLe: new Date().toISOString(),
+        otp: cible,
+        commandes: mesCommandes,
+        factures: tout.factures.filter((f) => cles.has(f.cle)),
+      },
+    });
+    onEtat({ phase: "ok", message: mesCommandes.length + " commande(s) récupérée(s) depuis SAP." });
+  } catch (e) {
+    onEtat({ phase: "erreur", message: "Import impossible : " + (e?.message || e) });
+  }
 }

@@ -1,8 +1,8 @@
 import { Fragment, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { analyserSapCommandes, normaliserOtp } from "../lib/parseSapCommandes";
-import { lireTexteSap } from "../lib/lireTexteSap";
+import { autoriser, choisirDossier, dossierSupporte, lireDossierMemorise } from "../lib/dossierExportSap";
+import { extraireFacturationSap, lireParamsSap } from "../lib/extractionSap";
 
 const euro = (n) =>
   Number(n || 0)
@@ -16,51 +16,34 @@ const pct = (v) => String(Math.round((Number(v) || 0) * 10) / 10).replace(".", "
 // Stockage dans le document chantier : sapFacturation { importeLe, commandes,
 // factures } et commentairesFacturationSap { <cle commande>: texte }.
 export default function FacturationSap({ chantierId, chantier, otp, peutGerer, factureSituations }) {
-  const entree = useRef(null);
-  const [message, setMessage] = useState(null);
   const [ouverts, setOuverts] = useState(new Set());
   const data = chantier?.sapFacturation || null;
   const commentaires = chantier?.commentairesFacturationSap || {};
   const commandes = data?.commandes || [];
   const factures = data?.factures || [];
 
-  const importer = async (fichier) => {
-    if (!fichier) return;
-    setMessage(null);
+  const [etat, setEtat] = useState(null);
+  const annule = useRef(false);
+  const enCours = etat?.phase === "attente" || etat?.phase === "import";
+
+  const recupererSap = async () => {
+    if (!otp) return setEtat({ phase: "erreur", message: "Renseignez le champ « Compte » du chantier (code OTP)." });
+    if (!dossierSupporte()) return setEtat({ phase: "erreur", message: "Navigateur non compatible (Chrome ou Edge requis)." });
     try {
-      if (!otp) {
-        setMessage({ type: "erreur", texte: "Renseignez le champ « Compte » du chantier (code OTP) pour filtrer l'export SAP." });
-        return;
-      }
-      const texte = await lireTexteSap(fichier);
-      const tout = analyserSapCommandes(texte);
-      const cible = normaliserOtp(otp);
-      const mesCommandes = tout.commandes.filter((c) => c.otp === cible || c.otp.startsWith(cible));
-      if (mesCommandes.length === 0) {
-        const trouves = [...new Set(tout.commandes.map((c) => c.otp))].slice(0, 8).join(", ");
-        setMessage({
-          type: "erreur",
-          texte:
-            tout.commandes.length === 0
-              ? "Fichier non reconnu : aucune commande trouvée (export ZDS_ADV attendu)."
-              : "Aucune commande pour l'OTP " + cible + " dans ce fichier. OTP présents : " + trouves + ".",
-        });
-        return;
-      }
-      const cles = new Set(mesCommandes.map((c) => c.cle));
-      await updateDoc(doc(db, "sites", chantierId), {
-        sapFacturation: {
-          importeLe: new Date().toISOString(),
-          otp: cible,
-          commandes: mesCommandes,
-          factures: tout.factures.filter((f) => cles.has(f.cle)),
-        },
+      let h = await lireDossierMemorise();
+      if (!h) h = await choisirDossier();
+      if (!(await autoriser(h))) return setEtat({ phase: "erreur", message: "Accès au dossier d'export refusé." });
+      annule.current = false;
+      await extraireFacturationSap({
+        handle: h,
+        chantierId,
+        otp,
+        params: lireParamsSap(),
+        onEtat: setEtat,
+        estAnnule: () => annule.current,
       });
-      setMessage({ type: "ok", texte: mesCommandes.length + " commande(s) importée(s) pour " + cible + "." });
     } catch (e) {
-      setMessage({ type: "erreur", texte: "Import impossible : " + (e?.message || e) });
-    } finally {
-      if (entree.current) entree.current.value = "";
+      if (e?.name !== "AbortError") setEtat({ phase: "erreur", message: e?.message || String(e) });
     }
   };
 
@@ -97,11 +80,22 @@ export default function FacturationSap({ chantierId, chantier, otp, peutGerer, f
       <div className="sit-sap-corps">
         {peutGerer && (
           <div className="sit-sap-import">
-            <input ref={entree} type="file" accept=".txt,.csv,text/plain" onChange={(e) => importer(e.target.files?.[0])} />
-            <span className="simple-list-meta">Export de la transaction ZDS_ADV (fichier texte) : seules les commandes de ce chantier sont retenues.</span>
+            <button type="button" className="btn btn-primary" disabled={enCours} onClick={recupererSap}>
+              ↻ Récupérer depuis SAP
+            </button>
+            {enCours && (
+              <button type="button" className="btn" onClick={() => { annule.current = true; setEtat(null); }}>
+                Annuler
+              </button>
+            )}
+            <span className="simple-list-meta">
+              {etat ? etat.message : "Extraction automatique de la transaction ZDS_ADV pour ce chantier."}
+            </span>
           </div>
         )}
-        {message && <div className={message.type === "ok" ? "form-success" : "form-error"}>{message.texte}</div>}
+        {etat && (etat.phase === "erreur" || etat.phase === "ok") && (
+          <div className={etat.phase === "ok" ? "form-success" : "form-error"}>{etat.message}</div>
+        )}
         {commandes.length === 0 ? (
           <p className="simple-list-meta">Aucune donnée SAP importée pour ce chantier.</p>
         ) : (

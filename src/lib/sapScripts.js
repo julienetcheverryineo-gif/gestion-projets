@@ -144,6 +144,8 @@ export function construireUrlLancement(type, params, otp, debut, fin) {
     ajoute("s", params.societeSap);
     ajoute("va", params.varianteAlvMo);
     ajoute("lh", String(params.ligneVarianteMo ?? "").trim() === "" ? "-1" : params.ligneVarianteMo);
+  } else if (type === "adv") {
+    // aucun paramètre supplémentaire : écrans découverts à l'exécution
   } else {
     ajoute("oa", params.organisationAchats);
     ajoute("vl", params.varianteListeFo);
@@ -630,6 +632,135 @@ Sub ExtraireMo()
   Terminer "ZCAT3", ""
 End Sub
 
+
+' ---- Facturation : transaction ZDS_ADV (ecrans decouverts a l'execution) ----
+' Les ecrans de ZDS_ADV ne sont pas connus d'avance : le script les decrit dans
+' zds-adv-ecran-1.txt (selection) et zds-adv-ecran-2.txt (resultat) pour
+' pouvoir l'ajuster si besoin.
+Function ChampOtpAdv()
+  Dim k, id, u
+  ChampOtpAdv = ""
+  For Each k In CHAMPS_SAISIE.Keys
+    id = CHAMPS_SAISIE(k)
+    u = UCase(id)
+    If Right(u, 4) = "-LOW" Then
+      If InStr(u, "PROJ") > 0 Or InStr(u, "POSID") > 0 Or InStr(u, "PSPNR") > 0 Or InStr(u, "OTP") > 0 Or InStr(u, "PSP") > 0 Or InStr(u, "WBS") > 0 Then
+        ChampOtpAdv = id
+        Exit Function
+      End If
+    End If
+  Next
+End Function
+
+Function TrouverGrille(obj, prof)
+  Dim i, coll, enf, t
+  Set TrouverGrille = Nothing
+  If prof > 7 Then Exit Function
+  On Error Resume Next
+  t = obj.Type
+  If t = "GuiGridView" Then
+    Set TrouverGrille = obj
+    Exit Function
+  End If
+  Set coll = obj.Children
+  If Err.Number <> 0 Then
+    Err.Clear
+    Exit Function
+  End If
+  For i = 0 To coll.Count - 1
+    Set enf = coll.Item(CLng(i))
+    If Err.Number = 0 Then
+      Set TrouverGrille = TrouverGrille(enf, prof + 1)
+      If Not TrouverGrille Is Nothing Then Exit Function
+    End If
+    Err.Clear
+  Next
+End Function
+
+Sub ExporterListeAdv()
+  Dim grille, essai, w, fait
+  Set grille = TrouverGrille(session.findById("wnd[0]/usr"), 0)
+  If Not grille Is Nothing Then
+    grille.pressToolbarContextButton "&MB_EXPORT"
+    grille.selectContextMenuItem "&PC"
+  Else
+    session.findById("wnd[0]/tbar[0]/okcd").Text = "%PC"
+    session.findById("wnd[0]").sendVKey 0
+  End If
+  For essai = 1 To 8
+    fait = False
+    For w = 2 To 1 Step -1
+      If Existe("wnd[" & w & "]/usr/ctxtDY_FILENAME") Then
+        If Existe("wnd[" & w & "]/usr/ctxtDY_PATH") Then session.findById("wnd[" & w & "]/usr/ctxtDY_PATH").Text = DOSSIER
+        session.findById("wnd[" & w & "]/usr/ctxtDY_FILENAME").Text = FICHIER
+        session.findById("wnd[" & w & "]/usr/ctxtDY_FILENAME").caretPosition = Len(FICHIER)
+        If Existe("wnd[" & w & "]/tbar[0]/btn[11]") Then
+          session.findById("wnd[" & w & "]/tbar[0]/btn[11]").press
+        Else
+          session.findById("wnd[" & w & "]/tbar[0]/btn[0]").press
+        End If
+        fait = True
+        Exit For
+      End If
+    Next
+    If Not fait Then
+      If Existe("wnd[1]/tbar[0]/btn[0]") Then
+        session.findById("wnd[1]/tbar[0]/btn[0]").press
+        fait = True
+      End If
+    End If
+    If FichierPresent() Then Exit For
+    If Not fait Then Exit For
+    WScript.Sleep 300
+  Next
+End Sub
+
+Function FichierPresent()
+  FichierPresent = fso.FileExists(CHEMIN)
+End Function
+
+Function BoutonMultiple(champ)
+  Dim pos, nom
+  pos = InStrRev(champ, "/")
+  nom = Mid(champ, pos + 1)
+  If Left(nom, 4) = "ctxt" Then
+    nom = Mid(nom, 5)
+  ElseIf Left(nom, 3) = "txt" Then
+    nom = Mid(nom, 4)
+  End If
+  nom = Left(nom, Len(nom) - 4)
+  BoutonMultiple = Left(champ, pos) & "btn%_" & nom & "_%_APP_%-VALU_PUSH"
+End Function
+
+Sub ExtraireAdv()
+  Dim champ, bouton, nb, n
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "ZDS_ADV"
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+  n = ScannerEcran("zds-adv-ecran-1.txt")
+  champ = ChampOtpAdv()
+  If champ = "" Then Fin "ZDS_ADV : champ affaire (OTP) introuvable sur l'ecran de selection (voir zds-adv-ecran-1.txt).", 48
+
+  bouton = BoutonMultiple(champ)
+  If Existe(bouton) Then
+    nb = SaisirSelectionMultiple(champ, bouton)
+    If nb = 0 Then
+      If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
+      Fin "Aucune affaire exploitable.", 48
+    End If
+    session.findById("wnd[1]/tbar[0]/btn[8]").press
+  Else
+    session.findById(champ).Text = LISTE_OTP(0)
+  End If
+
+  session.findById("wnd[0]/tbar[1]/btn[8]").press
+  WScript.Sleep 1500
+  If Existe(champ) Then FinVide "Aucune facturation pour ces affaires."
+  n = ScannerEcran("zds-adv-ecran-2.txt")
+  ExporterListeAdv
+  RetourAccueil
+  Terminer "ZDS_ADV", ""
+End Sub
+
 ' ---- Test d'ecriture : transaction ZCA_TACHES (saisie SANS enregistrement) ----
 Sub Collecter(obj, prof, sortie)
   Dim i, n, t, ch, id, tx, enf, coll, msg
@@ -904,6 +1035,8 @@ Sub Lancer()
     EcrireTaches
   ElseIf TYPE_EXTRACTION = "fo" Then
     ExtraireFo
+  ElseIf TYPE_EXTRACTION = "adv" Then
+    ExtraireAdv
   Else
     ExtraireMo
   End If
@@ -1083,12 +1216,18 @@ Function ChargerDepuisUrl(url)
     ChargerDepuisUrl = "Type d'extraction manquant."
     Exit Function
   End If
-  If Not Valide("^(fo|mo|taches)$", d("t")) Then
+  If Not Valide("^(fo|mo|taches|adv)$", d("t")) Then
     ChargerDepuisUrl = "Type d'extraction invalide."
     Exit Function
   End If
   TYPE_EXTRACTION = d("t")
-  If TYPE_EXTRACTION = "fo" Then FICHIER = "export-fo-sap.txt" Else FICHIER = "export-mo-sap.txt"
+  If TYPE_EXTRACTION = "fo" Then
+    FICHIER = "export-fo-sap.txt"
+  ElseIf TYPE_EXTRACTION = "adv" Then
+    FICHIER = "export-adv-sap.txt"
+  Else
+    FICHIER = "export-mo-sap.txt"
+  End If
   If TYPE_EXTRACTION = "taches" Then
     If d.Exists("m") Then
       If d("m") <> "lot" Then
@@ -1204,7 +1343,7 @@ Function ChargerDepuisUrl(url)
       End If
       LIGNE_HIST = CInt(d("lh"))
     End If
-  Else
+  ElseIf TYPE_EXTRACTION = "fo" Then
     If Not d.Exists("oa") Then
       ChargerDepuisUrl = "Organisation d'achats manquante."
       Exit Function
