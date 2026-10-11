@@ -641,36 +641,47 @@ export default function BilanFinancier({
                 Marge avec EAT réaliste : <strong style={classeNeg(atterrEat.nette)}>{eur(atterrEat.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
               </div>
               {Math.abs(ecart) > 1 && (() => {
-                // Impact sur la marge = −(coût à terme − coût prévu), ligne par ligne.
-                const impacts = [];
+                // Dépense en plus (+) ou en moins (−) par rapport au prévu, ligne par ligne.
+                const lignes = [];
                 detailMoE.forEach((t) => {
-                  const d = -(t.atterrH - t.prevuH) * txSap(t.code);
-                  if (Math.abs(d) >= 1) impacts.push({ lib: "MO — " + t.nom, d });
+                  const d = (t.atterrH - t.prevuH) * txSap(t.code);
+                  if (Math.abs(d) >= 1) lignes.push({ lib: "MO — " + t.nom, d });
                 });
                 foLignes.forEach((t) => {
-                  const d = -(t.reel + t.prevu * (1 - t.av) - t.prevu);
-                  if (Math.abs(d) >= 1) impacts.push({ lib: "Fournitures — " + t.libelle, d });
+                  const d = t.reel + t.prevu * (1 - t.av) - t.prevu;
+                  if (Math.abs(d) >= 1) lignes.push({ lib: "Fournitures — " + t.libelle, d });
                 });
-                const dAutres = -(reelAutresE + resteMi - prevu.C_mi);
-                if (Math.abs(dAutres) >= 1) impacts.push({ lib: "Autres frais", d: dAutres });
-                const reste = ecart - impacts.reduce((x, i) => x + i.d, 0);
-                if (Math.abs(reste) >= 1) impacts.push({ lib: "FRA, achats hors commandes, engagé et divers", d: reste });
-                impacts.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+                const dAutres = reelAutresE + resteMi - prevu.C_mi;
+                if (Math.abs(dAutres) >= 1) lignes.push({ lib: "Autres frais", d: dAutres });
+                const totalPlus = -ecart;
+                const reste = totalPlus - lignes.reduce((x, i) => x + i.d, 0);
+                if (Math.abs(reste) >= 1) lignes.push({ lib: "FRA, achats hors commandes, engagé et divers", d: reste });
+                lignes.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+                const coul = (d) => (d > 0 ? { color: ROUGE } : { color: "var(--ok)" });
+                const signe = (d) => (d > 0 ? "+" : "") + eur(d);
                 return (
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: 10 }}>
                     <strong>{ecart < 0 ? "Pourquoi la marge se dégrade" : "Pourquoi la marge s'améliore"}</strong>
-                    {impacts.map((i) => (
-                      <div key={i.lib} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-                        <span>{i.lib}</span>
-                        <span style={{ color: i.d < 0 ? ROUGE : "var(--ok)", fontVariantNumeric: "tabular-nums" }}>
-                          {(i.d > 0 ? "+" : "") + eur(i.d)}
-                        </span>
-                      </div>
-                    ))}
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontWeight: 700, borderTop: "1px solid var(--border)", marginTop: 4, paddingTop: 4 }}>
-                      <span>Total</span>
-                      <span style={{ color: ecart < 0 ? ROUGE : "var(--ok)", fontVariantNumeric: "tabular-nums" }}>{(ecart > 0 ? "+" : "") + eur(ecart)}</span>
-                    </div>
+                    <table className="data-table bf-table" style={{ marginTop: 4, maxWidth: 640 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left" }}>Poste</th>
+                          <th>Dépense vs prévu</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lignes.map((i) => (
+                          <tr key={i.lib}>
+                            <td style={{ textAlign: "left", whiteSpace: "normal" }}>{i.lib}</td>
+                            <td style={coul(i.d)}>{signe(i.d)}</td>
+                          </tr>
+                        ))}
+                        <tr className="bf-total">
+                          <td style={{ textAlign: "left" }}>{totalPlus >= 0 ? "Total dépenses en plus" : "Total dépenses en moins"}</td>
+                          <td style={{ ...coul(totalPlus), fontWeight: 700 }}>{signe(totalPlus)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 );
               })()}
