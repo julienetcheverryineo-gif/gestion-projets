@@ -210,6 +210,9 @@ export default function BilanFinancier({
     achatsSap.forEach((a) => a.docAchat && cmd.set(a.docAchat, (cmd.get(a.docAchat) || 0) + (Number(a.valNette) || 0)));
     const compta = new Map();
     (cji3Eat.ecritures || []).forEach((e) => /^60/.test(e.nat) && e.docAchat && compta.set(e.docAchat, (compta.get(e.docAchat) || 0) + e.montant));
+    // Sans numéro de commande dans les écritures CJI3 (variante d'affichage sans
+    // la colonne « Doc achat »), le rapprochement est impossible : pas d'engagé auto.
+    if (compta.size === 0) return 0;
     let t = 0;
     cmd.forEach((m, k) => { t += Math.max(0, m - (compta.get(k) || 0)); });
     return Math.round(t * 100) / 100;
