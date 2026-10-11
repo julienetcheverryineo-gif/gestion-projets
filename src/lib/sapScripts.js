@@ -24,6 +24,8 @@ export const PARAMS_SAP_DEFAUT = {
   miseEnFormeFo: "/GOAT_FO", // mise en forme ALV ME2J
   varianteAlvMo: "ZCAT3_EXPORT_TXT", // mise en forme ALV ZCAT3 (ou la vôtre, ex. IAQ2_GUEST)
   ligneVarianteMo: "50", // ligne de la liste des mises en forme où GOAT lit la variante personnelle ("" = ignorer)
+  organisationCom: "IAQS", // organisation commerciale SAP (DirectionRegionale.OrganisationComCode)
+  agencesCommerciales: { IAQ1: "ICP", IAQ2: "ICQ", IAQ4: "ICS", IAQ5: "ICT", IAQ6: "ICU", IAQB: "IAQB", IAQX: "IQX" },
   afficherSap: false, // true = fenêtre SAP visible (dépannage)
   popupProjet: false, // utilisateurs "fenêtre projet" ME2J
   profilProjet: "aaa",
@@ -128,6 +130,14 @@ export function construireUrlLotTaches(params) {
   return `${PROTOCOLE_SAP}://run?t=taches&m=lot&sy=${sy}`;
 }
 
+// Agence commerciale SAP (S_VKBUR) déduite de l'OTP : AAQ5… -> agence IAQ5 -> ICT.
+export function agenceCommercialeDepuisOtp(otp, params) {
+  const brut = String(otp || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const agence = "I" + brut.slice(1, 4);
+  const carte = { ...(PARAMS_SAP_DEFAUT.agencesCommerciales || {}), ...(params.agencesCommerciales || {}) };
+  return carte[agence] || agence;
+}
+
 // Lien ouvert par l'appli pour lancer le gestionnaire installé. Jeu de
 // caractères volontairement restreint (pas de « % » : le gestionnaire passe
 // ce lien à une ligne de commande Windows) ; l'espace devient « + ».
@@ -145,7 +155,8 @@ export function construireUrlLancement(type, params, otp, debut, fin) {
     ajoute("va", params.varianteAlvMo);
     ajoute("lh", String(params.ligneVarianteMo ?? "").trim() === "" ? "-1" : params.ligneVarianteMo);
   } else if (type === "adv") {
-    // aucun paramètre supplémentaire : écrans découverts à l'exécution
+    ajoute("oc", params.organisationCom);
+    ajoute("ac", agenceCommercialeDepuisOtp(otp[0], params));
   } else {
     ajoute("oa", params.organisationAchats);
     ajoute("vl", params.varianteListeFo);
@@ -637,21 +648,6 @@ End Sub
 ' Les ecrans de ZSD_ADV ne sont pas connus d'avance : le script les decrit dans
 ' zsd-adv-ecran-1.txt (selection) et zsd-adv-ecran-2.txt (resultat) pour
 ' pouvoir l'ajuster si besoin.
-Function ChampOtpAdv()
-  Dim k, id, u
-  ChampOtpAdv = ""
-  For Each k In CHAMPS_SAISIE.Keys
-    id = CHAMPS_SAISIE(k)
-    u = UCase(id)
-    If Right(u, 4) = "-LOW" Then
-      If InStr(u, "PROJ") > 0 Or InStr(u, "POSID") > 0 Or InStr(u, "PSPNR") > 0 Or InStr(u, "OTP") > 0 Or InStr(u, "PSP") > 0 Or InStr(u, "WBS") > 0 Then
-        ChampOtpAdv = id
-        Exit Function
-      End If
-    End If
-  Next
-End Function
-
 Function TrouverGrille(obj, prof)
   Dim i, coll, enf, t
   Set TrouverGrille = Nothing
@@ -677,87 +673,95 @@ Function TrouverGrille(obj, prof)
   Next
 End Function
 
-Sub ExporterListeAdv()
-  Dim grille, essai, w, fait
-  Set grille = TrouverGrille(session.findById("wnd[0]/usr"), 0)
-  If Not grille Is Nothing Then
-    grille.pressToolbarContextButton "&MB_EXPORT"
-    grille.selectContextMenuItem "&PC"
-  Else
-    session.findById("wnd[0]/tbar[0]/okcd").Text = "%PC"
-    session.findById("wnd[0]").sendVKey 0
-  End If
-  For essai = 1 To 8
-    fait = False
-    For w = 2 To 1 Step -1
-      If Existe("wnd[" & w & "]/usr/ctxtDY_FILENAME") Then
-        If Existe("wnd[" & w & "]/usr/ctxtDY_PATH") Then session.findById("wnd[" & w & "]/usr/ctxtDY_PATH").Text = DOSSIER
-        session.findById("wnd[" & w & "]/usr/ctxtDY_FILENAME").Text = FICHIER
-        session.findById("wnd[" & w & "]/usr/ctxtDY_FILENAME").caretPosition = Len(FICHIER)
-        If Existe("wnd[" & w & "]/tbar[0]/btn[11]") Then
-          session.findById("wnd[" & w & "]/tbar[0]/btn[11]").press
-        Else
-          session.findById("wnd[" & w & "]/tbar[0]/btn[0]").press
-        End If
-        fait = True
-        Exit For
-      End If
-    Next
-    If Not fait Then
-      If Existe("wnd[1]/tbar[0]/btn[0]") Then
-        session.findById("wnd[1]/tbar[0]/btn[0]").press
-        fait = True
-      End If
-    End If
-    If FichierPresent() Then Exit For
-    If Not fait Then Exit For
-    WScript.Sleep 300
-  Next
-End Sub
-
-Function FichierPresent()
-  FichierPresent = fso.FileExists(CHEMIN)
-End Function
-
-Function BoutonMultiple(champ)
-  Dim pos, nom
-  pos = InStrRev(champ, "/")
-  nom = Mid(champ, pos + 1)
-  If Left(nom, 4) = "ctxt" Then
-    nom = Mid(nom, 5)
-  ElseIf Left(nom, 3) = "txt" Then
-    nom = Mid(nom, 4)
-  End If
-  nom = Left(nom, Len(nom) - 4)
-  BoutonMultiple = Left(champ, pos) & "btn%_" & nom & "_%_APP_%-VALU_PUSH"
-End Function
-
 Sub ExtraireAdv()
-  Dim champ, bouton, nb, n
+  Dim tbl, i, nbVis, page, ligneT, pageCour, decalage, base, grille, n, nb
+  Const SEL_TABLE = "wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE"
+  Const COL_BASE = "wnd[1]/usr/tabsG_TS_ALV/tabpALV_M_R1/ssubSUB_CONFIGURATION:SAPLSALV_CUL_COLUMN_SELECTION:0620/"
+  session.findById("wnd[0]").maximize
   session.findById("wnd[0]/tbar[0]/okcd").Text = "ZSD_ADV"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
   n = ScannerEcran("zsd-adv-ecran-1.txt")
-  champ = ChampOtpAdv()
-  If champ = "" Then Fin "ZSD_ADV : champ affaire (OTP) introuvable sur l'ecran de selection (voir zsd-adv-ecran-1.txt).", 48
 
-  bouton = BoutonMultiple(champ)
-  If Existe(bouton) Then
-    nb = SaisirSelectionMultiple(champ, bouton)
-    If nb = 0 Then
-      If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
-      Fin "Aucune affaire exploitable.", 48
+  ' ORG_ACHATS = organisation commerciale (ex. IAQS), SOCIETE = agence commerciale (ex. ICT)
+  session.findById("wnd[0]/usr/ctxtP_VKORG").Text = ORG_ACHATS
+  session.findById("wnd[0]/usr/ctxtS_VKBUR-LOW").Text = SOCIETE
+  session.findById("wnd[0]/usr/ctxtS_VKBUR-LOW").SetFocus
+  session.findById("wnd[0]/usr/ctxtS_VKBUR-LOW").caretPosition = Len(SOCIETE)
+
+  session.findById("wnd[0]/usr/btn%_S_OTP_%_APP_%-VALU_PUSH").press
+  Set tbl = session.findById(SEL_TABLE)
+  nbVis = 0
+  On Error Resume Next
+  nbVis = tbl.VisibleRowCount
+  If Err.Number <> 0 Or nbVis <= 0 Then
+    Err.Clear
+    nbVis = tbl.RowCount
+  End If
+  On Error GoTo 0
+  If nbVis <= 0 Then nbVis = 10
+  pageCour = -1 : decalage = 0 : nb = 0
+  For i = 0 To UBound(LISTE_OTP)
+    If Trim(LISTE_OTP(i)) <> "" Then
+      page = decalage \ nbVis
+      ligneT = decalage Mod nbVis
+      If page <> pageCour Then
+        tbl.verticalScrollbar.Position = page * nbVis
+        pageCour = page
+      End If
+      session.findById("wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE/ctxtRSCSEL_255-SLOW_I[1," & ligneT & "]").Text = LISTE_OTP(i)
+      decalage = decalage + 1
+      nb = nb + 1
     End If
-    session.findById("wnd[1]/tbar[0]/btn[8]").press
+  Next
+  If nb = 0 Then
+    If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
+    Fin "Aucune affaire exploitable.", 48
+  End If
+  session.findById("wnd[1]/tbar[0]/btn[0]").press
+  On Error Resume Next
+  session.findById("wnd[1]/tbar[0]/btn[12]").press
+  session.findById("wnd[2]/usr/btnSPOP-OPTION1").press
+  Err.Clear
+  On Error GoTo 0
+
+  session.findById("wnd[0]/usr/chkP_SIMP").Selected = True
+  session.findById("wnd[0]/usr/chkP_SIMP").SetFocus
+  session.findById("wnd[0]/tbar[1]/btn[8]").press
+  WScript.Sleep 1000
+  If Existe("wnd[0]/usr/chkP_SIMP") Then FinVide "Aucune facturation pour ces affaires."
+
+  Set grille = Nothing
+  If Existe("wnd[0]/usr/cntlCONTAINER2/shellcont/shell") Then
+    Set grille = session.findById("wnd[0]/usr/cntlCONTAINER2/shellcont/shell")
   Else
-    session.findById(champ).Text = LISTE_OTP(0)
+    Set grille = TrouverGrille(session.findById("wnd[0]/usr"), 0)
+  End If
+  If grille Is Nothing Then
+    n = ScannerEcran("zsd-adv-ecran-2.txt")
+    Fin "ZSD_ADV : liste des resultats introuvable (voir zsd-adv-ecran-2.txt).", 48
   End If
 
-  session.findById("wnd[0]/tbar[1]/btn[8]").press
-  WScript.Sleep 1500
-  If Existe(champ) Then FinVide "Aucune facturation pour ces affaires."
-  n = ScannerEcran("zsd-adv-ecran-2.txt")
-  ExporterListeAdv
-  RetourAccueil
+  ' Toutes les colonnes (comme GOAT)
+  grille.pressToolbarContextButton "&MB_VARIANT"
+  grille.selectContextMenuItem "&COL0"
+  session.findById(COL_BASE & "cntlCONTAINER2_LAYO/shellcont/shell").SelectAll
+  session.findById(COL_BASE & "btnAPP_FL_SING").press
+  session.findById(COL_BASE & "cntlCONTAINER1_LAYO/shellcont/shell").SelectAll
+  session.findById(COL_BASE & "btnAPP_WL_SING").press
+  session.findById("wnd[1]/tbar[0]/btn[0]").press
+
+  grille.pressToolbarContextButton "&MB_EXPORT"
+  grille.selectContextMenuItem "&PC"
+  session.findById("wnd[1]/tbar[0]/btn[0]").press
+  session.findById("wnd[1]/usr/ctxtDY_PATH").Text = DOSSIER
+  session.findById("wnd[1]/usr/ctxtDY_FILENAME").Text = FICHIER
+  session.findById("wnd[1]/usr/ctxtDY_FILENAME").caretPosition = Len(FICHIER)
+  session.findById("wnd[1]/tbar[0]/btn[0]").press
+
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  session.findById("wnd[0]").sendVKey 0
   Terminer "ZSD_ADV", ""
 End Sub
 
@@ -1343,6 +1347,16 @@ Function ChargerDepuisUrl(url)
       End If
       LIGNE_HIST = CInt(d("lh"))
     End If
+  ElseIf TYPE_EXTRACTION = "adv" Then
+    If Not (d.Exists("oc") And d.Exists("ac")) Then
+      ChargerDepuisUrl = "Organisation ou agence commerciale manquante."
+      Exit Function
+    End If
+    If Not (Valide("^[A-Za-z0-9]{1,10}$", d("oc")) And Valide("^[A-Za-z0-9]{1,10}$", d("ac"))) Then
+      ChargerDepuisUrl = "Organisation ou agence commerciale invalide."
+      Exit Function
+    End If
+    ORG_ACHATS = d("oc") : SOCIETE = d("ac")
   ElseIf TYPE_EXTRACTION = "fo" Then
     If Not d.Exists("oa") Then
       ChargerDepuisUrl = "Organisation d'achats manquante."
