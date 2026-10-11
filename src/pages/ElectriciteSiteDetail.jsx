@@ -2989,6 +2989,12 @@ export default function ElectriciteSiteDetail() {
                     .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0)}
                   caSaisi={chantier?.caHt ?? null}
                   caNonSoumis={0}
+                  margeCibleEat={chantier?.eatMargeCible ?? null}
+                  onChangerMargeCibleEat={
+                    peutGerer
+                      ? (v) => updateDoc(doc(db, "sites", chantierId), { eatMargeCible: v })
+                      : null
+                  }
                   onChangerCa={
                     peutGerer
                       ? (champ, v) => updateDoc(doc(db, "sites", chantierId), { [champ]: v })

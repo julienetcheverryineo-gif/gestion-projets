@@ -49,6 +49,8 @@ export default function BilanFinancier({
   caSaisi,
   caNonSoumis,
   onChangerCa,
+  margeCibleEat,
+  onChangerMargeCibleEat,
   foa: foaDefaut,
   pctSaisis,
   onChangerPct,
@@ -67,7 +69,10 @@ export default function BilanFinancier({
 }) {
   const [saisieCa, setSaisieCa] = useState({});
   const [saisiePct, setSaisiePct] = useState({});
-  const [kCible, setKCible] = useState("");
+  // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
+  const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
+  const kAffiche =
+    kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
   // % de la rubrique C : valeur propre à l'affaire, sinon paramètre FOA.
   const foa = { ...foaDefaut };
   ["prorata", "fraisDivers", "aleas", "negociation"].forEach((k) => {
@@ -521,7 +526,7 @@ export default function BilanFinancier({
         );
         const resAnnonce = resoudreEat(prevu.nette);
         const kSaisi = (() => {
-          const t = String(kCible).replace(",", ".").replace("%", "").trim();
+          const t = String(kAffiche).replace(",", ".").replace("%", "").trim();
           const n = t === "" ? null : Number(t);
           return n !== null && Number.isFinite(n) ? n / 100 : null;
         })();
@@ -540,11 +545,21 @@ export default function BilanFinancier({
                 type="text"
                 inputMode="decimal"
                 placeholder={prevu.k === null ? "ex. 8" : num(prevu.k * 100, 1)}
-                value={kCible}
+                value={kAffiche}
+                disabled={!onChangerMargeCibleEat}
                 onChange={(e) => setKCible(e.target.value)}
+                onBlur={() => {
+                  if (kCible === null) return;
+                  const t = String(kCible).replace(",", ".").replace("%", "").trim();
+                  const n = t === "" ? null : Number(t);
+                  setKCible(null);
+                  if (n === null || (Number.isFinite(n) && n > -100 && n < 100)) onChangerMargeCibleEat?.(n === null ? null : n / 100);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                 style={{ width: "5em", textAlign: "right" }}
               />
               <span>% de marge nette (k de vente)</span>
+              {typeof margeCibleEat === "number" && <span className="simple-list-meta">enregistré pour ce chantier</span>}
             </div>
             {resCible
               ? tableauEat(
