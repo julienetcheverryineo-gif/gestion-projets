@@ -215,8 +215,8 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
       <div className="sit-top">
         <div>
           <h2 className="sit-titre">Situations de travaux{mode === "devis" ? " · par devis" : ""}</h2>
-          <div className="simple-list-meta">
-            {mode === "devis" ? "Devis" : "Marché"} : <strong>{euro(marche)} € HT</strong>
+          <div className="sit-marche">
+            {mode === "devis" ? "Montant du devis" : "Montant du marché"} : <strong>{euro(marche)} € HT</strong>
           </div>
         </div>
         {peutGerer && devis.length > 1 && (
@@ -280,7 +280,10 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                   <div className="sit-barre">
                     <i style={{ width: Math.min(100, pctGlobal) + "%" }} />
                   </div>
-                  <em>{pctTexte(pctGlobal)} % du marché</em>
+                  <em>{pctTexte(pctGlobal)} % du {mode === "devis" ? "devis" : "marché"}</em>
+                  <em className="sit-reste">
+                    Reste à facturer : <b>{euro(Math.max(0, marche - cumulHt))} € HT</b> ({pctTexte(Math.max(0, 100 - pctGlobal))} %)
+                  </em>
                 </div>
                 <div className="sit-kpi">
                   <span>{indexOuvert === 0 && acompte ? "Acompte à déduire" : "Déjà facturé"}</span>
@@ -288,7 +291,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                   <em>HT</em>
                 </div>
                 <div className="sit-kpi sit-kpi-fort">
-                  <span>Montant du mois</span>
+                  <span>Montant de la situation</span>
                   <strong>{euro(moisHt)} €</strong>
                   <em>HT · travaux de la période {euro(travauxPeriode)} €</em>
                 </div>

@@ -4209,3 +4209,7 @@ textarea:focus {
 .sit-coh-retard { border-color: var(--warn); }
 .sit-coh-verdict { line-height: 1.35; }
 .sit-coh-retard { border-width: 2px; }
+.sit-marche { margin-top: 2px; font-size: 1.05rem; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+.sit-marche strong { font-weight: 700; font-size: 1.15rem; }
+.sit-reste { color: var(--text) !important; font-size: 0.84rem !important; margin-top: 2px; }
+.sit-reste b { font-weight: 700; }
