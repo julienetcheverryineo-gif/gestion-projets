@@ -573,6 +573,10 @@ export default function BilanFinancier({
       {affichage === "eat" && (
       <div className="bf-eat" style={{ marginTop: 18 }}>
         <h3 style={{ margin: "0 0 4px" }}>🎯 Aide à la déclaration EAT (estimation à terme)</h3>
+        <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
+          EAT réaliste = réel pointé / acheté + reste à faire au budget (budget × (1 − avancement)). FRA, frais généraux,
+          prorata, aléas, négociation et matériel interne sont recalculés par la FOA à partir de ces saisies.
+        </p>
         <div className="data-table-wrapper">
           <table className="data-table bf-table">
             <thead>
