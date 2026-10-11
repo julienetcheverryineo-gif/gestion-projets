@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { construireLignesSituation, montantADeduire, montantAvancement, montantMarche, pctCumule, pctLogique, totalCumule, TVA_DEFAUT } from "../lib/situations";
 import { genererFichierSituation } from "../lib/exportSituation";
+import FacturationSap from "./FacturationSap";
 
 const euro = (n) =>
   Number(n || 0)
@@ -31,7 +32,7 @@ function telecharger(blob, nom) {
 // ligne de la minute (prix de vente de la minute), puis export Excel.
 // Stockage : chantier.situationsMode ("ensemble" | "devis") et
 // chantier.situationsData = { "_all" | <devisId>: [situations] }.
-export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer, tauxHoraire, sap }) {
+export default function SituationsFacturation({ chantierId, chantier, devis, toutesLignes, tousGroupes, peutGerer, tauxHoraire, sap, otp }) {
   const { profile } = useAuth();
   const mode = chantier?.situationsMode || null; // null = pas encore choisi
   const [devisChoisi, setDevisChoisi] = useState(null);
@@ -215,6 +216,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
 
   return (
     <div className="sit">
+      <FacturationSap chantierId={chantierId} chantier={chantier} otp={otp} peutGerer={peutGerer} factureSituations={globalFact.facture} />
       <div className="sit-top">
         <div>
           <h2 className="sit-titre">Situations de travaux{mode === "devis" ? " · par devis" : ""}</h2>

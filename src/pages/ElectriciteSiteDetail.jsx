@@ -2907,6 +2907,7 @@ export default function ElectriciteSiteDetail() {
               return (
             <SituationsFacturation
               sap={sap}
+              otp={otpSap}
               chantierId={chantierId}
               chantier={chantier}
               devis={devis}
