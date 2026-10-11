@@ -4045,6 +4045,20 @@ textarea:focus {
 .bf-detail td:first-child {
   border-left: 4px solid color-mix(in srgb, var(--bf-c) 30%, transparent);
 }
+.af-table th:nth-child(2),
+.af-table td:nth-child(2) {
+  text-align: left;
+  white-space: normal;
+}
+.af-total td {
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+}
+.af-ecriture td {
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .bf-total td {
   background: var(--panel-raised);
   font-weight: 700;

@@ -1,3 +1,4 @@
+import iconeAutresFrais from "../assets/icone-autres-frais.png";
 import { estLigneSomme } from "../lib/ligneSomme";
 import BilanFinancier from "../components/BilanFinancier";
 import { useTauxHoraires, useParametresFoa, useMontantsZone } from "../lib/tauxHoraires";
@@ -2840,7 +2841,7 @@ export default function ElectriciteSiteDetail() {
               onClick={() => setRecapActif("autresfrais")}
               title="Dépenses comptabilisées dans SAP hors main d'œuvre (CJI3)"
             >
-              🧾 Bilan autres frais
+              <img src={iconeAutresFrais} alt="" style={{ height: "1.2em", width: "auto", verticalAlign: "-0.2em" }} /> Bilan autres frais
             </button>
             {/* Bilan Achats masqué pour le moment (module à retravailler) */}
             <button

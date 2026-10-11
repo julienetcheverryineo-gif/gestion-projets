@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { libelleTypeActivite, normaliserTypeActivite, inclutMaterielInterne } from "../lib/typesActiviteSap";
 import { HEURES_PAR_JOUR_ZONE } from "../lib/tauxHoraires";
+import iconeAutresFrais from "../assets/icone-autres-frais.png";
 import { analyserCji3 } from "../lib/parseCji3";
 
 const eur = (v) =>
@@ -88,7 +89,6 @@ export default function BilanFinancier({
   // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
   const [saisieReelSap, setSaisieReelSap] = useState(null);
   const [messageCji3, setMessageCji3] = useState("");
-  const [ouvertsAf, setOuvertsAf] = useState({}); // comptes dépliés du bilan autres frais
   const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
   const kAffiche =
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
@@ -357,10 +357,9 @@ export default function BilanFinancier({
         const lignes = lignesTout.filter((e) => !dansFo(e));
         const masquees = lignesTout.filter(dansFo);
         const groupes = [
-          ["Achats (classe 60)", (e) => /^60/.test(e.nat)],
-          ["Autres frais (62, 64, 9000)", (e) => /^(62|64|9000)/.test(e.nat)],
-          ["FRA (941)", (e) => /^941/.test(e.nat)],
-          ["Produits / facturé (70)", (e) => /^70/.test(e.nat)],
+          ["Achats (classe 60)", (e) => /^60/.test(e.nat), true],
+          ["Autres frais (62, 64, 9000)", (e) => /^(62|64|9000)/.test(e.nat), true],
+          ["FRA (941)", (e) => /^941/.test(e.nat), false],
         ];
         const parCompte = (liste) => {
           const m = new Map();
@@ -378,9 +377,9 @@ export default function BilanFinancier({
         const totalSansCommande = sansCommande.reduce((x, e) => x + e.montant, 0);
         return (
           <div className="bf-eat" style={{ marginTop: 18 }}>
-            <h3 style={{ margin: "0 0 4px" }}>🧾 Bilan autres frais — comptabilité SAP (CJI3 du {cji3Eat.importeLe ? new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR") : "—"})</h3>
+            <h3 style={{ margin: "0 0 4px" }}><img src={iconeAutresFrais} alt="" style={{ height: "1.2em", width: "auto", verticalAlign: "-0.2em" }} /> Bilan autres frais — comptabilité SAP (CJI3 du {cji3Eat.importeLe ? new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR") : "—"})</h3>
             <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
-              Tout ce que SAP a comptabilisé hors main d'œuvre, par compte. Cliquez sur un compte pour voir ses écritures (date, pièce, libellé, fournisseur, n° de commande).
+              Tout ce que SAP a comptabilisé hors main d'œuvre, par thème et par compte, avec le détail des écritures (date, pièce, libellé, fournisseur, n° de commande).
               {masquees.length > 0 && (
                 <>
                   <br />
@@ -388,72 +387,57 @@ export default function BilanFinancier({
                 </>
               )}
             </p>
-            <div style={{ margin: "0 0 8px" }}>
-              <button
-                className="btn-ghost"
-                onClick={() => {
-                  const cles = groupes.flatMap(([titre, test]) => parCompte(lignes.filter(test)).map((g) => titre + g.nat + g.designation));
-                  const toutOuvert = cles.length > 0 && cles.every((c) => ouvertsAf[c]);
-                  setOuvertsAf(toutOuvert ? {} : Object.fromEntries(cles.map((c) => [c, true])));
-                }}
-              >
-                ⇕ Tout déplier / replier
-              </button>
-            </div>
             <div className="data-table-wrapper">
-              <table className="data-table bf-table">
+              <table className="data-table table-recap bf-table af-table">
                 <thead>
                   <tr>
-                    <th>Compte</th>
-                    <th>Désignation</th>
-                    <th>Écritures</th>
+                    <th>Compte / date</th>
+                    <th>Désignation / libellé</th>
+                    <th>Écritures / n° commande</th>
                     <th>Montant</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {groupes.map(([titre, test]) => {
+                  {groupes.map(([titre, test, detaille]) => {
                     const liste = lignes.filter(test);
                     if (liste.length === 0) return null;
                     const total = liste.reduce((x, e) => x + e.montant, 0);
+                    const dateTri = (d) => String(d || "").split(".").reverse().join("");
+                    const ligneTotal = (
+                      <tr key={titre + "-total"} className="af-total bf-autres">
+                        <td colSpan={2}>Total {titre}</td>
+                        <td>{liste.length}</td>
+                        <td style={classeNeg(-total)}>{eur(total)}</td>
+                      </tr>
+                    );
+                    if (!detaille) return ligneTotal;
                     return [
                       <tr key={titre} className="bf-section bf-autres">
-                        <td colSpan={3}>{titre}</td>
-                        <td style={classeNeg(-total)}>{eur(total)}</td>
+                        <td colSpan={4}>{titre}</td>
                       </tr>,
-                      ...parCompte(liste).flatMap((g) => {
-                        const cle = titre + g.nat + g.designation;
-                        const ouvert = !!ouvertsAf[cle];
-                        const dateTri = (d) => String(d || "").split(".").reverse().join("");
-                        return [
-                          <tr
-                            key={cle}
-                            className="bf-detail bf-autres"
-                            style={{ cursor: "pointer" }}
-                            onClick={() => setOuvertsAf((o) => ({ ...o, [cle]: !o[cle] }))}
-                          >
-                            <td style={{ paddingLeft: 24 }}>{ouvert ? "▾" : "▸"} {g.nat}</td>
-                            <td>{g.designation}</td>
-                            <td>{g.nb}</td>
-                            <td>{eur(g.montant)}</td>
-                          </tr>,
-                          ...(ouvert
-                            ? [...g.ecr]
-                                .sort((a, b) => dateTri(b.date).localeCompare(dateTri(a.date)))
-                                .map((e, i) => {
-                                  const four = e.docAchat ? fournisseurParCommande.get(e.docAchat) : "";
-                                  const libelle = [e.typePiece, e.texte, four].filter(Boolean).join(" · ");
-                                  return (
-                                    <tr key={cle + i} className="bf-detail" style={{ fontSize: "0.9em", opacity: 0.9 }}>
-                                      <td style={{ paddingLeft: 48 }}>{e.date}</td>
-                                      <td>{libelle || "—"}</td>
-                                      <td>{e.docAchat || ""}</td>
-                                      <td>{eur(e.montant)}</td>
-                                    </tr>
-                                  );
-                                })
-                            : []),
-                        ];
-                      }),
+                      ...parCompte(liste).flatMap((g) => [
+                        <tr key={titre + g.nat + g.designation} className="bf-detail bf-autres af-compte">
+                          <td style={{ paddingLeft: 24, fontWeight: 600 }}>{g.nat}</td>
+                          <td style={{ fontWeight: 600 }}>{g.designation}</td>
+                          <td>{g.nb}</td>
+                          <td style={{ fontWeight: 600 }}>{eur(g.montant)}</td>
+                        </tr>,
+                        ...[...g.ecr]
+                          .sort((a, b) => dateTri(b.date).localeCompare(dateTri(a.date)))
+                          .map((e, i) => {
+                            const four = e.docAchat ? fournisseurParCommande.get(e.docAchat) : "";
+                            const libelle = [e.typePiece, e.texte, four].filter(Boolean).join(" · ");
+                            return (
+                              <tr key={titre + g.nat + i} className="bf-detail af-ecriture">
+                                <td style={{ paddingLeft: 48 }}>{e.date}</td>
+                                <td>{libelle || "—"}</td>
+                                <td>{e.docAchat || ""}</td>
+                                <td>{eur(e.montant)}</td>
+                              </tr>
+                            );
+                          }),
+                      ]),
+                      ligneTotal,
                     ];
                   })}
                 </tbody>
@@ -497,7 +481,7 @@ export default function BilanFinancier({
     return (
       <div className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-header">
-          <h2>🧾 Bilan autres frais</h2>
+          <h2><img src={iconeAutresFrais} alt="" style={{ height: "1.2em", width: "auto", verticalAlign: "-0.2em" }} /> Bilan autres frais</h2>
         </div>
         {blocAutresFrais || (
           <p className="simple-list-meta">
