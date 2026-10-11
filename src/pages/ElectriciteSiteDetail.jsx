@@ -2991,9 +2991,15 @@ export default function ElectriciteSiteDetail() {
                   caNonSoumis={0}
                   margeCibleEat={chantier?.eatMargeCible ?? null}
                   cji3Eat={chantier?.eatCji3 ?? null}
+                  engageSapEat={chantier?.eatEngageSap ?? null}
+                  onChangerEngageSapEat={
+                    peutGerer
+                      ? (v) => updateDoc(doc(db, "sites", chantierId), { eatEngageSap: v })
+                      : null
+                  }
                   onChangerCji3Eat={
                     peutGerer
-                      ? (v) => updateDoc(doc(db, "sites", chantierId), { eatCji3: v, eatReelSap: (v?.directTotal ?? 0) + (chantier?.eatEngageSap || 0) })
+                      ? (v) => updateDoc(doc(db, "sites", chantierId), { eatCji3: v })
                       : null
                   }
                   reelSapEat={chantier?.eatReelSap ?? null}

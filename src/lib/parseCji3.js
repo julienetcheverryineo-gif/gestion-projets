@@ -12,7 +12,7 @@ const nombre = (s) => {
   return Number.isFinite(v) ? (neg ? -v : v) : 0;
 };
 
-export function analyserCji3(texte) {
+export function analyserCji3(texte, otpFiltre = "") {
   const lignes = String(texte || "").split(/\r?\n/);
   const iEntete = lignes.findIndex((l) => /\|\s*Elt d'OTP/.test(l));
   if (iEntete < 0) throw new Error("Fichier CJI3 non reconnu (colonne « Elt d'OTP » introuvable).");
@@ -24,11 +24,25 @@ export function analyserCji3(texte) {
   const iUq = idx(/^UQ$/);
   const iOtp = idx(/^Elt d'OTP/);
   if (iNat < 0 || iVal < 0) throw new Error("Colonnes « Nat.cpt. » / « Val./D.Tra » absentes : ajoutez-les à la mise en page du CJI3.");
-  const res = { mo: {}, achats: 0, autresFrais: 0, fra: 0, produits: 0, nbEcritures: 0, otp: "" };
+  const cols2 = (lignes[iEntete + 1] || "").split("|").map((c) => c.trim());
+  const idx2 = (re) => cols2.findIndex((c) => re.test(c));
+  const iTypePiece = idx2(/^D.{1,3}sign type pi/);
+  const iTexte = idx2(/^D.{1,3}signation$/);
+  const iDocAchat = idx2(/^Doc achat/);
+  const iDate = idx(/^Date cpt/);
+  const iDes = idx(/^D.{1,3}s(ign)?\.nat/);
+  const norm = (o) => String(o || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const cibleOtp = norm(otpFiltre);
+  const res = { mo: {}, achats: 0, autresFrais: 0, fra: 0, produits: 0, nbEcritures: 0, otp: "", ecritures: [] };
   for (let i = iEntete + 1; i < lignes.length; i++) {
     const l = lignes[i];
     if (!/^\|\s+[A-Z]\.[A-Z0-9]/.test(l)) continue; // ligne d'écriture (OTP renseigné)
     const c = l.split("|").map((x) => x.trim());
+    if (cibleOtp && !norm(c[iOtp]).startsWith(cibleOtp)) {
+      if (/^\|[^|]*\|/.test(lignes[i + 1] || "") && !/^\|\s+[A-Z]\./.test(lignes[i + 1] || "")) i++;
+      continue;
+    }
+    const c2 = (lignes[i + 1] || "").split("|").map((x) => x.trim());
     const nat = c[iNat] || "";
     const val = nombre(c[iVal]);
     if (!res.otp && iOtp >= 0) res.otp = c[iOtp];
@@ -42,6 +56,17 @@ export function analyserCji3(texte) {
     else if (/^(62|64|9000)/.test(nat)) res.autresFrais += val;
     else if (/^941/.test(nat)) res.fra += val;
     else if (/^70/.test(nat)) res.produits += val;
+    if (!/^9430/.test(nat) && !/^92/.test(nat)) {
+      res.ecritures.push({
+        nat,
+        designation: iDes >= 0 ? c[iDes] : "",
+        montant: val,
+        date: iDate >= 0 ? c[iDate] : "",
+        typePiece: iTypePiece >= 0 ? c2[iTypePiece] || "" : "",
+        texte: iTexte >= 0 ? c2[iTexte] || "" : "",
+        docAchat: iDocAchat >= 0 ? c2[iDocAchat] || "" : "",
+      });
+    }
   }
   const arrondi = (v) => Math.round(v * 100) / 100;
   Object.values(res.mo).forEach((m) => {

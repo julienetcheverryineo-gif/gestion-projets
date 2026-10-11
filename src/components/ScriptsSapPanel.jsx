@@ -286,8 +286,11 @@ export default function ScriptsSapPanel({ importManuel = null, historique = null
         <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["adv"])}>
           ▶ Facturation (ZSD_ADV)
         </button>
-        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo", "mo", "adv"])}>
-          ▶ Tout (achats + heures + facturation)
+        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["cji3"])}>
+          ▶ Comptabilité (CJI3)
+        </button>
+        <button type="button" className="btn btn-primary" disabled={enCours} onClick={() => lancer(["fo", "mo", "adv", "cji3"])}>
+          ▶ Tout (achats + heures + facturation + comptabilité)
         </button>
         <button type="button" className="btn" onClick={() => setOuvert((o) => !o)}>
           {ouvert ? "Fermer les paramètres" : "⚙ Paramètres SAP"}

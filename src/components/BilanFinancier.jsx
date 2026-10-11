@@ -60,6 +60,8 @@ export default function BilanFinancier({
   onChangerReelSapEat,
   cji3Eat,
   onChangerCji3Eat,
+  engageSapEat,
+  onChangerEngageSapEat,
   foa: foaDefaut,
   pctSaisis,
   onChangerPct,
@@ -193,7 +195,8 @@ export default function BilanFinancier({
   // (Cpta Cum + Engagé du « CD hors FRA ») et le réel que l'outil reconstitue
   // (pointages, achats ME2J, matériel interne théorique). Ajouté tel quel au coût.
   const reelOutilDirect = reelMoE + zoneReel + reelFoLignes + heuresMiReellesE * foa.materielInterne;
-  const calageSap = typeof reelSapEat === "number" ? reelSapEat - reelOutilDirect : 0;
+  const reelSapEffectif = cji3Eat ? cji3Eat.directTotal + (typeof engageSapEat === "number" ? engageSapEat : 0) : typeof reelSapEat === "number" ? reelSapEat : null;
+  const calageSap = reelSapEffectif === null ? 0 : reelSapEffectif - reelOutilDirect;
   const eatPourFacteur = (f) => {
     const col = colonne(
       reelMoE + budgetMo * (1 - pctMo) * f,
@@ -416,6 +419,30 @@ export default function BilanFinancier({
             {messageCji3 ? <span>{messageCji3}</span> : cji3Eat?.importeLe ? <span>CJI3 du {new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR")} · réel direct {eur(cji3Eat.directTotal)}</span> : <span>(cumul comptable SAP : heures par type, achats, autres frais)</span>}
           </span>
           <br />
+          {cji3Eat ? (
+            <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              Engagé SAP (sous-traitance interne, commandes non facturées…) :
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="ex. 3 673"
+                disabled={!onChangerEngageSapEat}
+                value={saisieReelSap !== null ? saisieReelSap : typeof engageSapEat === "number" ? String(engageSapEat).replace(".", ",") : ""}
+                onChange={(e) => setSaisieReelSap(e.target.value)}
+                onBlur={() => {
+                  if (saisieReelSap === null) return;
+                  const t = String(saisieReelSap).replace(",", ".").replace(/\s/g, "").trim();
+                  const n = t === "" ? null : Number(t);
+                  setSaisieReelSap(null);
+                  if (n === null || (Number.isFinite(n) && n >= 0)) onChangerEngageSapEat?.(n);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                style={{ width: "7em", textAlign: "right" }}
+              />
+              € → réel SAP {eur(reelSapEffectif)} · calage {calageSap >= 0 ? "+" : ""}
+              {eur(calageSap)} (réel outil : {eur(reelOutilDirect)})
+            </span>
+          ) : (
           <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             Réel SAP cumulé + engagé (écran RàE, « CD hors FRA ») :
             <input
@@ -443,6 +470,7 @@ export default function BilanFinancier({
               </span>
             )}
           </span>
+          )}
           <br />
           <em>
             Calage SAP : frais généraux à {num(FG_EAT * 100, 1)} % du CA (valeur de l'écran RàE) au lieu de {num(foa.fg * 100, 1)} % (FOA) pour
@@ -662,6 +690,90 @@ export default function BilanFinancier({
                 )
               : <p className="simple-list-meta" style={{ marginTop: 6 }}>Saisissez un pourcentage pour obtenir les valeurs à déclarer.</p>}
           </>
+        );
+      })()}
+
+
+      {cji3Eat && (() => {
+        const lignes = cji3Eat.ecritures || [];
+        const groupes = [
+          ["Achats (classe 60)", (e) => /^60/.test(e.nat)],
+          ["Autres frais (62, 64, 9000)", (e) => /^(62|64|9000)/.test(e.nat)],
+          ["FRA (941)", (e) => /^941/.test(e.nat)],
+          ["Produits / facturé (70)", (e) => /^70/.test(e.nat)],
+        ];
+        const parCompte = (liste) => {
+          const m = new Map();
+          liste.forEach((e) => {
+            const k = e.nat + "|" + e.designation;
+            if (!m.has(k)) m.set(k, { nat: e.nat, designation: e.designation, nb: 0, montant: 0 });
+            const g = m.get(k);
+            g.nb++;
+            g.montant += e.montant;
+          });
+          return [...m.values()].sort((a, b) => a.nat.localeCompare(b.nat));
+        };
+        const sansCommande = lignes.filter((e) => /^60/.test(e.nat) && (!e.docAchat || !/facture mm/i.test(e.typePiece || "")));
+        const totalSansCommande = sansCommande.reduce((x, e) => x + e.montant, 0);
+        return (
+          <div className="bf-eat" style={{ marginTop: 18 }}>
+            <h3 style={{ margin: "0 0 4px" }}>🧾 Bilan autres frais — comptabilité SAP (CJI3 du {cji3Eat.importeLe ? new Date(cji3Eat.importeLe).toLocaleDateString("fr-FR") : "—"})</h3>
+            <p className="simple-list-meta" style={{ margin: "0 0 8px" }}>
+              Tout ce que SAP a comptabilisé hors main d'œuvre, par compte. Sert à caler l'EAT sur le réel comptable ; mise en page à retravailler.
+            </p>
+            <div className="data-table-wrapper">
+              <table className="data-table bf-table">
+                <thead>
+                  <tr>
+                    <th>Compte</th>
+                    <th>Désignation</th>
+                    <th>Écritures</th>
+                    <th>Montant</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupes.map(([titre, test]) => {
+                    const liste = lignes.filter(test);
+                    if (liste.length === 0) return null;
+                    const total = liste.reduce((x, e) => x + e.montant, 0);
+                    return [
+                      <tr key={titre} className="bf-section bf-autres">
+                        <td colSpan={3}>{titre}</td>
+                        <td style={classeNeg(-total)}>{eur(total)}</td>
+                      </tr>,
+                      ...parCompte(liste).map((g) => (
+                        <tr key={titre + g.nat + g.designation} className="bf-detail bf-autres">
+                          <td style={{ paddingLeft: 24 }}>{g.nat}</td>
+                          <td>{g.designation}</td>
+                          <td>{g.nb}</td>
+                          <td>{eur(g.montant)}</td>
+                        </tr>
+                      )),
+                    ];
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <div>
+                Achats comptabilisés : <strong>{eur(cji3Eat.achats)}</strong> · achats ME2J de l'outil : <strong>{eur(reelFoLignes)}</strong> · écart{" "}
+                <strong>{eur(cji3Eat.achats - reelFoLignes)}</strong>
+              </div>
+              {sansCommande.length > 0 && (
+                <div className="simple-list-meta" style={{ marginTop: 4 }}>
+                  Écritures achats sans commande d'achat (hors ME2J) : {eur(totalSansCommande)} —{" "}
+                  {sansCommande.map((e) => `${e.date} ${e.typePiece || "pièce"} ${e.texte || ""} ${eur(e.montant)}`).join(" ; ")}
+                </div>
+              )}
+              <div style={{ marginTop: 4 }}>
+                Autres frais comptabilisés : <strong>{eur(cji3Eat.autresFrais)}</strong> · matériel interne théorique de l'outil :{" "}
+                <strong>{eur(heuresMiReellesE * foa.materielInterne)}</strong>
+              </div>
+              <div style={{ marginTop: 4 }}>
+                FRA comptabilisé : <strong>{eur(cji3Eat.fra)}</strong> · facturé comptabilisé : <strong>{eur(-cji3Eat.produits)}</strong>
+              </div>
+            </div>
+          </div>
         );
       })()}
 

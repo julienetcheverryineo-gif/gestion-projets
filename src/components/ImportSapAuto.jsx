@@ -46,14 +46,14 @@ function ImportSapAutoInterne({ user }) {
     const debut = DEBUT_HEURES_DEFAUT;
     const fin = isoAujourdhui();
     const params = lireParamsSap();
-    const problemes = ["fo", "mo", "adv"].flatMap((t) =>
+    const problemes = ["fo", "mo", "adv", "cji3"].flatMap((t) =>
       validerParametres(params, otp, optionsValidation(t, debut, fin))
     );
     if (problemes.length > 0) return;
     annule.current = false;
     const res = await executerExtraction({
       handle,
-      types: ["fo", "mo", "adv"],
+      types: ["fo", "mo", "adv", "cji3"],
       chantiers,
       otp,
       debut,

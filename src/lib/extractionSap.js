@@ -13,6 +13,7 @@ import { otpDepuisCompte } from "./parseSapExports";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { analyserSapCommandes, normaliserOtp } from "./parseSapCommandes";
+import { analyserCji3 } from "./parseCji3";
 
 const CLE_PARAMS = "scriptsSapParams";
 
@@ -46,15 +47,30 @@ export function isoAujourdhui(decalageAnnees = 0) {
 
 export function optionsValidation(type, debut, fin, chemins = false) {
   if (type === "fo") return { fo: true, chemins };
-  if (type === "adv") return { chemins };
+  if (type === "adv" || type === "cji3") return { chemins };
   return { mo: true, dates: true, debut, fin, chemins };
 }
 
 // Une passe = une extraction (ME2J ou ZCAT3) pour les affaires d'UNE agence :
 // lance SAP via le gestionnaire installé sur le poste, attend la fin, lit le
 // fichier exporté et l'importe.
-const LIBELLES = { fo: "achats (ME2J)", mo: "heures (ZCAT3)", adv: "facturation (ZSD_ADV)" };
-const NOMS = { fo: "Achats", mo: "Heures", adv: "Facturation" };
+const LIBELLES = { fo: "achats (ME2J)", mo: "heures (ZCAT3)", adv: "facturation (ZSD_ADV)", cji3: "comptabilité (CJI3)" };
+const NOMS = { fo: "Achats", mo: "Heures", adv: "Facturation", cji3: "Comptabilité" };
+
+// Enregistre, pour chaque chantier ayant un compte, son cumul comptable
+// extrait du CJI3 (document chantier : eatCji3).
+async function importerCji3Chantiers(texte, chantiers) {
+  let nb = 0;
+  for (const c of chantiers || []) {
+    const otp = otpDepuisCompte(c.compte);
+    if (!otp || !c.id) continue;
+    const r = analyserCji3(texte, otp);
+    if (r.nbEcritures === 0) continue;
+    await updateDoc(doc(db, "sites", c.id), { eatCji3: { ...r, importeLe: new Date().toISOString() } });
+    nb++;
+  }
+  return nb;
+}
 
 // Enregistre, pour chaque chantier ayant un compte, ses commandes/factures
 // extraites de ZSD_ADV (document chantier : sapFacturation).
@@ -125,6 +141,10 @@ async function executerPasse({ handle, type, codes, titre, params, debut, fin, c
     const nomFichier = `export-${type}-sap.txt`;
     const fichier = await lireFichier(handle, nomFichier);
     if (!fichier) throw new Error("Fichier d'export introuvable dans le dossier choisi.");
+    if (type === "cji3") {
+      const nbCh = await importerCji3Chantiers(fichier.texte, chantiers);
+      return { ok: true, resume: `Comptabilité : ${nbCh} chantier(s) mis à jour` };
+    }
     if (type === "adv") {
       const nbCh = await importerFacturationChantiers(fichier.texte, chantiers);
       return { ok: true, resume: `Facturation : ${nbCh} chantier(s) mis à jour` };

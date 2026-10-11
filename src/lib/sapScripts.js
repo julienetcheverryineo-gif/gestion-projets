@@ -765,6 +765,84 @@ Sub ExtraireAdv()
   Terminer "ZSD_ADV", ""
 End Sub
 
+
+' ---- Comptabilite analytique : transaction CJI3 (postes individuels reels) ----
+' Cumul comptabilise par projet (MO, achats, autres frais, FRA, produits). Les
+' ecrans sont decrits dans cji3-ecran-1.txt (selection) et cji3-ecran-2.txt
+' (resultat) pour pouvoir ajuster la sequence si besoin.
+Sub ExtraireCji3()
+  Dim nb, grille, n
+  session.findById("wnd[0]").maximize
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "CJI3"
+  session.findById("wnd[0]/tbar[0]/btn[0]").press
+
+  If POPUP_PROJET Then
+    If Existe("wnd[1]/usr/ctxtTCNT-PROF_DB") Then
+      session.findById("wnd[1]/usr/ctxtTCNT-PROF_DB").Text = PROFIL_PROJET
+      session.findById("wnd[1]/usr/ctxtTCNT-PROF_DB").caretPosition = Len(PROFIL_PROJET)
+      session.findById("wnd[1]").sendVKey 4
+      If Existe("wnd[2]/tbar[0]/btn[0]") Then session.findById("wnd[2]/tbar[0]/btn[0]").press
+      If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+    End If
+  End If
+  n = ScannerEcran("cji3-ecran-1.txt")
+
+  ' Toutes les dates : on vide les eventuelles bornes proposees par defaut.
+  On Error Resume Next
+  session.findById("wnd[0]/usr/ctxtR_BUDAT-LOW").Text = ""
+  session.findById("wnd[0]/usr/ctxtR_BUDAT-HIGH").Text = ""
+  session.findById("wnd[0]/usr/ctxtR_PERBL-LOW").Text = ""
+  session.findById("wnd[0]/usr/ctxtR_PERBL-HIGH").Text = ""
+  Err.Clear
+  On Error GoTo 0
+
+  nb = SaisirSelectionMultiple("wnd[0]/usr/ctxtCN_PSPNR-LOW", "wnd[0]/usr/btn%_CN_PSPNR_%_APP_%-VALU_PUSH")
+  If nb = 0 Then
+    If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
+    Fin "Aucune affaire exploitable.", 48
+  End If
+  session.findById("wnd[1]/tbar[0]/btn[8]").press
+
+  session.findById("wnd[0]/tbar[1]/btn[8]").press
+  WScript.Sleep 1000
+  If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+  If Existe("wnd[0]/usr/btn%_CN_PSPNR_%_APP_%-VALU_PUSH") Then FinVide "Aucune ecriture comptable pour ces affaires."
+
+  n = ScannerEcran("cji3-ecran-2.txt")
+  Set grille = Nothing
+  If Existe("wnd[0]/usr/cntlGRID1/shellcont/shell") Then
+    Set grille = session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell")
+  Else
+    Set grille = TrouverGrille(session.findById("wnd[0]/usr"), 0)
+  End If
+  If Not grille Is Nothing Then
+    grille.pressToolbarContextButton "&MB_EXPORT"
+    grille.selectContextMenuItem "&PC"
+  Else
+    ' Liste classique (edition de liste dynamique) : export local %pc
+    session.findById("wnd[0]/tbar[0]/okcd").Text = "%pc"
+    session.findById("wnd[0]/tbar[0]/btn[0]").press
+  End If
+  If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+  If Not Existe("wnd[1]/usr/ctxtDY_PATH") Then
+    n = ScannerEcran("cji3-ecran-3.txt")
+    Fin "CJI3 : la fenetre d'export est introuvable (voir cji3-ecran-2.txt et cji3-ecran-3.txt).", 48
+  End If
+  session.findById("wnd[1]/usr/ctxtDY_PATH").Text = DOSSIER
+  session.findById("wnd[1]/usr/ctxtDY_FILENAME").Text = FICHIER
+  session.findById("wnd[1]/usr/ctxtDY_FILENAME").caretPosition = Len(FICHIER)
+  session.findById("wnd[1]/tbar[0]/btn[0]").press
+  If Existe("wnd[1]/tbar[0]/btn[0]") Then session.findById("wnd[1]/tbar[0]/btn[0]").press
+
+  On Error Resume Next
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  session.findById("wnd[0]/tbar[0]/btn[3]").press
+  Err.Clear
+  On Error GoTo 0
+  Terminer "CJI3", ""
+End Sub
+
 ' ---- Test d'ecriture : transaction ZCA_TACHES (saisie SANS enregistrement) ----
 Sub Collecter(obj, prof, sortie)
   Dim i, n, t, ch, id, tx, enf, coll, msg
@@ -1041,6 +1119,8 @@ Sub Lancer()
     ExtraireFo
   ElseIf TYPE_EXTRACTION = "adv" Then
     ExtraireAdv
+  ElseIf TYPE_EXTRACTION = "cji3" Then
+    ExtraireCji3
   Else
     ExtraireMo
   End If
@@ -1220,7 +1300,7 @@ Function ChargerDepuisUrl(url)
     ChargerDepuisUrl = "Type d'extraction manquant."
     Exit Function
   End If
-  If Not Valide("^(fo|mo|taches|adv)$", d("t")) Then
+  If Not Valide("^(fo|mo|taches|adv|cji3)$", d("t")) Then
     ChargerDepuisUrl = "Type d'extraction invalide."
     Exit Function
   End If
@@ -1229,6 +1309,8 @@ Function ChargerDepuisUrl(url)
     FICHIER = "export-fo-sap.txt"
   ElseIf TYPE_EXTRACTION = "adv" Then
     FICHIER = "export-adv-sap.txt"
+  ElseIf TYPE_EXTRACTION = "cji3" Then
+    FICHIER = "export-cji3-sap.txt"
   Else
     FICHIER = "export-mo-sap.txt"
   End If
