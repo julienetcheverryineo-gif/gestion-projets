@@ -410,28 +410,89 @@ Sub FermerSessionDediee()
   End If
 End Sub
 
-' Saisie des affaires dans la fenetre de selection multiple (5 lignes
-' visibles, defilement par blocs de 5).
+' Nombre de valeurs de la selection multiple (titre de l'onglet : "... (11)").
+Function NbValeursSelection()
+  Dim t, p1, p2
+  NbValeursSelection = -1
+  On Error Resume Next
+  t = session.findById("wnd[1]/usr/tabsTAB_STRIP/tabpSIVA").Text
+  Err.Clear
+  On Error GoTo 0
+  p1 = InStrRev(t, "(")
+  p2 = InStrRev(t, ")")
+  If p1 > 0 And p2 > p1 Then
+    If IsNumeric(Mid(t, p1 + 1, p2 - p1 - 1)) Then NbValeursSelection = CLng(Mid(t, p1 + 1, p2 - p1 - 1))
+  End If
+End Function
+
+' Saisie des affaires dans la fenetre de selection multiple. Methode 1 :
+' collage depuis le presse-papiers (aucun defilement, quel que soit le
+' nombre d'affaires). Methode 2 (secours) : saisie ligne a ligne avec
+' defilement par pages de la taille visible de la table.
 Function SaisirSelectionMultiple(champSimple, boutonMultiple)
-  Dim tbl, i, ligne, scroll, nb
+  Dim tbl, i, ligneT, nb, nbVis, page, pageCour, decalage, texte, ex
   session.findById(champSimple).SetFocus
   session.findById(champSimple).caretPosition = 0
   session.findById(boutonMultiple).press
-  Set tbl = session.findById(TABLE_SEL)
-  ligne = 0 : scroll = 0 : nb = 0
+
+  nb = 0
+  texte = ""
   For i = 0 To UBound(LISTE_OTP)
     If Trim(LISTE_OTP(i)) <> "" Then
-      If ligne = 5 Then
-        scroll = scroll + 5
-        tbl.verticalScrollbar.Position = scroll
-        ligne = 0
-      End If
-      session.findById(TABLE_SEL & "/ctxtRSCSEL_255-SLOW_I[1," & ligne & "]").Text = LISTE_OTP(i)
-      ligne = ligne + 1
       nb = nb + 1
+      texte = texte & Trim(LISTE_OTP(i)) & vbCrLf
     End If
   Next
   SaisirSelectionMultiple = nb
+  If nb = 0 Then Exit Function
+
+  ' Methode 1 : presse-papiers
+  On Error Resume Next
+  If Existe("wnd[1]/tbar[0]/btn[16]") Then session.findById("wnd[1]/tbar[0]/btn[16]").press
+  Set ex = wsh.Exec("cmd /c clip")
+  ex.StdIn.Write texte
+  ex.StdIn.Close
+  WScript.Sleep 500
+  session.findById("wnd[1]/tbar[0]/btn[24]").press
+  Err.Clear
+  On Error GoTo 0
+  WScript.Sleep 500
+  If NbValeursSelection() = nb Then Exit Function
+
+  ' Methode 2 : saisie ligne a ligne
+  On Error Resume Next
+  If Existe("wnd[1]/tbar[0]/btn[16]") Then session.findById("wnd[1]/tbar[0]/btn[16]").press
+  Err.Clear
+  On Error GoTo 0
+  Set tbl = session.findById(TABLE_SEL)
+  nbVis = 0
+  On Error Resume Next
+  nbVis = tbl.VisibleRowCount
+  If Err.Number <> 0 Or nbVis <= 0 Then
+    Err.Clear
+    nbVis = tbl.RowCount
+  End If
+  On Error GoTo 0
+  If nbVis <= 0 Then nbVis = 5
+  pageCour = -1 : decalage = 0
+  For i = 0 To UBound(LISTE_OTP)
+    If Trim(LISTE_OTP(i)) <> "" Then
+      page = decalage \ nbVis
+      ligneT = decalage Mod nbVis
+      If page <> pageCour Then
+        On Error Resume Next
+        tbl.verticalScrollbar.Position = page * nbVis
+        Err.Clear
+        On Error GoTo 0
+        pageCour = page
+      End If
+      session.findById(TABLE_SEL & "/ctxtRSCSEL_255-SLOW_I[1," & ligneT & "]").Text = LISTE_OTP(i)
+      decalage = decalage + 1
+    End If
+  Next
+  If NbValeursSelection() <> nb Then
+    Fin "Saisie des affaires SAP incomplete (" & NbValeursSelection() & " sur " & nb & ") : fermez la fenetre SAP et relancez.", 48
+  End If
 End Function
 
 ' Valide la fenetre de selection multiple (Copier, F8) et verifie qu'elle
