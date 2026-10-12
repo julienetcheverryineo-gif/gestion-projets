@@ -3045,21 +3045,26 @@ export default function ElectriciteSiteDetail() {
               );
               const totMo = recapMoSynthese.total;
               const tauxDefautMo = totalTauxDefaut(chantier, tauxHoraire);
-              // Taux horaires du prévu modifiables dans le bilan : par affaire
-              // ("__chantier") ou propres à un devis (qui reprend sinon ceux de l'affaire).
+              // Taux du prévu modifiables dans le bilan : par affaire ("__chantier") ou
+              // propres à un devis (qui reprend sinon ceux de l'affaire). Codes
+              // spéciaux : "__zone" et "__mi" (€/h des indemnités de zone et du matériel interne).
               const scopeTaux = dSel ? dSel.id : "__chantier";
-              const tauxSurcharge = {
-                ...(chantier?.tauxPrevuBilan?.["__chantier"] || {}),
-                ...(dSel ? chantier?.tauxPrevuBilan?.[dSel.id] || {} : {}),
-              };
-              const tauxSurchargeScope = chantier?.tauxPrevuBilan?.[scopeTaux] || {};
-              const prevuMoLignes = recapMoSynthese.parType.map((l) => {
-                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
+              const tauxBilan = chantier?.tauxPrevuBilan || {};
+              const tauxBase = tauxBilan["__chantier"] || {};
+              const tauxDe = (id) => ({ ...tauxBase, ...(id ? tauxBilan[id] || {} : {}) });
+              const tauxSurchargeScope = tauxBilan[scopeTaux] || {};
+              const zoneBase = typeof tauxBase.__zone === "number" ? tauxBase.__zone : (montantZone(chantier?.zone || "") || 0) / 7.2;
+              const miBase = typeof tauxBase.__mi === "number" ? tauxBase.__mi : paramsFoa.materielInterne;
+              const profilDe = (l) => (l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "");
+              const tauxCode = (profil, rates) => {
                 const code = profil || "I205";
-                const t = typeof tauxSurcharge[code] === "number" ? tauxSurcharge[code] : profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
-                return { code, euro: (l.budget || 0) * t, heures: l.budget || 0 };
-              });
-              const budgetMoEuro = prevuMoLignes.reduce((sm, l) => sm + l.euro, 0);
+                return typeof rates[code] === "number" ? rates[code] : profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
+              };
+              const lignesMoPrevu = (recap, rates) =>
+                recap.parType.map((l) => {
+                  const profil = profilDe(l);
+                  return { code: profil || "I205", euro: (l.budget || 0) * tauxCode(profil, rates), heures: l.budget || 0 };
+                });
               // Heures prévues de production (profil I3xx / E) : base des
               // indemnités de zone, comme les lignes J de la FOA.
               const heuresProductionPrevues = recapMoSynthese.parType.reduce((sm, l) => {
@@ -3070,6 +3075,40 @@ export default function ElectriciteSiteDetail() {
                 const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
                 return inclutMaterielInterne(profil) ? sm + (l.budget || 0) : sm;
               }, 0);
+              const ratesScope = tauxDe(dSel ? dSel.id : null);
+              const prevuMoLignes = lignesMoPrevu(recapMoSynthese, ratesScope);
+              // Total multi-devis : on ajoute l'écart dû aux taux propres à chaque devis
+              // (zone, matériel interne, types de personnel), le total se recale donc seul.
+              let zonePrevuEuroTotal;
+              let miPrevuEuroTotal;
+              if (!dSel && devis.length > 1) {
+                let dZone = 0;
+                let dMi = 0;
+                let aSurcharge = false;
+                devis.forEach((d) => {
+                  if (!tauxBilan[d.id] || Object.keys(tauxBilan[d.id]).length === 0) return;
+                  aSurcharge = true;
+                  const ratesD = tauxDe(d.id);
+                  const recapD = construireRecapMo(
+                    calculerRecap(lignesChantier.filter((l) => l.devisId === d.id), "tempsTotalHeures", "avancementMo", {}),
+                    chantier,
+                    d.id,
+                    devis
+                  );
+                  recapD.parType.forEach((l) => {
+                    const profil = profilDe(l);
+                    const delta = (l.budget || 0) * (tauxCode(profil, ratesD) - tauxCode(profil, tauxBase));
+                    if (delta) prevuMoLignes.push({ code: profil || "I205", euro: delta, heures: 0 });
+                    if (/^(I3|E)/.test(profil || "")) dZone += (l.budget || 0) * ((typeof ratesD.__zone === "number" ? ratesD.__zone : zoneBase) - zoneBase);
+                    if (inclutMaterielInterne(profil)) dMi += (l.budget || 0) * ((typeof ratesD.__mi === "number" ? ratesD.__mi : miBase) - miBase);
+                  });
+                });
+                if (aSurcharge) {
+                  zonePrevuEuroTotal = heuresProductionPrevues * zoneBase + dZone;
+                  miPrevuEuroTotal = heuresMatInternePrevues * miBase + dMi;
+                }
+              }
+              const budgetMoEuro = prevuMoLignes.reduce((sm, l) => sm + l.euro, 0);
               const recapFoFin = calculerRecap(lignesB, "coutTotalFo", "avancementFo", ordreTypesFoChantier);
               const rapproFo = dSel ? { parCle: new Map(), horsBudget: { reel: 0 } } : rapprocherAchats(recapFoFin.parType, achatsSap, chantier?.affectationsSapLignes || {});
               const detailFo = recapFoFin.parType.map((l) => ({
@@ -3103,6 +3142,10 @@ export default function ElectriciteSiteDetail() {
                   detailFo={detailFo}
                   achatsSap={achatsSap}
                   heuresMatInternePrevues={heuresMatInternePrevues}
+                  zonePrevuEuro={zonePrevuEuroTotal}
+                  miPrevuEuro={miPrevuEuroTotal}
+                  tauxZoneEff={dSel ? (typeof ratesScope.__zone === "number" ? ratesScope.__zone : zoneBase) : zoneBase}
+                  tauxMiEff={dSel ? (typeof ratesScope.__mi === "number" ? ratesScope.__mi : miBase) : miBase}
                   zone={chantier?.zone || ""}
                   montantZone={montantZone(chantier?.zone || "")}
                   heuresZoneSap={heuresSapZone}

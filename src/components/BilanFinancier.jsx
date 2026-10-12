@@ -50,7 +50,11 @@ function LigneVals({ nom, vals, classe }) {
 export default function BilanFinancier({
   affichage = "finance",
   prevuSeul = false,
-  heuresMatInternePrevues,
+  heuresMatInternePrevues: heuresMiPrevuesProp,
+  zonePrevuEuro,
+  miPrevuEuro,
+  tauxZoneEff,
+  tauxMiEff,
   zone,
   montantZone,
   heuresZoneSap,
@@ -96,9 +100,15 @@ export default function BilanFinancier({
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
   // % de la rubrique C : valeur propre à l'affaire, sinon paramètre FOA.
   const foa = { ...foaDefaut };
-  ["prorata", "fraisDivers", "aleas", "negociation", "fra", "fg", "materielInterne"].forEach((k) => {
+  ["prorata", "fraisDivers", "aleas", "negociation", "fra", "fg"].forEach((k) => {
     if (typeof pctSaisis?.[k] === "number") foa[k] = pctSaisis[k];
   });
+
+  // Matériel interne (€/h) : taux de l'affaire ou du devis consulté.
+  if (typeof tauxMiEff === "number") foa.materielInterne = tauxMiEff;
+  // Heures équivalentes au taux effectif quand le prévu cumule des devis à taux différents.
+  const heuresMatInternePrevues =
+    typeof miPrevuEuro === "number" && foa.materielInterne > 0 ? miPrevuEuro / foa.materielInterne : heuresMiPrevuesProp;
 
   const reelFo = achats.reduce((s, a) => s + (Number(a.valNette) || 0), 0);
 
@@ -144,9 +154,9 @@ export default function BilanFinancier({
   };
   // Indemnités de zone (pointages J et F) : heures × montant de la zone ÷ 7,2 h.
   const tauxZoneDefaut = montantZone ? montantZone / HEURES_PAR_JOUR_ZONE : 0;
-  const tauxZone = typeof pctSaisis?.zoneHeure === "number" ? pctSaisis.zoneHeure : tauxZoneDefaut;
+  const tauxZone = typeof tauxZoneEff === "number" ? tauxZoneEff : tauxZoneDefaut;
   const heuresZoneReelles = (heuresZoneSap || []).reduce((s, h) => s + (Number(h.heures) || 0), 0);
-  const zonePrevu = heuresProductionPrevues * tauxZone;
+  const zonePrevu = typeof zonePrevuEuro === "number" ? zonePrevuEuro : heuresProductionPrevues * tauxZone;
   const zoneReel = heuresZoneReelles * tauxZone;
   const zoneAtterr = zoneReel + zonePrevu * (1 - pctMo);
   const heuresMiReelles = parType.filter((t) => inclutMaterielInterne(t.code === "—" ? "I205" : t.code)).reduce((s, t) => s + t.heures, 0);
@@ -292,6 +302,38 @@ export default function BilanFinancier({
       return reste;
     });
     if (n === null || n >= 0) onChangerPct?.(cle, n === null ? null : euro ? n : n / 100);
+  };
+  // Taux (€/h) propre à l'affaire ou au devis consulté : zone, matériel interne.
+  const champTauxScope = (code, valeur) => {
+    const cle = "t:" + code;
+    const valider = () => {
+      if (saisiePct[cle] === undefined) return;
+      const t = String(saisiePct[cle]).replace(",", ".").replace(/\s/g, "").trim();
+      const n = t === "" ? null : Number(t);
+      setSaisiePct((p) => {
+        const { [cle]: _omis, ...reste } = p;
+        return reste;
+      });
+      if (n === null || (Number.isFinite(n) && n >= 0)) onChangerTauxPrevu?.(code, n);
+    };
+    const modifie = typeof tauxPrevuModifies?.[code] === "number";
+    return (
+      <input
+        type="text"
+        inputMode="decimal"
+        disabled={!onChangerTauxPrevu}
+        title={modifie ? "Valeur propre à cette vue (vider pour revenir au défaut)" : "Cliquer pour modifier"}
+        value={saisiePct[cle] !== undefined ? saisiePct[cle] : String(Math.round(valeur * 100) / 100).replace(".", ",")}
+        onChange={(e) => setSaisiePct((p) => ({ ...p, [cle]: e.target.value }))}
+        onBlur={valider}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        style={{
+          width: "3.4em", padding: 0, margin: 0, height: "auto", border: "none", borderBottom: "1px dotted currentColor",
+          borderRadius: 0, background: "transparent", boxShadow: "none", font: "inherit", textAlign: "right",
+          color: modifie ? "var(--accent, inherit)" : "inherit",
+        }}
+      />
+    );
   };
   // `euro` : valeur en €/h (matériel interne, zone) au lieu d'un pourcentage.
   const champPct = (cle, { euro = false, valeur = foa[cle] } = {}) => (
@@ -644,7 +686,7 @@ export default function BilanFinancier({
                   dont indemnités de zone{" "}
                   {zone && montantZone ? (
                     <span className="simple-list-meta">
-                      {zone} : {eur(montantZone)}/j ÷ 7,2 h = {champPct("zoneHeure", { euro: true, valeur: tauxZone })} €/h
+                      {zone} : {eur(montantZone)}/j ÷ 7,2 h = {champTauxScope("__zone", tauxZone)} €/h
                     </span>
                   ) : (
                     <span style={{ color: ROUGE }}>
@@ -652,7 +694,7 @@ export default function BilanFinancier({
                     </span>
                   )}
                   {!(zone && montantZone) && (
-                    <span className="simple-list-meta"> · taux {champPct("zoneHeure", { euro: true, valeur: tauxZone })} €/h</span>
+                    <span className="simple-list-meta"> · taux {champTauxScope("__zone", tauxZone)} €/h</span>
                   )}
                 </>
               }
@@ -673,7 +715,7 @@ export default function BilanFinancier({
             <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />
             <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Aléas {champPct("aleas")} % du CA</>} champ="C_aleas" retrait />
             <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Négociation {champPct("negociation")} % du CA</>} champ="C_nego" retrait />
-            <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Matériel interne {champPct("materielInterne", { euro: true })} €/h</>} champ="C_mi" retrait />
+            <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Matériel interne {champTauxScope("__mi", foa.materielInterne)} €/h</>} champ="C_mi" retrait />
             <Ligne cols={cols} classe="bf-section bf-fra" nom={<>D – FRA ({champPct("fra")} %)</>} champ="D" fort />
             <Ligne cols={cols} classe="bf-total" nom="Total dépenses affaire" champ="dep" fort />
             <Ligne cols={cols} classe="bf-fg" nom={<>Frais généraux ({champPct("fg")} % CA)</>} champ="fg" sansReel />
