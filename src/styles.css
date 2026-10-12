@@ -4393,3 +4393,9 @@ table.af-table.table-recap {
 .fsap-legende .st-payee { color: #2e9e5b; }
 .fsap-legende .st-attente { color: #e08a1e; }
 .fsap-legende .st-retard { color: #d23b3b; }
+
+/* Bilan affaire d'un devis seul : prévu uniquement (colonnes Réel et Atterrissage masquées) */
+.bf-prevu-seul th:nth-child(3),
+.bf-prevu-seul td:nth-child(3),
+.bf-prevu-seul th:nth-child(4),
+.bf-prevu-seul td:nth-child(4) { display: none; }

@@ -49,6 +49,7 @@ function LigneVals({ nom, vals, classe }) {
 
 export default function BilanFinancier({
   affichage = "finance",
+  prevuSeul = false,
   heuresMatInternePrevues,
   zone,
   montantZone,
@@ -564,7 +565,7 @@ export default function BilanFinancier({
       </div>
 
       <div className="data-table-wrapper">
-        <table className="data-table bf-table">
+        <table className={"data-table bf-table" + (prevuSeul ? " bf-prevu-seul" : "")}>
           <thead>
             <tr>
               <th></th>
@@ -622,7 +623,9 @@ export default function BilanFinancier({
         </table>
       </div>
       <p className="simple-list-meta" style={{ margin: "8px 0 16px" }}>
-        Atterrissage = réel + reste à faire au budget (budget × (1 − avancement)).
+        {prevuSeul
+          ? "Prévu de ce devis uniquement (le réel SAP et l'atterrissage se lisent sur le total de l'affaire)."
+          : "Atterrissage = réel + reste à faire au budget (budget × (1 − avancement))."}
         <br />
         Réglage des taux dans « Import SAP » (commun à toutes les affaires).
       </p>

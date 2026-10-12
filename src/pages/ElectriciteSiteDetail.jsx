@@ -2143,6 +2143,8 @@ export default function ElectriciteSiteDetail() {
   // Par défaut "fo" : à l'ouverture d'un chantier, on arrive directement
   // sur la synthèse Fournitures plutôt que sur un devis.
   const [recapActif, setRecapActif] = useState(null);
+  // Bilan affaire : "" = total du chantier, sinon id d'un devis (prévu seul).
+  const [devisBilan, setDevisBilan] = useState("");
 
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
@@ -3031,11 +3033,14 @@ export default function ElectriciteSiteDetail() {
 
           {(["finance", "autresfrais", "eat", "eatAnnonce", "eatPilotage"].includes(recapActif)) &&
             (() => {
-              const totFo = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
+              const dSel = recapActif === "finance" && devisBilan ? devis.find((d) => d.id === devisBilan) || null : null;
+              const lignesB = dSel ? lignesChantier.filter((l) => l.devisId === dSel.id) : lignesChantier;
+              const porteeB = dSel ? dSel.id : GENERAL;
+              const totFo = calculerRecap(lignesB, "coutTotalFo", "avancementFo", {}).total;
               const recapMoSynthese = construireRecapMo(
-                calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", {}),
+                calculerRecap(lignesB, "tempsTotalHeures", "avancementMo", {}),
                 chantier,
-                GENERAL,
+                porteeB,
                 devis
               );
               const totMo = recapMoSynthese.total;
@@ -3056,8 +3061,8 @@ export default function ElectriciteSiteDetail() {
                 const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
                 return inclutMaterielInterne(profil) ? sm + (l.budget || 0) : sm;
               }, 0);
-              const recapFoFin = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", ordreTypesFoChantier);
-              const rapproFo = rapprocherAchats(recapFoFin.parType, achatsSap, chantier?.affectationsSapLignes || {});
+              const recapFoFin = calculerRecap(lignesB, "coutTotalFo", "avancementFo", ordreTypesFoChantier);
+              const rapproFo = dSel ? { parCle: new Map(), horsBudget: { reel: 0 } } : rapprocherAchats(recapFoFin.parType, achatsSap, chantier?.affectationsSapLignes || {});
               const detailFo = recapFoFin.parType.map((l) => ({
                 libelle: l.libelle,
                 prevu: l.budget,
@@ -3067,7 +3072,24 @@ export default function ElectriciteSiteDetail() {
               if (rapproFo.horsBudget.reel > 0.005)
                 detailFo.push({ libelle: "Achats hors budget", prevu: 0, reel: rapproFo.horsBudget.reel, av: 0 });
               return (
+                <>
+                {recapActif === "finance" && devis.length > 1 && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+                    <label htmlFor="bilan-devis">Bilan :</label>
+                    <select id="bilan-devis" className="sit-select" value={devisBilan} onChange={(e) => setDevisBilan(e.target.value)}>
+                      <option value="">Total de l'affaire (tous les devis)</option>
+                      {devis.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          Devis {d.nom}
+                        </option>
+                      ))}
+                    </select>
+                    {dSel && <span className="simple-list-meta">Prévu du devis seul : le réel SAP n'est pas ventilé par devis.</span>}
+                  </div>
+                )}
                 <BilanFinancier
+                  key={dSel ? dSel.id : "total"}
+                  prevuSeul={Boolean(dSel)}
                   affichage={recapActif === "autresfrais" ? "autresFrais" : recapActif}
                   detailFo={detailFo}
                   achatsSap={achatsSap}
@@ -3078,10 +3100,10 @@ export default function ElectriciteSiteDetail() {
                   heuresProductionPrevues={heuresProductionPrevues}
                   budgetMoEuro={budgetMoEuro}
                   prevuMoLignes={prevuMoLignes}
-                  caCalcule={lignesChantier
+                  caCalcule={lignesB
                     .filter((l) => !estLigneSomme(l))
                     .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0)}
-                  caSaisi={chantier?.caHt ?? null}
+                  caSaisi={dSel ? null : chantier?.caHt ?? null}
                   caNonSoumis={0}
                   margeCibleEat={chantier?.eatMargeCible ?? null}
                   cji3Eat={chantier?.eatCji3 ?? null}
@@ -3108,7 +3130,7 @@ export default function ElectriciteSiteDetail() {
                       : null
                   }
                   onChangerCa={
-                    peutGerer
+                    peutGerer && !dSel
                       ? (champ, v) => updateDoc(doc(db, "sites", chantierId), { [champ]: v })
                       : null
                   }
@@ -3126,12 +3148,13 @@ export default function ElectriciteSiteDetail() {
                   pctFo={totFo.pctAvancement}
                   budgetHeures={totMo.budget}
                   pctMo={totMo.pctAvancement}
-                  achats={achatsSap}
-                  heures={heuresSap}
+                  achats={dSel ? [] : achatsSap}
+                  heures={dSel ? [] : heuresSap}
                   taux={tauxHoraire}
                   tauxChiffrage={chantier?.tauxChiffrageMo ?? null}
                   tauxChiffrageDefaut={tauxHoraire("I205")}
                 />
+                </>
               );
             })()}
 
