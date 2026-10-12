@@ -3045,10 +3045,19 @@ export default function ElectriciteSiteDetail() {
               );
               const totMo = recapMoSynthese.total;
               const tauxDefautMo = totalTauxDefaut(chantier, tauxHoraire);
+              // Taux horaires du prévu modifiables dans le bilan : par affaire
+              // ("__chantier") ou propres à un devis (qui reprend sinon ceux de l'affaire).
+              const scopeTaux = dSel ? dSel.id : "__chantier";
+              const tauxSurcharge = {
+                ...(chantier?.tauxPrevuBilan?.["__chantier"] || {}),
+                ...(dSel ? chantier?.tauxPrevuBilan?.[dSel.id] || {} : {}),
+              };
+              const tauxSurchargeScope = chantier?.tauxPrevuBilan?.[scopeTaux] || {};
               const prevuMoLignes = recapMoSynthese.parType.map((l) => {
                 const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
-                const t = profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
-                return { code: profil || "I205", euro: (l.budget || 0) * t, heures: l.budget || 0 };
+                const code = profil || "I205";
+                const t = typeof tauxSurcharge[code] === "number" ? tauxSurcharge[code] : profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
+                return { code, euro: (l.budget || 0) * t, heures: l.budget || 0 };
               });
               const budgetMoEuro = prevuMoLignes.reduce((sm, l) => sm + l.euro, 0);
               // Heures prévues de production (profil I3xx / E) : base des
@@ -3100,6 +3109,19 @@ export default function ElectriciteSiteDetail() {
                   heuresProductionPrevues={heuresProductionPrevues}
                   budgetMoEuro={budgetMoEuro}
                   prevuMoLignes={prevuMoLignes}
+                  tauxPrevuModifies={tauxSurchargeScope}
+                  onChangerTauxPrevu={
+                    peutGerer
+                      ? (code, v) => {
+                          const maj = { ...(chantier?.tauxPrevuBilan?.[scopeTaux] || {}) };
+                          if (v === null) delete maj[code];
+                          else maj[code] = v;
+                          return updateDoc(doc(db, "sites", chantierId), {
+                            tauxPrevuBilan: { ...(chantier?.tauxPrevuBilan || {}), [scopeTaux]: maj },
+                          });
+                        }
+                      : null
+                  }
                   caCalcule={lignesB
                     .filter((l) => !estLigneSomme(l))
                     .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0)}

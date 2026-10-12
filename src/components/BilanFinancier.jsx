@@ -75,6 +75,8 @@ export default function BilanFinancier({
   budgetHeures,
   budgetMoEuro,
   prevuMoLignes,
+  tauxPrevuModifies,
+  onChangerTauxPrevu,
   detailFo,
   achatsSap,
   pctMo,
@@ -85,6 +87,8 @@ export default function BilanFinancier({
   tauxChiffrageDefaut,
 }) {
   const [saisieCa, setSaisieCa] = useState({});
+  // Taux horaire du prévu en cours de modification (code du type de personne).
+  const [editTaux, setEditTaux] = useState(null);
   const [saisiePct, setSaisiePct] = useState({});
   // Marge nette à annoncer : mémorisée sur le chantier (fraction, ex. 0,08).
   const [kCible, setKCible] = useState(null); // saisie en cours (texte), null = valeur enregistrée
@@ -576,9 +580,60 @@ export default function BilanFinancier({
           </thead>
           <tbody>
             <Ligne cols={cols} classe="bf-section bf-mo" nom="A – Main d'œuvre" champ="a" fort />
-{detailMo.map((t) => (
-              <LigneVals key={t.code} classe="bf-detail bf-mo" nom={t.nom} vals={[t.prevu, t.reel, t.atterr]} />
-            ))}
+{detailMo.map((t) => {
+              const txPrevu = t.prevuH > 0 ? t.prevu / t.prevuH : null;
+              const modifie = typeof tauxPrevuModifies?.[t.code] === "number";
+              const valider = (texte) => {
+                const brut = String(texte).replace(",", ".").replace(/\s/g, "").trim();
+                const n = brut === "" ? null : Number(brut);
+                setEditTaux(null);
+                if (n === null || (Number.isFinite(n) && n >= 0)) onChangerTauxPrevu?.(t.code, n);
+              };
+              return (
+                <LigneVals
+                  key={t.code}
+                  classe="bf-detail bf-mo"
+                  nom={
+                    <>
+                      {onChangerTauxPrevu && txPrevu !== null ? (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{ padding: 0, font: "inherit", textAlign: "left" }}
+                          title="Cliquer pour modifier le taux horaire du prévu (vider pour revenir au taux par défaut)"
+                          onClick={() => setEditTaux(t.code)}
+                        >
+                          {t.nom}
+                        </button>
+                      ) : (
+                        t.nom
+                      )}
+                      {txPrevu !== null && (
+                        editTaux === t.code ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            inputMode="decimal"
+                            defaultValue={String(Math.round(txPrevu * 100) / 100).replace(".", ",")}
+                            style={{ width: "5em", marginLeft: 8, textAlign: "right" }}
+                            onBlur={(e) => valider(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                              if (e.key === "Escape") setEditTaux(null);
+                            }}
+                          />
+                        ) : (
+                          <span className="simple-list-meta" style={{ marginLeft: 8, ...(modifie ? { color: "var(--accent)", fontWeight: 600 } : {}) }}>
+                            {eur(txPrevu)}/h{modifie ? " (modifié)" : ""}
+                          </span>
+                        )
+                      )}
+                    </>
+                  }
+                  vals={[t.prevu, t.reel, t.atterr]}
+                />
+              );
+            })}
             <Ligne
               cols={cols}
               classe="bf-detail bf-mo"
@@ -587,7 +642,7 @@ export default function BilanFinancier({
                   dont indemnités de zone{" "}
                   {zone && montantZone ? (
                     <span className="simple-list-meta">
-                      {zone} : {eur(montantZone)}/j ÷ 7,2 h
+                      {zone} : {eur(montantZone)}/j ÷ 7,2 h = {eur(montantZone / 7.2)}/h
                     </span>
                   ) : (
                     <span style={{ color: ROUGE }}>
