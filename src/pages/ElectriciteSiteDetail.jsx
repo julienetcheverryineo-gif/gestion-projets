@@ -3100,54 +3100,46 @@ export default function ElectriciteSiteDetail() {
                 const code = profil || "I205";
                 return typeof rates[code] === "number" ? rates[code] : profil ? tauxHoraire(profil) ?? tauxDefautMo : tauxDefautMo;
               };
-              const lignesMoPrevu = (recap, rates) =>
-                recap.parType.map((l) => {
-                  const profil = profilDe(l);
-                  return { code: profil || "I205", euro: (l.budget || 0) * tauxCode(profil, rates), heures: l.budget || 0 };
-                });
+              const ratesScope = tauxDe(dSel ? dSel.id : null);
+              // Le prévu du total est la SOMME des prévus recalés de chaque devis
+              // (taux par type, zone, matériel interne propres à chaque devis) ;
+              // la vue d'un devis seul ne compte que son propre prévu.
+              const sourcesPrevu =
+                !dSel && devis.length > 1
+                  ? devis.map((d) => ({
+                      recap: construireRecapMo(
+                        calculerRecap(lignesChantier.filter((l) => l.devisId === d.id), "tempsTotalHeures", "avancementMo", {}),
+                        chantier,
+                        d.id,
+                        devis
+                      ),
+                      rates: tauxDe(d.id),
+                    }))
+                  : [{ recap: recapMoSynthese, rates: ratesScope }];
+              const prevuMoLignes = [];
               // Heures prévues de production (profil I3xx / E) : base des
               // indemnités de zone, comme les lignes J de la FOA.
-              const heuresProductionPrevues = recapMoSynthese.parType.reduce((sm, l) => {
-                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
-                return /^(I3|E)/.test(profil || "") ? sm + (l.budget || 0) : sm;
-              }, 0);
-              const heuresMatInternePrevues = recapMoSynthese.parType.reduce((sm, l) => {
-                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
-                return inclutMaterielInterne(profil) ? sm + (l.budget || 0) : sm;
-              }, 0);
-              const ratesScope = tauxDe(dSel ? dSel.id : null);
-              const prevuMoLignes = lignesMoPrevu(recapMoSynthese, ratesScope);
-              // Total multi-devis : on ajoute l'écart dû aux taux propres à chaque devis
-              // (zone, matériel interne, types de personnel), le total se recale donc seul.
-              let zonePrevuEuroTotal;
-              let miPrevuEuroTotal;
-              if (!dSel && devis.length > 1) {
-                let dZone = 0;
-                let dMi = 0;
-                let aSurcharge = false;
-                devis.forEach((d) => {
-                  if (!tauxBilan[d.id] || Object.keys(tauxBilan[d.id]).length === 0) return;
-                  aSurcharge = true;
-                  const ratesD = tauxDe(d.id);
-                  const recapD = construireRecapMo(
-                    calculerRecap(lignesChantier.filter((l) => l.devisId === d.id), "tempsTotalHeures", "avancementMo", {}),
-                    chantier,
-                    d.id,
-                    devis
-                  );
-                  recapD.parType.forEach((l) => {
-                    const profil = profilDe(l);
-                    const delta = (l.budget || 0) * (tauxCode(profil, ratesD) - tauxCode(profil, tauxBase));
-                    if (delta) prevuMoLignes.push({ code: profil || "I205", euro: delta, heures: 0 });
-                    if (/^(I3|E)/.test(profil || "")) dZone += (l.budget || 0) * (zoneRateDe(ratesD) - zoneBase);
-                    if (inclutMaterielInterne(profil)) dMi += (l.budget || 0) * ((typeof ratesD.__mi === "number" ? ratesD.__mi : miBase) - miBase);
-                  });
+              let heuresProductionPrevues = 0;
+              let heuresMatInternePrevues = 0;
+              let zonePrevuEuroTotal = 0;
+              let miPrevuEuroTotal = 0;
+              sourcesPrevu.forEach(({ recap, rates }) => {
+                const zoneRate = zoneRateDe(rates);
+                const miRate = typeof rates.__mi === "number" ? rates.__mi : miBase;
+                recap.parType.forEach((l) => {
+                  const profil = profilDe(l);
+                  const h = l.budget || 0;
+                  prevuMoLignes.push({ code: profil || "I205", euro: h * tauxCode(profil, rates), heures: h });
+                  if (/^(I3|E)/.test(profil || "")) {
+                    heuresProductionPrevues += h;
+                    zonePrevuEuroTotal += h * zoneRate;
+                  }
+                  if (inclutMaterielInterne(profil)) {
+                    heuresMatInternePrevues += h;
+                    miPrevuEuroTotal += h * miRate;
+                  }
                 });
-                if (aSurcharge) {
-                  zonePrevuEuroTotal = heuresProductionPrevues * zoneBase + dZone;
-                  miPrevuEuroTotal = heuresMatInternePrevues * miBase + dMi;
-                }
-              }
+              });
               const budgetMoEuro = prevuMoLignes.reduce((sm, l) => sm + l.euro, 0);
               const recapFoFin = calculerRecap(lignesB, "coutTotalFo", "avancementFo", ordreTypesFoChantier);
               const rapproFo = dSel ? { parCle: new Map(), horsBudget: { reel: 0 } } : rapprocherAchats(recapFoFin.parType, achatsSap, chantier?.affectationsSapLignes || {});

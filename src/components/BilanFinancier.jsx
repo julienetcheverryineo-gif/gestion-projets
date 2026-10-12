@@ -673,6 +673,11 @@ export default function BilanFinancier({
                           </span>
                         )
                       )}
+                      {!prevuSeul && taux(t.code) !== null && taux(t.code) !== undefined && (
+                        <span className="simple-list-meta" style={{ marginLeft: 8 }}>
+                          {txPrevu !== null ? "· " : ""}SAP {eur(taux(t.code))}/h
+                        </span>
+                      )}
                     </>
                   }
                   vals={[t.prevu, t.reel, t.atterr]}
