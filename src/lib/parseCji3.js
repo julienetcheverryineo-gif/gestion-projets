@@ -14,32 +14,37 @@ const nombre = (s) => {
 
 export function analyserCji3(texte, otpFiltre = "") {
   const lignes = String(texte || "").split(/\r?\n/);
-  const iEntete = lignes.findIndex((l) => /\|\s*Elt d'OTP/.test(l));
-  if (iEntete < 0) throw new Error("Fichier CJI3 non reconnu (colonne « Elt d'OTP » introuvable).");
+  // La colonne de l'OTP s'appelle « Elt d'OTP » ou « Objet » selon la mise en page.
+  const iEntete = lignes.findIndex((l) => /\|\s*(Elt d'OTP|Objet)\s*\|/.test(l) && /Nat\.cpt\./.test(l));
+  if (iEntete < 0) throw new Error("Fichier CJI3 non reconnu (colonnes « Objet / Elt d'OTP » et « Nat.cpt. » introuvables).");
   const cols = lignes[iEntete].split("|").map((c) => c.trim());
   const idx = (re) => cols.findIndex((c) => re.test(c));
   const iNat = idx(/^Nat\.cpt\./);
   const iVal = idx(/^Val\.\/D\.Tra/);
   const iQte = idx(/^Quantit/);
   const iUq = idx(/^UQ$/);
-  const iOtp = idx(/^Elt d'OTP/);
+  const iOtp = idx(/^(Elt d'OTP|Objet)$/);
   if (iNat < 0 || iVal < 0) throw new Error("Colonnes « Nat.cpt. » / « Val./D.Tra » absentes : ajoutez-les à la mise en page du CJI3.");
   const cols2 = (lignes[iEntete + 1] || "").split("|").map((c) => c.trim());
   const idx2 = (re) => cols2.findIndex((c) => re.test(c));
   const iTypePiece = idx2(/^D.{1,3}sign type pi/);
   const iTexte = idx2(/^D.{1,3}signation$/);
   const iDocAchat = idx2(/^Doc achat/);
-  const iDate = idx(/^Date cpt/);
-  const iDes = idx(/^D.{1,3}s(ign)?\.nat/);
+  // Date et désignation du compte : première ou seconde ligne d'en-tête selon la mise en page.
+  const iDate1 = idx(/^Date cpt/);
+  const iDate2 = idx2(/^Date cpt/);
+  const iDes1 = idx(/^D.{1,3}s(ign)?\.nat/);
+  const iDes2 = idx2(/^D.{1,3}s(ign)?\.nat/);
   const norm = (o) => String(o || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const cibleOtp = norm(otpFiltre);
   const res = { mo: {}, achats: 0, autresFrais: 0, fra: 0, produits: 0, nbEcritures: 0, otp: "", ecritures: [] };
   for (let i = iEntete + 1; i < lignes.length; i++) {
     const l = lignes[i];
-    if (!/^\|\s+[A-Z]\.[A-Z0-9]/.test(l)) continue; // ligne d'écriture (OTP renseigné)
+    if (!l.startsWith("|")) continue;
     const c = l.split("|").map((x) => x.trim());
+    if (!/^[A-Z]\.[A-Z0-9]/.test(c[iOtp] || "")) continue; // ligne d'écriture (OTP renseigné)
     if (cibleOtp && !norm(c[iOtp]).startsWith(cibleOtp)) {
-      if (/^\|[^|]*\|/.test(lignes[i + 1] || "") && !/^\|\s+[A-Z]\./.test(lignes[i + 1] || "")) i++;
+      i++; // saute la seconde ligne de l'écriture
       continue;
     }
     const c2 = (lignes[i + 1] || "").split("|").map((x) => x.trim());
@@ -59,9 +64,9 @@ export function analyserCji3(texte, otpFiltre = "") {
     if (!/^9430/.test(nat) && !/^92/.test(nat)) {
       res.ecritures.push({
         nat,
-        designation: iDes >= 0 ? c[iDes] : "",
+        designation: iDes1 >= 0 ? c[iDes1] : iDes2 >= 0 ? c2[iDes2] || "" : "",
         montant: val,
-        date: iDate >= 0 ? c[iDate] : "",
+        date: iDate1 >= 0 ? c[iDate1] : iDate2 >= 0 ? c2[iDate2] || "" : "",
         typePiece: iTypePiece >= 0 ? c2[iTypePiece] || "" : "",
         texte: iTexte >= 0 ? c2[iTexte] || "" : "",
         docAchat: iDocAchat >= 0 ? c2[iDocAchat] || "" : "",
