@@ -105,6 +105,9 @@ const SOMME_LARGEURS_RECAP_FIXES =
 // "4  [Automatisme & Contrôle]" → "4 · Automatisme & Contrôle" : le numéro
 // ET le type, comme dans le devis, affichés en tout petit (voir
 // .elec-type-code).
+// Étude / chiffrage : montant saisi à la main par devis, compté dans les fournitures.
+const CLE_ETUDE = "0 [Étude chiffrage]";
+
 function formatTypeFo(texte) {
   if (!texte) return "—";
   const m = texte.match(/^\s*(\d+)\s*\[?\s*([^\]]*?)\s*\]?\s*$/);
@@ -2269,8 +2272,33 @@ export default function ElectriciteSiteDetail() {
   // clés « devisId||type ». Leur coût FO est mis à 0 ici, donc tous les
   // bilans les ignorent ; les heures de MO des mêmes lignes restent.
   const exclusFo = new Set(chantier?.typesFoExclus || []);
+  const etudesChiffrage = chantier?.etudeChiffrage || {};
+  const lignesEtude = devis
+    .filter((d) => (etudesChiffrage[d.id]?.montant || 0) > 0)
+    .map((d) => ({
+      id: "__etude_" + d.id,
+      _synthetique: true,
+      chantierId,
+      devisId: d.id,
+      typeFo: CLE_ETUDE,
+      designation: "Étude chiffrage",
+      quantite: 1,
+      coutTotalFo: etudesChiffrage[d.id].montant,
+      coutTotalFoPr: etudesChiffrage[d.id].montant,
+      avancementFo: etudesChiffrage[d.id].av || 0,
+    }));
+  const changerEtudeChiffrage = async (devisId, valeur) => {
+    const t = String(valeur).replace(",", ".").replace(/\s/g, "").trim();
+    const n = t === "" ? 0 : Number(t);
+    if (!Number.isFinite(n) || n < 0) return;
+    const maj = { ...(chantier?.etudeChiffrage || {}) };
+    if (n === 0) delete maj[devisId];
+    else maj[devisId] = { montant: n, av: maj[devisId]?.av || 0 };
+    await updateDoc(doc(db, "sites", chantierId), { etudeChiffrage: maj });
+  };
   const lignesChantier = toutesLignes
     .filter((l) => l.chantierId === chantierId && !l.estPoste)
+    .concat(lignesEtude)
     .map((l) =>
       exclusFo.size > 0 && exclusFo.has(l.devisId + "||" + (l.typeFo || "").trim())
         ? { ...l, coutTotalFo: 0, coutTotalFoPr: 0 }
@@ -2717,6 +2745,14 @@ export default function ElectriciteSiteDetail() {
         devis.forEach((d) => (maj[d.id + "||" + id] = v));
       }
       await updateDoc(doc(db, "sites", chantierId), { avancementsMoSup: maj });
+      return;
+    }
+    if (cle === CLE_ETUDE) {
+      const maj = { ...(chantier?.etudeChiffrage || {}) };
+      Object.keys(maj).forEach((id) => {
+        if (!devisId || id === devisId) maj[id] = { ...maj[id], av: v };
+      });
+      await updateDoc(doc(db, "sites", chantierId), { etudeChiffrage: maj });
       return;
     }
     const champ = champAvancementRecap;
@@ -3251,6 +3287,34 @@ export default function ElectriciteSiteDetail() {
 
     {(recapActif === "fo" || recapActif === "mo") && (
             <>
+              {recapActif === "fo" && peutGerer && (
+                <div className="panel" style={{ marginBottom: 16 }}>
+                  <div className="panel-header">
+                    <h2>Étude / chiffrage par devis</h2>
+                  </div>
+                  <p className="simple-list-meta" style={{ marginBottom: 8 }}>
+                    Montant saisi à la main, compté dans les fournitures de chaque devis (ligne « 0 · Étude chiffrage »).
+                  </p>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                    {devis.map((d) => (
+                      <label key={d.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {d.nom}
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          key={d.id + ":" + (etudesChiffrage[d.id]?.montant || 0)}
+                          defaultValue={etudesChiffrage[d.id]?.montant ? String(etudesChiffrage[d.id].montant).replace(".", ",") : ""}
+                          placeholder="0"
+                          style={{ width: "7em", textAlign: "right" }}
+                          onBlur={(e) => changerEtudeChiffrage(d.id, e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                        />
+                        €
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <TableauRecap
                 titre={titreRecap}
                 sousTitre="synthèse tous devis"
