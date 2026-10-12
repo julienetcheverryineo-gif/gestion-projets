@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { libelleTypeActivite, normaliserTypeActivite, inclutMaterielInterne } from "../lib/typesActiviteSap";
-import { HEURES_PAR_JOUR_ZONE } from "../lib/tauxHoraires";
+import { HEURES_PAR_JOUR_ZONE, ZONES_DEFAUT } from "../lib/tauxHoraires";
 import iconeAutresFrais from "../assets/icone-autres-frais.png";
 
 const eur = (v) =>
@@ -55,6 +55,7 @@ export default function BilanFinancier({
   miPrevuEuro,
   tauxZoneEff,
   tauxMiEff,
+  onChangerZone,
   zone,
   montantZone,
   heuresZoneSap,
@@ -684,18 +685,24 @@ export default function BilanFinancier({
               nom={
                 <>
                   dont indemnités de zone{" "}
-                  {zone && montantZone ? (
-                    <span className="simple-list-meta">
-                      {zone} : {eur(montantZone)}/j ÷ 7,2 h = {champTauxScope("__zone", tauxZone)} €/h
-                    </span>
-                  ) : (
-                    <span style={{ color: ROUGE }}>
-                      {zone ? "montant de la zone manquant (Import SAP)" : "zone non renseignée (fiche chantier)"}
-                    </span>
-                  )}
-                  {!(zone && montantZone) && (
-                    <span className="simple-list-meta"> · taux {champTauxScope("__zone", tauxZone)} €/h</span>
-                  )}
+                  <span className="simple-list-meta">
+                    <select
+                      value={zone || ""}
+                      disabled={!onChangerZone}
+                      title="Zone de petit déplacement de ce bilan (propre à l'affaire ou au devis consulté)"
+                      onChange={(e) => onChangerZone?.(e.target.value)}
+                      style={{ font: "inherit", padding: "0 2px", height: "auto" }}
+                    >
+                      <option value="">zone ?</option>
+                      {ZONES_DEFAUT.map((z) => (
+                        <option key={z.code} value={z.code}>
+                          {z.code}
+                        </option>
+                      ))}
+                    </select>
+                    {montantZone ? " : " + eur(montantZone) + "/j ÷ 7,2 h = " : " · taux "}
+                    {champTauxScope("__zone", tauxZone)} €/h
+                  </span>
                 </>
               }
               champ="zoneEuro"

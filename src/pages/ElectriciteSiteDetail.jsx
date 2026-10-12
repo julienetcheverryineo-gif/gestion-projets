@@ -3053,7 +3053,11 @@ export default function ElectriciteSiteDetail() {
               const tauxBase = tauxBilan["__chantier"] || {};
               const tauxDe = (id) => ({ ...tauxBase, ...(id ? tauxBilan[id] || {} : {}) });
               const tauxSurchargeScope = tauxBilan[scopeTaux] || {};
-              const zoneBase = typeof tauxBase.__zone === "number" ? tauxBase.__zone : (montantZone(chantier?.zone || "") || 0) / 7.2;
+              // Zone et coût horaire : propres au bilan consulté, sinon ceux de l'affaire.
+              const zoneCodeDe = (rates) => (typeof rates.__zoneCode === "string" ? rates.__zoneCode : chantier?.zone || "");
+              const zoneRateDe = (rates) =>
+                typeof rates.__zone === "number" ? rates.__zone : (montantZone(zoneCodeDe(rates)) || 0) / 7.2;
+              const zoneBase = zoneRateDe(tauxBase);
               const miBase = typeof tauxBase.__mi === "number" ? tauxBase.__mi : paramsFoa.materielInterne;
               const profilDe = (l) => (l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "");
               const tauxCode = (profil, rates) => {
@@ -3099,7 +3103,7 @@ export default function ElectriciteSiteDetail() {
                     const profil = profilDe(l);
                     const delta = (l.budget || 0) * (tauxCode(profil, ratesD) - tauxCode(profil, tauxBase));
                     if (delta) prevuMoLignes.push({ code: profil || "I205", euro: delta, heures: 0 });
-                    if (/^(I3|E)/.test(profil || "")) dZone += (l.budget || 0) * ((typeof ratesD.__zone === "number" ? ratesD.__zone : zoneBase) - zoneBase);
+                    if (/^(I3|E)/.test(profil || "")) dZone += (l.budget || 0) * (zoneRateDe(ratesD) - zoneBase);
                     if (inclutMaterielInterne(profil)) dMi += (l.budget || 0) * ((typeof ratesD.__mi === "number" ? ratesD.__mi : miBase) - miBase);
                   });
                 });
@@ -3144,10 +3148,23 @@ export default function ElectriciteSiteDetail() {
                   heuresMatInternePrevues={heuresMatInternePrevues}
                   zonePrevuEuro={zonePrevuEuroTotal}
                   miPrevuEuro={miPrevuEuroTotal}
-                  tauxZoneEff={dSel ? (typeof ratesScope.__zone === "number" ? ratesScope.__zone : zoneBase) : zoneBase}
+                  tauxZoneEff={zoneRateDe(ratesScope)}
                   tauxMiEff={dSel ? (typeof ratesScope.__mi === "number" ? ratesScope.__mi : miBase) : miBase}
-                  zone={chantier?.zone || ""}
-                  montantZone={montantZone(chantier?.zone || "")}
+                  zone={zoneCodeDe(ratesScope)}
+                  montantZone={montantZone(zoneCodeDe(ratesScope))}
+                  onChangerZone={
+                    peutGerer
+                      ? (code) => {
+                          const maj = { ...(chantier?.tauxPrevuBilan?.[scopeTaux] || {}) };
+                          delete maj.__zone;
+                          if (code) maj.__zoneCode = code;
+                          else delete maj.__zoneCode;
+                          return updateDoc(doc(db, "sites", chantierId), {
+                            tauxPrevuBilan: { ...(chantier?.tauxPrevuBilan || {}), [scopeTaux]: maj },
+                          });
+                        }
+                      : null
+                  }
                   heuresZoneSap={heuresSapZone}
                   heuresProductionPrevues={heuresProductionPrevues}
                   budgetMoEuro={budgetMoEuro}
