@@ -434,6 +434,31 @@ Function SaisirSelectionMultiple(champSimple, boutonMultiple)
   SaisirSelectionMultiple = nb
 End Function
 
+' Valide la fenetre de selection multiple (Copier, F8) et verifie qu'elle
+' se ferme ; plusieurs tentatives car SAP ignore parfois le premier appel
+' (valeur encore en cours de saisie dans la derniere cellule).
+Sub ValiderSelectionMultiple()
+  Dim essai
+  For essai = 1 To 4
+    On Error Resume Next
+    If essai = 1 Then session.findById("wnd[1]/tbar[0]/btn[8]").press
+    If essai = 2 Then session.findById("wnd[1]").sendVKey 8
+    If essai = 3 Then
+      session.findById("wnd[1]").sendVKey 0
+      session.findById("wnd[1]").sendVKey 8
+    End If
+    If essai = 4 Then
+      session.findById("wnd[1]/tbar[0]/btn[8]").setFocus
+      session.findById("wnd[1]/tbar[0]/btn[8]").press
+    End If
+    Err.Clear
+    On Error GoTo 0
+    WScript.Sleep 700
+    If Not Existe("wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE") Then Exit Sub
+  Next
+  Fin "La fenetre de selection des affaires SAP ne se ferme pas : validez-la a la main (Copier) puis relancez.", 48
+End Sub
+
 Sub PreparerDossier()
   Dim parties, i, cur
   parties = Split(DOSSIER, "\")
@@ -494,7 +519,7 @@ Sub ExtraireFo()
     If Existe("wnd[1]/tbar[0]/btn[12]") Then session.findById("wnd[1]/tbar[0]/btn[12]").press
     Fin "Aucune affaire exploitable.", 48
   End If
-  session.findById("wnd[1]/tbar[0]/btn[8]").press
+  ValiderSelectionMultiple
 
   session.findById("wnd[0]/usr/ctxtS_EKORG-LOW").Text = ORG_ACHATS
   session.findById("wnd[0]/usr/ctxtLISTU").Text = VAR_LISTE_FO
