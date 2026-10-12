@@ -2,7 +2,7 @@ import iconeAutresFrais from "../assets/icone-autres-frais.png";
 import { estLigneSomme } from "../lib/ligneSomme";
 import BilanFinancier from "../components/BilanFinancier";
 import { useTauxHoraires, useParametresFoa, useMontantsZone } from "../lib/tauxHoraires";
-import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   addDoc,
@@ -296,6 +296,12 @@ function TableauRecap({
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
   const [fiche, setFiche] = useState(null);
+  useEffect(() => {
+    if (!fiche) return undefined;
+    const h = (e) => e.key === "Escape" && setFiche(null);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [fiche]);
   const [triFo, setTriFo] = useState(TRI_FILTRE_VIDE);
   const [triMo, setTriMo] = useState(TRI_FILTRE_VIDE);
   const [selHeures, setSelHeures] = useState(new Set());
@@ -816,7 +822,10 @@ function TableauRecap({
                     )}
                     {avecCode && l.cle && (
                       <span className="elec-code-badge" style={{ marginLeft: 6, fontFamily: "var(--font-mono, monospace)", fontSize: 11, opacity: 0.7 }}>
-                        {codeAffiche(l)}
+                        {(() => {
+                          const p = profilsMo?.[clePourCode(l)] || "I205";
+                          return p + "|" + libelleTypeActivite(p).replace(/ \([^)]*\)$/, "");
+                        })()}
                       </span>
                     )}
                     {l.deroge && (
@@ -3199,7 +3208,7 @@ export default function ElectriciteSiteDetail() {
                   prevuMoLignes={prevuMoLignes}
                   tauxPrevuModifies={tauxSurchargeScope}
                   onChangerTauxPrevu={
-                    peutGerer
+                    peutGerer && dSel
                       ? (code, v) => {
                           const maj = { ...(chantier?.tauxPrevuBilan?.[scopeTaux] || {}) };
                           if (v === null) delete maj[code];
@@ -3400,6 +3409,17 @@ export default function ElectriciteSiteDetail() {
                 <div className="panel-header">
                   <h2>Synthèse — {devisOuvert.nom}</h2>
                   {peutGerer && (
+                    <span style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="btn-ghost"
+                      onClick={async () => {
+                        const n = prompt("Nouveau nom du devis :", devisOuvert.nom);
+                        if (n && n.trim() && n.trim() !== devisOuvert.nom)
+                          await updateDoc(doc(db, "elecDevis", devisOuvert.id), { nom: n.trim() });
+                      }}
+                    >
+                      Renommer
+                    </button>
                     <button
                       className="btn-ghost btn-danger"
                       onClick={() => supprimerDevis(devisOuvert)}
@@ -3407,6 +3427,7 @@ export default function ElectriciteSiteDetail() {
                     >
                       Supprimer ce devis
                     </button>
+                    </span>
                   )}
                 </div>
                 <div className="elec-synthese-grid">

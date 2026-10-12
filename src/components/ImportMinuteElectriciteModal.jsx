@@ -220,6 +220,9 @@ export default function ImportMinuteElectriciteModal({
         <div className="import-fullscreen-body">
           {!sequence && (
             <div className="import-drop">
+              <p style={{ margin: "0 0 12px", color: "var(--danger, #c0392b)", fontWeight: 700 }}>
+                Dans QDV7 supprimer les options non retenues et recalculer votre devis avant export QDV7
+              </p>
               <p className="empty-state-description" style={{ margin: "0 0 16px" }}>
                 Sélectionnez le fichier Excel (.xlsx) de la minute de devis. Elle devient un
                 nouvel onglet de devis sur ce chantier, avec toutes ses lignes prêtes à
