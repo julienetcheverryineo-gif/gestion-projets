@@ -653,7 +653,7 @@ export default function BilanFinancier({
                       ) : (
                         t.nom
                       )}
-                      {txPrevu !== null && (
+                      {txPrevu !== null && onChangerTauxPrevu && (
                         editTaux === t.code ? (
                           <input
                             autoFocus
@@ -675,7 +675,7 @@ export default function BilanFinancier({
                       )}
                       {!prevuSeul && taux(t.code) !== null && taux(t.code) !== undefined && (
                         <span className="simple-list-meta" style={{ marginLeft: 8 }}>
-                          {txPrevu !== null ? "· " : ""}SAP {eur(taux(t.code))}/h
+                          {txPrevu !== null && onChangerTauxPrevu ? "· " : ""}SAP {eur(taux(t.code))}/h
                         </span>
                       )}
                     </>
