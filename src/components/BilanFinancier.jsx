@@ -96,7 +96,7 @@ export default function BilanFinancier({
     kCible !== null ? kCible : typeof margeCibleEat === "number" ? String(Math.round(margeCibleEat * 100000) / 1000).replace(".", ",") : "";
   // % de la rubrique C : valeur propre à l'affaire, sinon paramètre FOA.
   const foa = { ...foaDefaut };
-  ["prorata", "fraisDivers", "aleas", "negociation"].forEach((k) => {
+  ["prorata", "fraisDivers", "aleas", "negociation", "fra", "fg", "materielInterne"].forEach((k) => {
     if (typeof pctSaisis?.[k] === "number") foa[k] = pctSaisis[k];
   });
 
@@ -143,7 +143,8 @@ export default function BilanFinancier({
     return { a: a + zoneEuro, aHorsZone: a, zoneEuro, b, C, C_prorata, C_divers, C_aleas, C_nego, C_mi, D, dep, brute, fg, nette, k: base > 0 ? nette / base : null };
   };
   // Indemnités de zone (pointages J et F) : heures × montant de la zone ÷ 7,2 h.
-  const tauxZone = montantZone ? montantZone / HEURES_PAR_JOUR_ZONE : 0;
+  const tauxZoneDefaut = montantZone ? montantZone / HEURES_PAR_JOUR_ZONE : 0;
+  const tauxZone = typeof pctSaisis?.zoneHeure === "number" ? pctSaisis.zoneHeure : tauxZoneDefaut;
   const heuresZoneReelles = (heuresZoneSap || []).reduce((s, h) => s + (Number(h.heures) || 0), 0);
   const zonePrevu = heuresProductionPrevues * tauxZone;
   const zoneReel = heuresZoneReelles * tauxZone;
@@ -282,7 +283,7 @@ export default function BilanFinancier({
     return { f: lo, atteignable: true, col: eatPourFacteur(lo) };
   };
 
-  const validerPct = (cle) => {
+  const validerPct = (cle, euro = false) => {
     if (saisiePct[cle] === undefined) return;
     const t = String(saisiePct[cle]).replace(",", ".").trim();
     const n = t === "" ? null : Number(t);
@@ -290,17 +291,18 @@ export default function BilanFinancier({
       const { [cle]: _omis, ...reste } = p;
       return reste;
     });
-    if (n === null || n >= 0) onChangerPct?.(cle, n === null ? null : n / 100);
+    if (n === null || n >= 0) onChangerPct?.(cle, n === null ? null : euro ? n : n / 100);
   };
-  const champPct = (cle) => (
+  // `euro` : valeur en €/h (matériel interne, zone) au lieu d'un pourcentage.
+  const champPct = (cle, { euro = false, valeur = foa[cle] } = {}) => (
     <input
       type="text"
       inputMode="decimal"
       disabled={!onChangerPct}
       title={typeof pctSaisis?.[cle] === "number" ? "Valeur propre à cette affaire (vider pour revenir au paramètre)" : "Paramètre par défaut — cliquer pour modifier"}
-      value={saisiePct[cle] !== undefined ? saisiePct[cle] : String(Math.round(foa[cle] * 100000) / 1000).replace(".", ",")}
+      value={saisiePct[cle] !== undefined ? saisiePct[cle] : (euro ? String(Math.round(valeur * 100) / 100) : String(Math.round(valeur * 100000) / 1000)).replace(".", ",")}
       onChange={(e) => setSaisiePct((p) => ({ ...p, [cle]: e.target.value }))}
-      onBlur={() => validerPct(cle)}
+      onBlur={() => validerPct(cle, euro)}
       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
       style={{
         width: "3.4em",
@@ -642,12 +644,15 @@ export default function BilanFinancier({
                   dont indemnités de zone{" "}
                   {zone && montantZone ? (
                     <span className="simple-list-meta">
-                      {zone} : {eur(montantZone)}/j ÷ 7,2 h = {eur(montantZone / 7.2)}/h
+                      {zone} : {eur(montantZone)}/j ÷ 7,2 h = {champPct("zoneHeure", { euro: true, valeur: tauxZone })} €/h
                     </span>
                   ) : (
                     <span style={{ color: ROUGE }}>
                       {zone ? "montant de la zone manquant (Import SAP)" : "zone non renseignée (fiche chantier)"}
                     </span>
+                  )}
+                  {!(zone && montantZone) && (
+                    <span className="simple-list-meta"> · taux {champPct("zoneHeure", { euro: true, valeur: tauxZone })} €/h</span>
                   )}
                 </>
               }
@@ -668,10 +673,10 @@ export default function BilanFinancier({
             <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Frais divers {champPct("fraisDivers")} % de la MO</>} champ="C_divers" retrait />
             <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Aléas {champPct("aleas")} % du CA</>} champ="C_aleas" retrait />
             <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Négociation {champPct("negociation")} % du CA</>} champ="C_nego" retrait />
-            <Ligne cols={cols} classe="bf-detail bf-autres" nom="Matériel interne" champ="C_mi" retrait />
-            <Ligne cols={cols} classe="bf-section bf-fra" nom={"D – FRA (" + num(foa.fra * 100, 3) + " %)"} champ="D" fort />
+            <Ligne cols={cols} classe="bf-detail bf-autres" nom={<>Matériel interne {champPct("materielInterne", { euro: true })} €/h</>} champ="C_mi" retrait />
+            <Ligne cols={cols} classe="bf-section bf-fra" nom={<>D – FRA ({champPct("fra")} %)</>} champ="D" fort />
             <Ligne cols={cols} classe="bf-total" nom="Total dépenses affaire" champ="dep" fort />
-            <Ligne cols={cols} classe="bf-fg" nom={"Frais généraux (" + num(foa.fg * 100, 2) + " % CA)"} champ="fg" sansReel />
+            <Ligne cols={cols} classe="bf-fg" nom={<>Frais généraux ({champPct("fg")} % CA)</>} champ="fg" sansReel />
             <Ligne cols={cols} classe={"bf-resultat" + (atterr.nette < 0 ? " bf-perte" : "")} tonePos nom="Marge nette" champ="nette" fort sansReel />
             <Ligne cols={cols} classe={"bf-resultat" + (atterr.nette < 0 ? " bf-perte" : "")} tonePos nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
           </tbody>
