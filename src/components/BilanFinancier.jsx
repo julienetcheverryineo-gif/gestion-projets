@@ -254,7 +254,19 @@ export default function BilanFinancier({
   const heuresMiAtterrE = heuresMiReellesE + heuresMatInternePrevues * (1 - pctMo);
   const prevuEat = colonne(budgetMo, budgetFo, zonePrevu, heuresMatInternePrevues, FG_EAT);
   // Cherche f ∈ [0 ; 1] tel que la marge nette atteigne la cible (en €).
-  const resoudreEat = (cibleNette) => {
+  // Avec `degrader`, une cible plus basse que l'EAT réaliste est atteinte en
+  // déclarant plus de dépenses que le reste à faire (f > 1).
+  const resoudreEat = (cibleNette, degrader = false) => {
+    if (degrader && eatPourFacteur(1).nette > cibleNette + 0.005) {
+      const FMAX = 1000;
+      if (eatPourFacteur(FMAX).nette > cibleNette) return { f: FMAX, atteignable: false, degrade: true, col: eatPourFacteur(FMAX) };
+      let lo = 1, hi = FMAX;
+      for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        if (eatPourFacteur(mid).nette > cibleNette) lo = mid; else hi = mid;
+      }
+      return { f: hi, atteignable: true, degrade: true, col: eatPourFacteur(hi) };
+    }
     if (eatPourFacteur(1).nette >= cibleNette - 0.005) return { f: 1, atteignable: true, col: eatPourFacteur(1) };
     if (eatPourFacteur(0).nette < cibleNette) return { f: 0, atteignable: false, col: eatPourFacteur(0) };
     let lo = 0, hi = 1;
@@ -786,10 +798,19 @@ export default function BilanFinancier({
                 {res.col.k === null ? "—" : num(res.col.k * 100, 1) + " %"}
                 {cible !== null && <span className="simple-list-meta"> (cible : {eur(cible)})</span>}
               </div>
-              {!res.atteignable ? (
+              {!res.atteignable && res.degrade ? (
+                <div style={{ color: ROUGE, marginTop: 4 }}>
+                  Objectif inatteignable : il n'y a pas assez de reste à faire pour dégrader la marge à ce niveau (les dépenses déclarées ne peuvent pas suffire).
+                </div>
+              ) : !res.atteignable ? (
                 <div style={{ color: ROUGE, marginTop: 4 }}>
                   Objectif inatteignable : même sans aucune dépense supplémentaire, la marge maximale est de {eur(res.col.nette)}
                   {res.col.k === null ? "" : " (" + num(res.col.k * 100, 1) + " %)"}. Il faudrait du CA en plus (avenant) ou revoir les paramètres FOA.
+                </div>
+              ) : res.degrade ? (
+                <div className="simple-list-meta" style={{ marginTop: 4 }}>
+                  Dégradation volontaire : cette marge est plus basse que celle de l'EAT réaliste. Elle suppose de déclarer{" "}
+                  {num(res.f * 100, 0)} % du reste à faire au budget (soit {num((res.f - 1) * 100, 0)} % de plus que le réaliste), sur toutes les lignes.
                 </div>
               ) : res.f >= 0.9999 ? (
                 <div className="simple-list-meta" style={{ marginTop: 4 }}>L'EAT réaliste suffit à atteindre cette marge : déclarez-le tel quel.</div>
@@ -809,7 +830,7 @@ export default function BilanFinancier({
           const n = t === "" ? null : Number(t);
           return n !== null && Number.isFinite(n) ? n / 100 : null;
         })();
-        const resCible = kSaisi !== null ? resoudreEat(kSaisi * base) : null;
+        const resCible = kSaisi !== null ? resoudreEat(kSaisi * base, true) : null;
         return (
           <>
             {affichage === "eatAnnonce" && tableauEat(
