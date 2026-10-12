@@ -104,13 +104,14 @@ function NoteCarte({ note, peutModifier, onModifier, onSupprimer }) {
 // (page dédiée du menu de gauche). Toujours triées de la plus récente à
 // la plus ancienne (tri par défaut de useCollection). Modifiable/
 // supprimable par son auteur, ou par un admin/chef de projet.
-export default function NotesPanel({ chantierId = null, texteVide = "Aucune note pour l'instant." }) {
+// `portee` : espace dédié (ex. "elec-problemes") ; null = notes classiques.
+export default function NotesPanel({ chantierId = null, portee = null, texteVide = "Aucune note pour l'instant." }) {
   const { user, profile, isAdmin, isChefDeProjet } = useAuth();
   const { documents: toutesLesNotes, chargement } = useCollection("notes");
   const [htmlNouvelleNote, setHtmlNouvelleNote] = useState("");
   const [enAjout, setEnAjout] = useState(false);
 
-  const notes = toutesLesNotes.filter((n) => (n.chantierId || null) === chantierId);
+  const notes = toutesLesNotes.filter((n) => (n.chantierId || null) === chantierId && (n.portee || null) === portee);
 
   const ajouter = async () => {
     if (htmlEstVide(htmlNouvelleNote)) return;
@@ -118,6 +119,7 @@ export default function NotesPanel({ chantierId = null, texteVide = "Aucune note
     try {
       await addDoc(collection(db, "notes"), {
         chantierId,
+        ...(portee ? { portee } : {}),
         texte: nettoyerHtmlNote(htmlNouvelleNote),
         userId: user?.uid || null,
         auteur: profile?.nom || "?",

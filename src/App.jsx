@@ -10,6 +10,7 @@ import Tasks from "./pages/Tasks";
 import Planning from "./pages/Planning";
 import ReservesGlobal from "./pages/ReservesGlobal";
 import Notes from "./pages/Notes";
+import ElectriciteNotes from "./pages/ElectriciteNotes";
 import Users from "./pages/Users";
 import Statistiques from "./pages/Statistiques";
 import ElectriciteChantiers from "./pages/ElectriciteChantiers";
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="electricite/chantiers/:chantierId" element={<ElectriciteSiteDetail />} />
             <Route path="electricite/plan-de-charge" element={<ElectricitePlanDeCharge />} />
             <Route path="electricite/import-sap" element={<ElectriciteImportSap />} />
+            <Route path="electricite/notes" element={<ElectriciteNotes />} />
             <Route
               path="utilisateurs"
               element={
