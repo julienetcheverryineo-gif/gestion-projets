@@ -288,6 +288,7 @@ function TableauRecap({
   kAchats,
   onChangerK,
   tauxHoraire,
+  fo,
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
@@ -797,6 +798,19 @@ function TableauRecap({
                     ) : (
                       l.libelle
                     )}
+                    {fo && !avecCode && (
+                      <button
+                        type="button"
+                        className="btn-ghost btn-danger"
+                        style={{ padding: "0 6px", marginLeft: 6 }}
+                        title="Retirer du budget : dépense prévue qui n'aura jamais lieu"
+                        onClick={() => {
+                          if (confirm("Retirer « " + l.libelle + " » du budget" + (portee === "devis" ? " de ce devis" : " (tous les devis)") + " ? Vous pourrez le rétablir.")) fo.onExclure(l.cle);
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
                     {avecCode && l.cle && (
                       <span className="elec-code-badge" style={{ marginLeft: 6, fontFamily: "var(--font-mono, monospace)", fontSize: 11, opacity: 0.7 }}>
                         {codeAffiche(l)}
@@ -1265,6 +1279,20 @@ function TableauRecap({
             + Ajouter une tâche
           </button>
         </form>
+      )}
+      {fo && fo.retires.length > 0 && (
+        <div className="simple-list-meta" style={{ marginTop: 8 }}>
+          <strong>Retirés du budget :</strong>{" "}
+          {fo.retires.map((r) => (
+            <span key={r.cle} style={{ marginRight: 12, whiteSpace: "nowrap" }}>
+              {r.libelle}
+              {portee !== "devis" && r.devisNom ? " (" + r.devisNom + ")" : ""} — {formatEuro(r.montant)} €{" "}
+              <button type="button" className="btn-ghost" style={{ padding: "0 6px" }} onClick={() => fo.onRetablir(r.cle)}>
+                Rétablir
+              </button>
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -2235,8 +2263,17 @@ export default function ElectriciteSiteDetail() {
   // Le k achat se gère par devis (chantier.kAchatDevis[devisId][typeFo]).
   // Tant qu'un devis n'a pas son propre réglage, on reprend l'ancien k
   // unique du chantier (chantier.kAchatFo).
+  // Types de FO retirés du budget (dépenses prévues qui n'arriveront jamais) :
+  // clés « devisId||type ». Leur coût FO est mis à 0 ici, donc tous les
+  // bilans les ignorent ; les heures de MO des mêmes lignes restent.
+  const exclusFo = new Set(chantier?.typesFoExclus || []);
   const lignesChantier = toutesLignes
     .filter((l) => l.chantierId === chantierId && !l.estPoste)
+    .map((l) =>
+      exclusFo.size > 0 && exclusFo.has(l.devisId + "||" + (l.typeFo || "").trim())
+        ? { ...l, coutTotalFo: 0, coutTotalFoPr: 0 }
+        : l
+    )
     .map((l) => {
       const k = kAchatsDevis(l.devisId)[(l.typeFo || "").trim()];
       return typeof k === "number" && k > 0 && k !== 1
@@ -2253,6 +2290,33 @@ export default function ElectriciteSiteDetail() {
       kAchatDevis: { ...(chantier?.kAchatDevis || {}), [devisId]: maj },
     });
   };
+  // Retire un type de FO du budget : d'un devis, ou de tous (devisId null).
+  const exclureTypeFo = async (cle, devisId = null) => {
+    const ids = devisId
+      ? [devisId]
+      : [...new Set(toutesLignes.filter((l) => l.chantierId === chantierId && !l.estPoste && (l.typeFo || "").trim() === cle).map((l) => l.devisId))];
+    const maj = new Set(chantier?.typesFoExclus || []);
+    ids.forEach((id) => maj.add(id + "||" + cle));
+    await updateDoc(doc(db, "sites", chantierId), { typesFoExclus: [...maj] });
+  };
+  const retablirTypeFo = async (cleExclusion) => {
+    await updateDoc(doc(db, "sites", chantierId), {
+      typesFoExclus: (chantier?.typesFoExclus || []).filter((k) => k !== cleExclusion),
+    });
+  };
+  // Types retirés, avec leur montant (déboursé du devis) pour pouvoir les rétablir.
+  const typesFoRetires = (() => {
+    const m = new Map();
+    toutesLignes.forEach((l) => {
+      if (l.chantierId !== chantierId || l.estPoste || estLigneSomme(l)) return;
+      const cle = l.devisId + "||" + (l.typeFo || "").trim();
+      if (!exclusFo.has(cle)) return;
+      const e = m.get(cle) || { cle, devisId: l.devisId, libelle: (l.typeFo || "").trim() ? formatTypeFo(l.typeFo.trim()) : "Sans type de FO", montant: 0 };
+      e.montant += l.coutTotalFo || 0;
+      m.set(cle, e);
+    });
+    return [...m.values()].map((e) => ({ ...e, devisNom: devis.find((d) => d.id === e.devisId)?.nom || "" }));
+  })();
   // Tâches (types de FO) réellement utilisées dans les devis du chantier :
   // code + libellé, pour l'envoi vers SAP.
   const tachesUtilisees = (() => {
@@ -3095,6 +3159,7 @@ export default function ElectriciteSiteDetail() {
                 ordreTypes={ordreTypesChantier}
                 onModifierOrdre={peutGerer ? modifierOrdreType : null}
                 sap={sapRecap}
+                fo={recapActif === "fo" && peutGerer ? { onExclure: (cle) => exclureTypeFo(cle), onRetablir: retablirTypeFo, retires: typesFoRetires } : null}
                 codesMo={avecSup ? codesMoChantier : null}
                 onChangerCodeMo={avecSup && peutGerer ? changerCodeMo : null}
                 profilsMo={avecSup ? profilsMoChantier : null}
@@ -3134,6 +3199,7 @@ export default function ElectriciteSiteDetail() {
                   ordreTypes={ordreTypesChantier}
                   onModifierOrdre={peutGerer ? modifierOrdreType : null}
                   sap={sapRecapDevis(d, recap)}
+                  fo={recapActif === "fo" && peutGerer ? { onExclure: (cle) => exclureTypeFo(cle, d.id), onRetablir: retablirTypeFo, retires: typesFoRetires.filter((r) => r.devisId === d.id) } : null}
                   codesMo={avecSup ? codesMoChantier : null}
                   onChangerCodeMo={avecSup && peutGerer ? changerCodeMo : null}
                 profilsMo={avecSup ? profilsMoChantier : null}
