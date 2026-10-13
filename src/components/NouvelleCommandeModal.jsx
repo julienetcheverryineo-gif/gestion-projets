@@ -20,7 +20,7 @@ const HEURES = [
 export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, onClose }) {
   const [nom, setNom] = useState("");
   const [heures, setHeures] = useState(() =>
-    Object.fromEntries(HEURES.map((h) => [h.cle, { h: "", pv: "", type: h.defaut }]))
+    Object.fromEntries(HEURES.map((h) => [h.cle, { h: "", pv: "", type: h.defaut, tache: "4" }]))
   );
   const [materiel, setMateriel] = useState([{ designation: "", type: "14", cout: "" }]);
   const [pvTotal, setPvTotal] = useState("");
@@ -38,7 +38,9 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
       const h = nombre(s.h);
       if (!h) return;
       const t = LISTE_TYPES_MO.find((x) => x.code === s.type);
+      const tache = LISTE_TYPES_FO.find((x) => x.code === s.tache);
       lignes.push({
+        typeFo: tache ? valeurType(tache.code, tache.label) : "",
         designation: def.libelle,
         unite: "h",
         quantite: h,
@@ -100,7 +102,8 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
               <tr>
                 <th></th>
                 <th>Heures</th>
-                <th>Type de MO</th>
+                <th>Tâche (poste)</th>
+                <th>Profil (type de MO)</th>
               </tr>
             </thead>
             <tbody>
@@ -114,6 +117,15 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
                       value={heures[def.cle].h}
                       onChange={(e) => majHeures(def.cle, "h", e.target.value)}
                     />
+                  </td>
+                  <td>
+                    <select value={heures[def.cle].tache} onChange={(e) => majHeures(def.cle, "tache", e.target.value)}>
+                      {LISTE_TYPES_FO.map((t) => (
+                        <option key={t.code} value={t.code}>
+                          {t.code} | {t.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
                     <select value={heures[def.cle].type} onChange={(e) => majHeures(def.cle, "type", e.target.value)}>
