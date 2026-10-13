@@ -106,6 +106,26 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
     setChoixIndex(situations.length);
   };
 
+  // Nouvelle situation avec toutes les lignes facturables à 100 %.
+  const facturerA100 = async () => {
+    if (!window.confirm("Créer une nouvelle situation avec toutes les lignes à 100 % ?")) return;
+    const precedente = situations[situations.length - 1];
+    const avancements = { ...(precedente?.avancements || {}) };
+    rows.filter((r) => r.type === "ligne").forEach((r) => {
+      avancements[r.id] = 100;
+    });
+    await enregistrer([
+      ...situations,
+      {
+        numero: (precedente?.numero ?? 0) + 1,
+        date: aujourdhui(),
+        auteur: [profile?.prenom, profile?.nom].filter(Boolean).join(" ") || profile?.nom || "",
+        avancements,
+      },
+    ]);
+    setChoixIndex(situations.length);
+  };
+
   const supprimerDerniere = async () => {
     if (!estDerniere || !window.confirm("Supprimer la situation " + sit.numero + " ?")) return;
     await enregistrer(situations.slice(0, -1));
@@ -301,6 +321,11 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
             {peutGerer && (
               <button className="sit-chip sit-chip-ajout" onClick={nouvelleSituation}>
                 + Nouvelle situation
+              </button>
+            )}
+            {peutGerer && (
+              <button className="sit-chip sit-chip-ajout" onClick={facturerA100}>
+                + Facturer à 100 %
               </button>
             )}
             {peutGerer && (
