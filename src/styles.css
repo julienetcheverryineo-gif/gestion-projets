@@ -4404,3 +4404,10 @@ table.af-table.table-recap {
 .bf-prevu-seul td:nth-child(3),
 .bf-prevu-seul th:nth-child(4),
 .bf-prevu-seul td:nth-child(4) { display: none; }
+
+.modal .elec-code-input {
+  width: 200px;
+  padding: 8px 10px;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   libelleTypeActivite,
   estLigneMoIgnoree,
@@ -260,6 +260,26 @@ const CONSULTATION = {
       { champ: "valNette", label: "Val. nette €", numerique: true, euro: true },
     ],
     champsRecherche: ["otp", "designation", "grOr", "nomFournisseur", "reference", "docAchat"],
+    filtres: [
+      { champ: "grOr", label: "Code SAP" },
+      { champ: "nomFournisseur", label: "Fournisseur" },
+    ],
+    detail: [
+      ["docAchat", "Doc. achat"],
+      ["poste", "Poste"],
+      ["reference", "Référence"],
+      ["fournisseur", "N° fournisseur"],
+      ["nomFournisseur", "Fournisseur"],
+      ["designation", "Désignation"],
+      ["quantite", "Quantité"],
+      ["unite", "Unité"],
+      ["prixNet", "Prix net"],
+      ["valNette", "Val. nette €"],
+      ["grOr", "Code SAP"],
+      ["besoin", "Besoin"],
+      ["dateDoc", "Date"],
+      ["otp", "OTP"],
+    ],
     champValeur: "valNette",
     labelTotal: "Val. nette totale",
     suffixeTotal: " €",
@@ -275,6 +295,23 @@ const CONSULTATION = {
       { champ: "heures", label: "Heures", numerique: true },
     ],
     champsRecherche: ["otp", "nomPrenom", "designationImputation", "typAct", "matricule"],
+    filtres: [
+      { champ: "nomPrenom", label: "Personne" },
+      { champ: "typAct", label: "Type activité", libelle: true },
+      { champ: "tache", label: "Tâche" },
+    ],
+    detail: [
+      ["date", "Date"],
+      ["nomPrenom", "Personne"],
+      ["matricule", "Matricule"],
+      ["imputation", "Imputation"],
+      ["otp", "OTP"],
+      ["designationImputation", "Désignation imputation"],
+      ["tache", "Tâche"],
+      ["typAct", "Type activité", true],
+      ["heures", "Heures"],
+      ["responsable", "Responsable"],
+    ],
     champValeur: "heures",
     labelTotal: "Heures totales",
     suffixeTotal: " h",
@@ -295,31 +332,99 @@ function formatValeur(v, numerique, euro) {
 // Main d'œuvre) — remontée avec une clé différente par onglet (voir
 // VueConsultation) pour repartir d'un état propre en changeant d'onglet,
 // plutôt qu'un useEffect de réinitialisation.
+// dd.mm.yyyy -> yyyymmdd (comparable) ; "" si illisible.
+const cleDate = (d) => {
+  const m = String(d || "").match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+  return m ? m[3] + m[2] + m[1] : "";
+};
+const champDate = (config) => (config.collectionLignes === "sapLignesMo" ? "date" : "dateDoc");
+
 function TableauConsultation({ config }) {
   const { documents: lignes, chargement } = useCollection(config.collectionLignes);
   const [recherche, setRecherche] = useState("");
   const [otpFiltre, setOtpFiltre] = useState("");
+  const [filtres, setFiltres] = useState({});
+  const [du, setDu] = useState("");
+  const [au, setAu] = useState("");
+  const [tri, setTri] = useState({ champ: champDate(config), sens: -1 });
+  const [ouvert, setOuvert] = useState(null);
   const [nbAffiches, setNbAffiches] = useState(50);
+  const estMo = config.collectionLignes === "sapLignesMo";
+  const fDate = champDate(config);
+
+  const valeurAff = (l, champ, libelle) => (libelle ? libelleTypeActivite(l[champ]) : l[champ] ?? "");
 
   const otpsDisponibles = useMemo(
     () => [...new Set(lignes.map((l) => l.otp).filter(Boolean))].sort(),
     [lignes]
   );
+  const baseLignes = useMemo(() => lignes.filter((l) => !(estMo && estLigneMoIgnoree(l))), [lignes, estMo]);
+  const optionsFiltre = useMemo(() => {
+    const o = {};
+    config.filtres.forEach((f) => {
+      o[f.champ] = [...new Set(baseLignes.map((l) => String(l[f.champ] ?? "")).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, "fr", { numeric: true })
+      );
+    });
+    return o;
+  }, [baseLignes, config]);
 
   const filtrees = useMemo(() => {
     const termes = recherche.trim().toLowerCase();
-    return lignes.filter((l) => {
-      if (config.collectionLignes === "sapLignesMo" && estLigneMoIgnoree(l)) return false;
+    const dDu = du ? du.replaceAll("-", "") : "";
+    const dAu = au ? au.replaceAll("-", "") : "";
+    const res = baseLignes.filter((l) => {
       if (otpFiltre && l.otp !== otpFiltre) return false;
+      for (const f of config.filtres) {
+        if (filtres[f.champ] && String(l[f.champ] ?? "") !== filtres[f.champ]) return false;
+      }
+      if (dDu || dAu) {
+        const d = cleDate(l[fDate]);
+        if (!d || (dDu && d < dDu) || (dAu && d > dAu)) return false;
+      }
       if (!termes) return true;
       return config.champsRecherche.some((c) => String(l[c] ?? "").toLowerCase().includes(termes));
     });
-  }, [lignes, recherche, otpFiltre, config]);
+    const num = config.colonnes.find((c) => c.champ === tri.champ)?.numerique;
+    return [...res].sort((x, y) => {
+      let a = x[tri.champ] ?? "";
+      let b = y[tri.champ] ?? "";
+      if (tri.champ === fDate) {
+        a = cleDate(a);
+        b = cleDate(b);
+      }
+      if (num) return (Number(a) - Number(b)) * tri.sens;
+      return String(a).localeCompare(String(b), "fr", { numeric: true }) * tri.sens;
+    });
+  }, [baseLignes, recherche, otpFiltre, filtres, du, au, tri, config, fDate]);
 
   const total = useMemo(
     () => filtrees.reduce((s, l) => s + (Number(l[config.champValeur]) || 0), 0),
     [filtrees, config]
   );
+
+  // Récapitulatif par premier filtre (Code SAP / Personne) sur la sélection.
+  const champGroupe = config.filtres[0];
+  const groupes = useMemo(() => {
+    const m = new Map();
+    filtrees.forEach((l) => {
+      const k = String(l[champGroupe.champ] ?? "") || "—";
+      m.set(k, (m.get(k) || 0) + (Number(l[config.champValeur]) || 0));
+    });
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [filtrees, champGroupe, config]);
+
+  const reinit = () => {
+    setRecherche("");
+    setOtpFiltre("");
+    setFiltres({});
+    setDu("");
+    setAu("");
+    setNbAffiches(50);
+  };
+  const filtreActif = recherche || otpFiltre || du || au || Object.values(filtres).some(Boolean);
+  const trier = (champ) => setTri((t) => (t.champ === champ ? { champ, sens: -t.sens } : { champ, sens: 1 }));
+  const euroTotal = config.suffixeTotal === " €";
 
   return (
     <>
@@ -329,7 +434,7 @@ function TableauConsultation({ config }) {
         <p className="empty-state-description">Aucune ligne importée pour le moment.</p>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
             <input
               placeholder="Rechercher…"
               value={recherche}
@@ -337,61 +442,109 @@ function TableauConsultation({ config }) {
                 setNbAffiches(50);
                 setRecherche(e.target.value);
               }}
-              style={{ minWidth: 220, flex: "1 1 220px" }}
+              style={{ minWidth: 200, flex: "1 1 200px" }}
             />
-            <select
-              value={otpFiltre}
-              onChange={(e) => {
-                setNbAffiches(50);
-                setOtpFiltre(e.target.value);
-              }}
-            >
+            <select value={otpFiltre} onChange={(e) => { setNbAffiches(50); setOtpFiltre(e.target.value); }}>
               <option value="">Tous les chantiers (OTP)</option>
               {otpsDisponibles.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
+                <option key={o} value={o}>{o}</option>
               ))}
             </select>
+            {config.filtres.map((f) => (
+              <select
+                key={f.champ}
+                value={filtres[f.champ] || ""}
+                onChange={(e) => { setNbAffiches(50); setFiltres((p) => ({ ...p, [f.champ]: e.target.value })); }}
+              >
+                <option value="">{f.label} : tous</option>
+                {optionsFiltre[f.champ].map((o) => (
+                  <option key={o} value={o}>{f.libelle ? libelleTypeActivite(o) : o}</option>
+                ))}
+              </select>
+            ))}
+            <label className="simple-list-meta">
+              Du <input type="date" value={du} onChange={(e) => { setNbAffiches(50); setDu(e.target.value); }} />
+            </label>
+            <label className="simple-list-meta">
+              au <input type="date" value={au} onChange={(e) => { setNbAffiches(50); setAu(e.target.value); }} />
+            </label>
+            {filtreActif && (
+              <button className="btn-ghost" onClick={reinit}>Réinitialiser</button>
+            )}
           </div>
 
           <p className="page-subtitle" style={{ marginBottom: 8 }}>
             {filtrees.length} ligne(s) — {config.labelTotal} :{" "}
             <strong>
-              {formatValeur(total, true, config.suffixeTotal === " €")}
+              {formatValeur(total, true, euroTotal)}
               {config.suffixeTotal}
             </strong>
           </p>
+
+          {groupes.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {groupes.slice(0, 30).map(([k, v]) => (
+                <button
+                  key={k}
+                  className={filtres[champGroupe.champ] === k ? "btn-primary" : "btn-ghost"}
+                  style={{ padding: "2px 10px", fontSize: 12 }}
+                  title={"Filtrer sur " + champGroupe.label + " " + k}
+                  onClick={() => {
+                    setNbAffiches(50);
+                    setFiltres((p) => ({ ...p, [champGroupe.champ]: p[champGroupe.champ] === k ? "" : k }));
+                  }}
+                >
+                  {champGroupe.libelle ? libelleTypeActivite(k) : k} · {formatValeur(v, true, euroTotal)}
+                  {config.suffixeTotal}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="hscroll-auto" style={{ overflowX: "auto" }}>
             <table className="data-table">
               <thead>
                 <tr>
                   {config.colonnes.map((c) => (
-                    <th key={c.champ}>{c.label}</th>
+                    <th key={c.champ} style={{ cursor: "pointer", userSelect: "none" }} onClick={() => trier(c.champ)}>
+                      {c.label}
+                      {tri.champ === c.champ ? (tri.sens > 0 ? " ▲" : " ▼") : ""}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtrees.slice(0, nbAffiches).map((l) => (
-                  <tr key={l.id}>
-                    {config.colonnes.map((c) => (
-                      <td key={c.champ} data-label={c.label}>
-                        {c.champ === "typAct" ? libelleTypeActivite(l.typAct) : formatValeur(l[c.champ], c.numerique, c.euro)}
-                      </td>
-                    ))}
-                  </tr>
+                  <Fragment key={l.id}>
+                    <tr style={{ cursor: "pointer" }} onClick={() => setOuvert(ouvert === l.id ? null : l.id)}>
+                      {config.colonnes.map((c) => (
+                        <td key={c.champ} data-label={c.label}>
+                          {c.champ === "typAct" ? libelleTypeActivite(l.typAct) : formatValeur(l[c.champ], c.numerique, c.euro)}
+                        </td>
+                      ))}
+                    </tr>
+                    {ouvert === l.id && (
+                      <tr>
+                        <td colSpan={config.colonnes.length}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "6px 20px", padding: "6px 4px" }}>
+                            {config.detail.map(([champ, label, lib]) => (
+                              <div key={champ}>
+                                <div className="simple-list-meta">{label}</div>
+                                <div>{String(valeurAff(l, champ, lib)) || "—"}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
           </div>
 
           {filtrees.length > nbAffiches && (
-            <button
-              className="btn-ghost"
-              style={{ marginTop: 12 }}
-              onClick={() => setNbAffiches((n) => n + 50)}
-            >
+            <button className="btn-ghost" style={{ marginTop: 12 }} onClick={() => setNbAffiches((n) => n + 50)}>
               Afficher plus ({filtrees.length - nbAffiches} restante(s))
             </button>
           )}

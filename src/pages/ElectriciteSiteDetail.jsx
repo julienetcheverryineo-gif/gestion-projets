@@ -118,9 +118,9 @@ function formatTypeFo(texte) {
 
 // Arrondi à 1 chiffre après la virgule, jamais plus.
 function formatNombre(n) {
-  return (Math.round((n || 0) * 10) / 10).toLocaleString("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
+  return (Math.round((n || 0) * 100) / 100).toLocaleString("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 
@@ -1181,10 +1181,10 @@ function TableauRecap({
                     {sup?.onChangerHeures ? (
                       <input
                         type="number"
-                        step="0.5"
+                        step="0.01"
                         className="elec-heures-input"
                         key={"a" + l.saisie}
-                        defaultValue={l.saisie}
+                        defaultValue={Number(l.saisie || 0).toFixed(2)}
                         onBlur={(e) => sup.onChangerHeures(l.tacheId, sup.portee, e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                       />
@@ -1203,11 +1203,11 @@ function TableauRecap({
                     {sup?.onChangerPrelevement ? (
                       <input
                         type="number"
-                        step="0.5"
+                        step="0.01"
                         min="0"
                         className="elec-heures-input"
                         key={"p" + l.prelevePropreSaisi}
-                        defaultValue={l.prelevePropreSaisi}
+                        defaultValue={Number(l.prelevePropreSaisi || 0).toFixed(2)}
                         title={
                           "Max " +
                           formatNombre((sup.disponible?.(sup.portee, l.tacheId) || 0) + (l.prelevePropreSaisi || 0)) +
