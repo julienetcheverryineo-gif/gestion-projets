@@ -22,7 +22,8 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
   const [heures, setHeures] = useState(() =>
     Object.fromEntries(HEURES.map((h) => [h.cle, { h: "", pv: "", type: h.defaut }]))
   );
-  const [materiel, setMateriel] = useState([{ designation: "", type: "14", cout: "", pv: "" }]);
+  const [materiel, setMateriel] = useState([{ designation: "", type: "14", cout: "" }]);
+  const [pvTotal, setPvTotal] = useState("");
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
 
@@ -35,8 +36,7 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
     HEURES.forEach((def) => {
       const s = heures[def.cle];
       const h = nombre(s.h);
-      const pv = nombre(s.pv);
-      if (!h && !pv) return;
+      if (!h) return;
       const t = LISTE_TYPES_MO.find((x) => x.code === s.type);
       lignes.push({
         designation: def.libelle,
@@ -45,14 +45,11 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
         typeMo: t ? valeurType(t.code, t.label) : "",
         tempsUnitaire: 1,
         tempsTotalHeures: h,
-        pvLigne: pv,
-        pvTotal: pv,
       });
     });
     materiel.forEach((m) => {
       const cout = nombre(m.cout);
-      const pv = nombre(m.pv);
-      if (!m.designation.trim() && !cout && !pv) return;
+      if (!m.designation.trim() && !cout) return;
       const t = LISTE_TYPES_FO.find((x) => x.code === m.type);
       lignes.push({
         designation: m.designation.trim() || "Matériel",
@@ -61,11 +58,11 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
         typeFo: t ? valeurType(t.code, t.label) : "",
         coutUnitaireFo: cout,
         coutTotalFo: cout,
-        pvLigne: pv,
-        pvTotal: pv,
       });
     });
     if (lignes.length === 0) return setErreur("Saisis au moins des heures ou du matériel.");
+    const pv = nombre(pvTotal);
+    if (pv) lignes.push({ designation: "Montant vendu de la commande", unite: "u", quantite: 1, pvLigne: pv, pvTotal: pv });
     const sequence = [
       { estPoste: true, code: "A", profondeur: 0, designation: nom.trim() },
       ...lignes.map((l) => ({ estPoste: false, code: "", profondeur: 1, ...l })),
@@ -90,6 +87,12 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
           <input style={{ width: "100%" }} value={nom} onChange={(e) => setNom(e.target.value)} autoFocus />
         </label>
 
+        <label style={{ display: "block", marginTop: 12 }}>
+          Montant vendu total de la commande (€ HT)
+          <br />
+          <input inputMode="decimal" style={{ width: 160 }} value={pvTotal} onChange={(e) => setPvTotal(e.target.value)} />
+        </label>
+
         <h3>Heures</h3>
         <div className="data-table-wrapper">
           <table className="data-table">
@@ -98,7 +101,6 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
                 <th></th>
                 <th>Heures</th>
                 <th>Type de MO</th>
-                <th>Vendu (€ HT)</th>
               </tr>
             </thead>
             <tbody>
@@ -122,14 +124,6 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
                       ))}
                     </select>
                   </td>
-                  <td>
-                    <input
-                      inputMode="decimal"
-                      style={{ width: 110 }}
-                      value={heures[def.cle].pv}
-                      onChange={(e) => majHeures(def.cle, "pv", e.target.value)}
-                    />
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -144,7 +138,6 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
                 <th>Désignation</th>
                 <th>Type de FO</th>
                 <th>Coût d'achat (€)</th>
-                <th>Vendu (€ HT)</th>
                 <th></th>
               </tr>
             </thead>
@@ -167,9 +160,6 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
                     <input inputMode="decimal" style={{ width: 100 }} value={m.cout} onChange={(e) => majMat(i, "cout", e.target.value)} />
                   </td>
                   <td>
-                    <input inputMode="decimal" style={{ width: 100 }} value={m.pv} onChange={(e) => majMat(i, "pv", e.target.value)} />
-                  </td>
-                  <td>
                     {materiel.length > 1 && (
                       <button className="btn-ghost btn-danger" onClick={() => setMateriel((p) => p.filter((_, k) => k !== i))}>
                         ×
@@ -184,7 +174,7 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
         <button
           className="btn-ghost"
           style={{ marginTop: 8 }}
-          onClick={() => setMateriel((p) => [...p, { designation: "", type: "14", cout: "", pv: "" }])}
+          onClick={() => setMateriel((p) => [...p, { designation: "", type: "14", cout: "" }])}
         >
           + Ajouter une ligne de matériel
         </button>
