@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { doc, FieldPath, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { ecrireDevisElec } from "../lib/importCroise";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 
@@ -11,10 +13,12 @@ const nombre = (v) => {
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
+// suivi / étude : versées aux tâches « Suivi de chantier » / « Étude » du Récap MO
+// (prises sur « Sans tâche ») ; chantier : rattachées à une tâche (type de FO) au choix.
 const HEURES = [
-  { cle: "suivi", libelle: "Heures de suivi", defaut: "53" },
-  { cle: "be", libelle: "Heures de bureau d'étude", defaut: "61" },
-  { cle: "chantier", libelle: "Heures de chantier", defaut: "PR" },
+  { cle: "suivi", libelle: "Heures de suivi", defaut: "53", tacheSup: "suivi" },
+  { cle: "be", libelle: "Heures de bureau d'étude", defaut: "61", tacheSup: "etude" },
+  { cle: "chantier", libelle: "Heures de chantier", defaut: "PR", tacheSup: null },
 ];
 
 export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, onClose }) {
@@ -33,12 +37,14 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
   const creer = async () => {
     if (!nom.trim()) return setErreur("Donne un nom à la commande.");
     const lignes = [];
+    const prelevements = [];
     HEURES.forEach((def) => {
       const s = heures[def.cle];
       const h = nombre(s.h);
       if (!h) return;
       const t = LISTE_TYPES_MO.find((x) => x.code === s.type);
-      const tache = LISTE_TYPES_FO.find((x) => x.code === s.tache);
+      const tache = def.tacheSup ? null : LISTE_TYPES_FO.find((x) => x.code === s.tache);
+      if (def.tacheSup) prelevements.push([def.tacheSup, h]);
       lignes.push({
         typeFo: tache ? valeurType(tache.code, tache.label) : "",
         designation: def.libelle,
@@ -64,14 +70,16 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
     });
     if (lignes.length === 0) return setErreur("Saisis au moins des heures ou du matériel.");
     const pv = nombre(pvTotal);
-    if (pv) lignes.push({ designation: "Montant vendu de la commande", unite: "u", quantite: 1, pvLigne: pv, pvTotal: pv });
     const sequence = [
-      { estPoste: true, code: "A", profondeur: 0, designation: nom.trim() },
+      { estPoste: true, code: "A", profondeur: 0, designation: nom.trim(), pvLigne: pv, pvTotal: pv },
       ...lignes.map((l) => ({ estPoste: false, code: "", profondeur: 1, ...l })),
     ].map((l, i) => ({ ...l, ordre: i }));
     setEnCours(true);
     try {
-      await ecrireDevisElec({ chantierId, nomDevis: nom, nomFichier: "", sequence, ordre: nbDevisExistants });
+      const devisId = await ecrireDevisElec({ chantierId, nomDevis: nom, nomFichier: "", sequence, ordre: nbDevisExistants });
+      for (const [tacheId, h] of prelevements) {
+        await updateDoc(doc(db, "sites", chantierId), new FieldPath("prelevementsMoSup", devisId + "||" + tacheId), h);
+      }
       onClose();
     } catch (err) {
       setErreur("Erreur pendant la création : " + err.message);
@@ -119,6 +127,11 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
                     />
                   </td>
                   <td>
+                    {def.tacheSup ? (
+                      <span className="simple-list-meta">
+                        Tâche « {def.tacheSup === "suivi" ? "Suivi de chantier" : "Étude"} »
+                      </span>
+                    ) : (
                     <select value={heures[def.cle].tache} onChange={(e) => majHeures(def.cle, "tache", e.target.value)}>
                       {LISTE_TYPES_FO.map((t) => (
                         <option key={t.code} value={t.code}>
@@ -126,6 +139,7 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
                         </option>
                       ))}
                     </select>
+                    )}
                   </td>
                   <td>
                     <select value={heures[def.cle].type} onChange={(e) => majHeures(def.cle, "type", e.target.value)}>
