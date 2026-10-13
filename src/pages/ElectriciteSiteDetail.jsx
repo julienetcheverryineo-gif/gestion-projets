@@ -22,6 +22,7 @@ import SiteFormModal, { formatStatutChantier } from "../components/SiteFormModal
 import { libelleTypeActivite, normaliserTypeActivite, estLigneMoIgnoree, estActiviteIgnoree, CODES_TYPES_ACTIVITE_CONNUS, inclutMaterielInterne } from "../lib/typesActiviteSap";
 import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
+import NouvelleCommandeModal from "../components/NouvelleCommandeModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
 import { codeTypeFo, codeMo, libelleTypeFo, resumerPoste } from "../lib/exportGoat";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
@@ -2160,6 +2161,7 @@ export default function ElectriciteSiteDetail() {
 
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
+  const [afficherNouvelleCommande, setAfficherNouvelleCommande] = useState(false);
   const [suppressionEnCours, setSuppressionEnCours] = useState(false);
 
   const lignes = toutesLignes
@@ -2897,6 +2899,9 @@ export default function ElectriciteSiteDetail() {
             <>
               <button className="btn-ghost" onClick={() => setAfficherFormulaire(true)}>
                 ✎ Modifier le chantier
+              </button>
+              <button className="btn-ghost" onClick={() => setAfficherNouvelleCommande(true)}>
+                + Nouvelle commande sans minute
               </button>
               <button className="btn-primary" onClick={() => setAfficherImport(true)}>
                 Importer / mettre à jour une minute
@@ -3696,6 +3701,14 @@ export default function ElectriciteSiteDetail() {
           utilisateurs={utilisateurs}
           service="electricite"
           onClose={() => setAfficherFormulaire(false)}
+        />
+      )}
+
+      {afficherNouvelleCommande && (
+        <NouvelleCommandeModal
+          chantierId={chantierId}
+          nbDevisExistants={devis.length}
+          onClose={() => setAfficherNouvelleCommande(false)}
         />
       )}
 
