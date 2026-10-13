@@ -52,7 +52,7 @@ export const normaliserOtp = (v) => String(v ?? "").toUpperCase().replace(/[\s.]
 function colonnesDepuisEntete(lignes) {
   const entete = lignes.find((l) => l.startsWith("|") && /doc\. vente/i.test(l) && /elt d'otp/i.test(l));
   if (!entete) return COL_DEFAUT;
-  const h = entete.split("|").map((x) => x.trim().toLowerCase());
+  const h = entete.split("|").map((x) => x.replace(/\s+/g, " ").trim().toLowerCase());
   const trouve = (re, defaut, depuis = 0) => {
     const i = h.findIndex((x, k) => k >= depuis && re.test(x));
     return i >= 0 ? i : defaut;
@@ -74,10 +74,10 @@ function colonnesDepuisEntete(lignes) {
     typeFacture,
     libelleFacture: typeFacture + 1,
     dateFacture: trouve(/^date fact\.$/, COL_DEFAUT.dateFacture),
-    montantTtc: trouve(/^mt facttc$/, COL_DEFAUT.montantTtc),
+    montantTtc: trouve(/^mt fact ?ttc$/, COL_DEFAUT.montantTtc),
     numeroFacture: trouve(/^facture$/, COL_DEFAUT.numeroFacture),
     creeLe: trouve(/^cr.{1,4}\s*le$/, COL_DEFAUT.creeLe),
-    dateEchF: trouve(/^dte .{1,4}ch f$/, COL_DEFAUT.dateEchF),
+    dateEchF: trouve(/^dte .{1,4}ch.{1,4} f$/, COL_DEFAUT.dateEchF),
     pieceRegl: trouve(/^pi.{1,4}ce r.{1,4}gl$/, COL_DEFAUT.pieceRegl),
     dateRegl: trouve(/^date r.{1,4}gl\.$/, COL_DEFAUT.dateRegl),
     echeance: trouve(/^eche regl\.$/, COL_DEFAUT.echeance),
