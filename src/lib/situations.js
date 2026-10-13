@@ -61,7 +61,8 @@ export function construireLignesSituation(devisList, toutesLignes, chantierId, g
     const duDevis = lignes
       .filter((l) => l.devisId === d.id)
       .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
-    if (duDevis.length === 0) return;
+    const vendu = Number(d.montantVendu) || 0;
+    if (duDevis.length === 0 && !vendu) return;
     if (devisList.length > 1) rows.push({ type: "chapitre", id: "devis-" + d.id, texte: d.nom || "Devis" });
     cible = null;
     teteParGroupe.clear();
@@ -138,6 +139,20 @@ export function construireLignesSituation(devisList, toutesLignes, chantierId, g
       rows.push(rowLigne);
       cible = rowLigne;
     });
+    // Commande saisie sans minute : montant vendu porté par le devis, facturable comme une ligne.
+    if (vendu > 0) {
+      rows.push({
+        suivi: agregerSuivi(duDevis.filter((l) => !l.estPoste)),
+        type: "ligne",
+        id: "vendu-" + d.id,
+        code: "",
+        texte: d.nom || "Commande",
+        unite: "Ens",
+        quantite: 1,
+        pu: vendu,
+        total: arrondi2(vendu),
+      });
+    }
   });
   return rows;
 }
