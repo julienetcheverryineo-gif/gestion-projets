@@ -732,7 +732,7 @@ export default function BilanFinancier({
             <Ligne cols={cols} classe="bf-total" nom="Total dépenses affaire" champ="dep" fort />
             <Ligne cols={cols} classe="bf-fg" nom={<>Frais généraux ({champPct("fg")} % CA)</>} champ="fg" sansReel />
             <Ligne cols={cols} classe={"bf-resultat" + (atterr.nette < 0 ? " bf-perte" : "")} tonePos nom="Marge nette" champ="nette" fort sansReel />
-            <Ligne cols={cols} classe={"bf-resultat" + (atterr.nette < 0 ? " bf-perte" : "")} tonePos nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 1) + " %"} />
+            <Ligne cols={cols} classe={"bf-resultat" + (atterr.nette < 0 ? " bf-perte" : "")} tonePos nom="k de vente (marge nette ÷ CA)" champ="k" fort sansReel fmt={(v) => num(v * 100, 2) + " %"} />
           </tbody>
         </table>
       </div>
@@ -812,10 +812,10 @@ export default function BilanFinancier({
           return (
             <div className="bf-eat-synthese" style={{ marginTop: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
               <div>
-                Marge annoncée (prévu) : <strong>{eur(prevuEat.nette)}</strong> · k {kPrevu === null ? "—" : num(kPrevu * 100, 1) + " %"}
+                Marge annoncée (prévu) : <strong>{eur(prevuEat.nette)}</strong> · k {kPrevu === null ? "—" : num(kPrevu * 100, 2) + " %"}
               </div>
               <div>
-                Marge avec EAT réaliste : <strong style={classeNeg(atterrEat.nette)}>{eur(atterrEat.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 1) + " %"}
+                Marge avec EAT réaliste : <strong style={classeNeg(atterrEat.nette)}>{eur(atterrEat.nette)}</strong> · k {kAtt === null ? "—" : num(kAtt * 100, 2) + " %"}
               </div>
               {justificatif(1, atterrEat, ecart < 0 ? "Pourquoi la marge se dégrade" : "Pourquoi la marge s'améliore")}
             </div>
@@ -912,7 +912,7 @@ export default function BilanFinancier({
               )}
               <div>
                 Marge nette obtenue : <strong style={classeNeg(res.col.nette)}>{eur(res.col.nette)}</strong> · k{" "}
-                {res.col.k === null ? "—" : num(res.col.k * 100, 1) + " %"}
+                {res.col.k === null ? "—" : num(res.col.k * 100, 2) + " %"}
                 {cible !== null && <span className="simple-list-meta"> (cible : {eur(cible)})</span>}
               </div>
               {!res.atteignable && res.degrade ? (
@@ -922,7 +922,7 @@ export default function BilanFinancier({
               ) : !res.atteignable ? (
                 <div style={{ color: ROUGE, marginTop: 4 }}>
                   Objectif inatteignable : même sans aucune dépense supplémentaire, la marge maximale est de {eur(res.col.nette)}
-                  {res.col.k === null ? "" : " (" + num(res.col.k * 100, 1) + " %)"}. Il faudrait du CA en plus (avenant) ou revoir les paramètres FOA.
+                  {res.col.k === null ? "" : " (" + num(res.col.k * 100, 2) + " %)"}. Il faudrait du CA en plus (avenant) ou revoir les paramètres FOA.
                 </div>
               ) : res.degrade ? (
                 <div className="simple-list-meta" style={{ marginTop: 4 }}>
@@ -933,7 +933,7 @@ export default function BilanFinancier({
                 <div className="simple-list-meta" style={{ marginTop: 4 }}>L'EAT réaliste suffit à atteindre cette marge : déclarez-le tel quel.</div>
               ) : (
                 <div className="simple-list-meta" style={{ marginTop: 4 }}>
-                  Cela suppose de ne dépenser que {num(res.f * 100, 1)} % du reste à faire au budget, sur toutes les lignes
+                  Cela suppose de ne dépenser que {num(res.f * 100, 2)} % du reste à faire au budget, sur toutes les lignes
                   (réel déjà dépensé conservé). À défendre : chaque réduction doit correspondre à une économie réellement attendue.
                 </div>
               )}
@@ -952,7 +952,7 @@ export default function BilanFinancier({
           <>
             {affichage === "eatAnnonce" && tableauEat(
               "🛡️ EAT à déclarer pour tenir la marge annoncée",
-              "Même marge nette que le prévu (" + eur(prevuEat.nette) + ", k " + (prevuEat.k === null ? "—" : num(prevuEat.k * 100, 1) + " %") + ") : l'outil calcule la part du reste à faire à ne pas dépasser, ligne par ligne, avec le FRA, les frais généraux et le matériel interne recalculés.",
+              "Même marge nette que le prévu (" + eur(prevuEat.nette) + ", k " + (prevuEat.k === null ? "—" : num(prevuEat.k * 100, 2) + " %") + ") : l'outil calcule la part du reste à faire à ne pas dépasser, ligne par ligne, avec le FRA, les frais généraux et le matériel interne recalculés.",
               resAnnonce,
               prevuEat.nette
             )}
@@ -962,7 +962,7 @@ export default function BilanFinancier({
               <input
                 type="text"
                 inputMode="decimal"
-                placeholder={prevuEat.k === null ? "ex. 8" : num(prevuEat.k * 100, 1)}
+                placeholder={prevuEat.k === null ? "ex. 8" : num(prevuEat.k * 100, 2)}
                 value={kAffiche}
                 disabled={!onChangerMargeCibleEat}
                 onChange={(e) => setKCible(e.target.value)}
@@ -981,7 +981,7 @@ export default function BilanFinancier({
             </div>
             {resCible
               ? tableauEat(
-                  "🎯 EAT à déclarer pour " + num(kSaisi * 100, 1) + " % de marge nette",
+                  "🎯 EAT à déclarer pour " + num(kSaisi * 100, 2) + " % de marge nette",
                   "Marge nette cible : " + eur(kSaisi * base) + " sur un CA de " + eur(base) + ".",
                   resCible,
                   kSaisi * base
