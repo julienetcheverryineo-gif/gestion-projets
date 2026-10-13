@@ -15,39 +15,46 @@ const nombre = (v) => {
 
 // suivi / étude : versées aux tâches « Suivi de chantier » / « Étude » du Récap MO
 // (prises sur « Sans tâche ») ; chantier : rattachées à une tâche (type de FO) au choix.
-const HEURES = [
-  { cle: "suivi", libelle: "Heures de suivi", defaut: "53", tacheSup: "suivi" },
-  { cle: "be", libelle: "Heures de bureau d'étude", defaut: "61", tacheSup: "etude" },
-  { cle: "chantier", libelle: "Heures de chantier", defaut: "PR", tacheSup: null },
-];
+const CATEGORIES = {
+  suivi: { libelle: "Suivi", designation: "Heures de suivi", profil: "53", tacheSup: "suivi" },
+  etude: { libelle: "Bureau d'étude", designation: "Heures de bureau d'étude", profil: "61", tacheSup: "etude" },
+  chantier: { libelle: "Chantier", designation: "Heures de chantier", profil: "PR", tacheSup: null },
+};
+const nouvelleLigneHeures = (cat) => ({ cat, h: "", profil: CATEGORIES[cat].profil, tache: "4" });
 
 export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, onClose }) {
   const [nom, setNom] = useState("");
-  const [heures, setHeures] = useState(() =>
-    Object.fromEntries(HEURES.map((h) => [h.cle, { h: "", pv: "", type: h.defaut, tache: "4" }]))
-  );
+  const [heures, setHeures] = useState(() => Object.keys(CATEGORIES).map(nouvelleLigneHeures));
   const [materiel, setMateriel] = useState([{ designation: "", type: "14", cout: "" }]);
   const [pvTotal, setPvTotal] = useState("");
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
 
-  const majHeures = (cle, champ, v) => setHeures((p) => ({ ...p, [cle]: { ...p[cle], [champ]: v } }));
+  const majHeures = (i, champ, v) =>
+    setHeures((p) =>
+      p.map((l, k) => {
+        if (k !== i) return l;
+        // Changer de catégorie reprend le profil par défaut de la nouvelle catégorie.
+        return champ === "cat" ? { ...l, cat: v, profil: CATEGORIES[v].profil } : { ...l, [champ]: v };
+      })
+    );
   const majMat = (i, champ, v) => setMateriel((p) => p.map((m, k) => (k === i ? { ...m, [champ]: v } : m)));
 
   const creer = async () => {
     if (!nom.trim()) return setErreur("Donne un nom à la commande.");
     const lignes = [];
     const prelevements = [];
-    HEURES.forEach((def) => {
-      const s = heures[def.cle];
+    const parTacheSup = new Map();
+    heures.forEach((s) => {
+      const def = CATEGORIES[s.cat];
       const h = nombre(s.h);
       if (!h) return;
-      const t = LISTE_TYPES_MO.find((x) => x.code === s.type);
+      const t = LISTE_TYPES_MO.find((x) => x.code === s.profil);
       const tache = def.tacheSup ? null : LISTE_TYPES_FO.find((x) => x.code === s.tache);
-      if (def.tacheSup) prelevements.push([def.tacheSup, h]);
+      if (def.tacheSup) parTacheSup.set(def.tacheSup, (parTacheSup.get(def.tacheSup) || 0) + h);
       lignes.push({
         typeFo: tache ? valeurType(tache.code, tache.label) : "",
-        designation: def.libelle,
+        designation: def.designation,
         unite: "h",
         quantite: h,
         typeMo: t ? valeurType(t.code, t.label) : "",
@@ -55,6 +62,7 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
         tempsTotalHeures: h,
       });
     });
+    parTacheSup.forEach((h, id) => prelevements.push([id, h]));
     materiel.forEach((m) => {
       const cout = nombre(m.cout);
       if (!m.designation.trim() && !cout) return;
@@ -108,32 +116,45 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
 
         <h3 className="nc-titre">Heures</h3>
         <div className="nc-grid nc-heures">
-          <span className="nc-th"></span>
+          <span className="nc-th">Type</span>
           <span className="nc-th">Heures</span>
           <span className="nc-th">Tâche</span>
           <span className="nc-th">Profil</span>
-          {HEURES.map((def) => (
-            <Fragment key={def.cle}>
-              <span className="nc-lib">{def.libelle}</span>
-              <input
-                inputMode="decimal"
-                placeholder="0"
-                value={heures[def.cle].h}
-                onChange={(e) => majHeures(def.cle, "h", e.target.value)}
-              />
-              {def.tacheSup ? (
-                <span className="nc-fixe">{def.tacheSup === "suivi" ? "Suivi de chantier" : "Étude"}</span>
+          <span></span>
+          {heures.map((l, i) => (
+            <Fragment key={i}>
+              <select value={l.cat} onChange={(e) => majHeures(i, "cat", e.target.value)}>
+                {Object.entries(CATEGORIES).map(([cle, c]) => (
+                  <option key={cle} value={cle}>
+                    {c.libelle}
+                  </option>
+                ))}
+              </select>
+              <input inputMode="decimal" placeholder="0" value={l.h} onChange={(e) => majHeures(i, "h", e.target.value)} />
+              {CATEGORIES[l.cat].tacheSup ? (
+                <span className="nc-fixe">{CATEGORIES[l.cat].tacheSup === "suivi" ? "Suivi de chantier" : "Étude"}</span>
               ) : (
-                <select value={heures[def.cle].tache} onChange={(e) => majHeures(def.cle, "tache", e.target.value)}>
+                <select value={l.tache} onChange={(e) => majHeures(i, "tache", e.target.value)}>
                   {options(LISTE_TYPES_FO)}
                 </select>
               )}
-              <select value={heures[def.cle].type} onChange={(e) => majHeures(def.cle, "type", e.target.value)}>
+              <select value={l.profil} onChange={(e) => majHeures(i, "profil", e.target.value)}>
                 {options(LISTE_TYPES_MO)}
               </select>
+              {heures.length > 1 ? (
+                <button className="nc-x" title="Retirer" onClick={() => setHeures((p) => p.filter((_, k) => k !== i))}>
+                  ×
+                </button>
+              ) : (
+                <span />
+              )}
             </Fragment>
           ))}
         </div>
+
+        <button className="btn-ghost nc-ajout" onClick={() => setHeures((p) => [...p, nouvelleLigneHeures("chantier")])}>
+          + Ligne d'heures
+        </button>
 
         <h3 className="nc-titre">Matériel</h3>
         <div className="nc-grid nc-materiel">

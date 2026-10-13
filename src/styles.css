@@ -4418,7 +4418,7 @@ table.af-table.table-recap {
 .nc-titre { margin: 22px 0 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted, #667); font-weight: 600; }
 .nc-grid { display: grid; gap: 8px 10px; align-items: center; }
 .nc-entete { grid-template-columns: 1fr 170px; }
-.nc-heures { grid-template-columns: 150px 80px minmax(0, 1fr) minmax(0, 1fr); }
+.nc-heures { grid-template-columns: 130px 80px minmax(0, 1fr) minmax(0, 1fr) 28px; }
 .nc-materiel { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 120px 28px; }
 .nc-grid input, .nc-grid select { width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 7px 9px; font-size: 0.9rem; height: auto; }
 .nc-th { font-size: 0.72rem; color: var(--text-muted, #667); }
@@ -4428,7 +4428,7 @@ table.af-table.table-recap {
 .nc-ajout { margin-top: 8px; font-size: 0.85rem; padding: 4px 10px; }
 .nc-modal .modal-actions { margin-top: 22px; }
 @media (max-width: 640px) {
-  .nc-heures { grid-template-columns: 1fr 80px; }
+  .nc-heures { grid-template-columns: 1fr 80px 28px; }
   .nc-materiel { grid-template-columns: 1fr 100px 28px; }
   .nc-materiel > :nth-child(2), .nc-materiel > select { grid-column: 1 / -1; }
 }

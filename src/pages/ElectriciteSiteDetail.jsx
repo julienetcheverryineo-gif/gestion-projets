@@ -1520,7 +1520,7 @@ function PanneauSap({ otp, achats, heures, onEnvoyerTaches }) {
         {onEnvoyerTaches && (
           <button
             className="btn-ghost"
-            title="Créer les tâches de tous les devis de ce chantier dans SAP (ZCA_TACHES)"
+            title="Créer les tâches de tous les devis de ce chantier dans SAP (ZCA_TASKS)"
             onClick={onEnvoyerTaches}
           >
             <IconeSap /> Tâches vers SAP

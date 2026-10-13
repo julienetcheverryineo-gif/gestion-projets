@@ -214,7 +214,7 @@ export const definirAutoActif = (actif) => {
   }
 };
 
-// Envoi d'un lot de tâches vers ZCA_TACHES : l'appli écrit le lot dans le
+// Envoi d'un lot de tâches vers ZCA_TASKS : l'appli écrit le lot dans le
 // dossier d'export (UTF-16, pour garder les accents), lance le gestionnaire
 // SAP puis attend son compte rendu. Doit être appelée depuis un clic (la
 // permission d'écriture sur le dossier est demandée au navigateur).

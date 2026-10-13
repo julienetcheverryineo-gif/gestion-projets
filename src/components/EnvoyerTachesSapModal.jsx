@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { autoriser, choisirDossier, dossierSupporte, lireDossierMemorise } from "../lib/dossierExportSap";
 import { envoyerTachesSap, lireParamsSap } from "../lib/extractionSap";
 
-// Envoi des tâches du chantier vers SAP (transaction ZCA_TACHES) : on liste
+// Envoi des tâches du chantier vers SAP (transaction ZCA_TASKS) : on liste
 // les tâches utilisées dans les devis, l'utilisateur coche celles à créer,
 // puis le gestionnaire SAP installé sur le poste les saisit et les enregistre.
 // Les tâches déjà présentes dans SAP pour ce compte ne sont pas recréées.
@@ -50,7 +50,7 @@ export default function EnvoyerTachesSapModal({ compte, taches, onClose }) {
       <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
         <h2>Envoyer les tâches vers SAP</h2>
         <p className="simple-list-meta" style={{ marginBottom: 10 }}>
-          Transaction ZCA_TACHES, compte <strong>{compte}</strong>. Les tâches déjà présentes dans SAP
+          Transaction ZCA_TASKS, compte <strong>{compte}</strong>. Les tâches déjà présentes dans SAP
           ne sont pas recréées. Libellés limités à 40 caractères.
         </p>
         {taches.length === 0 ? (

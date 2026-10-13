@@ -961,7 +961,7 @@ Sub ExtraireCji3()
   Terminer "CJI3", ""
 End Sub
 
-' ---- Test d'ecriture : transaction ZCA_TACHES (saisie SANS enregistrement) ----
+' ---- Test d'ecriture : transaction ZCA_TASKS (saisie SANS enregistrement) ----
 Sub Collecter(obj, prof, sortie)
   Dim i, n, t, ch, id, tx, enf, coll, msg
   If prof > 14 Then Exit Sub
@@ -1029,7 +1029,7 @@ Function ScannerEcran(nomFichier)
   ScannerEcran = CHAMPS_SAISIE.Count
 End Function
 
-' Description de la grille ALV de ZCA_TACHES : colonnes, lignes, boutons.
+' Description de la grille ALV de ZCA_TASKS : colonnes, lignes, boutons.
 Sub DecrireGrille(sortie)
   Dim g, i, n, col, r, ligne, nr, tit
   If Not Existe("wnd[0]/shellcont/shell") Then Exit Sub
@@ -1112,35 +1112,35 @@ End Sub
 Sub EcrireTaches()
   Dim n, g, idChamp, bouton, nl, ligne, i, j, nc, col, cibles, barre, msgFenetre
   Dim colCode, colLib, existants, aEnvoyer, cree, deja, code, lib, nbAvant
-  EcrireStatut "EN_COURS", "Ouverture de ZCA_TACHES"
-  session.findById("wnd[0]/tbar[0]/okcd").Text = "/nZCA_TACHES"
+  EcrireStatut "EN_COURS", "Ouverture de ZCA_TASKS"
+  session.findById("wnd[0]/tbar[0]/okcd").Text = "/nZCA_TASKS"
   session.findById("wnd[0]/tbar[0]/btn[0]").press
   WScript.Sleep 2000
-  n = ScannerEcran("zca-taches-ecran-1.txt")
+  n = ScannerEcran("zca-tasks-ecran-1.txt")
   If Existe("wnd[0]/usr/ctxtP_CHARGE") Then
     idChamp = "wnd[0]/usr/ctxtP_CHARGE"
   ElseIf n > 0 Then
     idChamp = CHAMPS_SAISIE(0)
   Else
-    Fin "ZCA_TACHES : champ Imputation introuvable (voir zca-taches-ecran-1.txt).", 48
+    Fin "ZCA_TASKS : champ Imputation introuvable (voir zca-tasks-ecran-1.txt).", 48
   End If
   session.findById(idChamp).Text = LISTE_OTP(0)
   session.findById("wnd[0]/tbar[1]/btn[8]").press
   WScript.Sleep 2500
-  n = ScannerEcran("zca-taches-ecran-2.txt")
-  If Not Existe(GRILLE_TACHES) Then Fin "ZCA_TACHES : la grille des taches n'est pas affichee (voir zca-taches-ecran-2.txt).", 48
+  n = ScannerEcran("zca-tasks-ecran-2.txt")
+  If Not Existe(GRILLE_TACHES) Then Fin "ZCA_TASKS : la grille des taches n'est pas affichee (voir zca-tasks-ecran-2.txt).", 48
   Set g = session.findById(GRILLE_TACHES)
   nbAvant = g.RowCount
 
   bouton = BoutonGrille(g, "APPEND")
   If bouton = "" Then bouton = BoutonGrille(g, "INSERT_ROW")
   If bouton = "" Then bouton = BoutonGrille(g, "Ajouter|Cr.er|Nouvelle|Ins.rer")
-  If bouton = "" Then Fin "ZCA_TACHES : aucun bouton d'ajout de ligne trouve dans la grille (voir zca-taches-ecran-2.txt).", 48
+  If bouton = "" Then Fin "ZCA_TASKS : aucun bouton d'ajout de ligne trouve dans la grille (voir zca-tasks-ecran-2.txt).", 48
 
   ' Une premiere ligne vide sert a reperer les colonnes de saisie (code, libelle).
   g.pressToolbarButton bouton
   WScript.Sleep 1200
-  If Existe("wnd[1]") Then Fin "ZCA_TACHES : une fenetre s'est ouverte apres l'ajout de ligne.", 48
+  If Existe("wnd[1]") Then Fin "ZCA_TASKS : une fenetre s'est ouverte apres l'ajout de ligne.", 48
   Set g = session.findById(GRILLE_TACHES)
   If g.RowCount > nbAvant Then
     ligne = g.CurrentCellRow
@@ -1153,7 +1153,7 @@ Sub EcrireTaches()
     col = g.ColumnOrder.Item(CLng(i))
     If g.GetCellChangeable(ligne, col) Then cibles.Add cibles.Count, col
   Next
-  If cibles.Count < 2 Then Fin "ZCA_TACHES : moins de 2 colonnes modifiables sur la nouvelle ligne.", 48
+  If cibles.Count < 2 Then Fin "ZCA_TASKS : moins de 2 colonnes modifiables sur la nouvelle ligne.", 48
   colCode = cibles(0)
   colLib = cibles(1)
 
@@ -1176,7 +1176,7 @@ Sub EcrireTaches()
   Next
   If aEnvoyer.Count = 0 Then
     SESSION_CREEE = False
-    Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & " - rien a creer, les " & deja & " tache(s) existent deja. Une ligne vide non enregistree reste dans la fenetre SAP : fermez-la sans enregistrer.", 64
+    Fin "ZCA_TASKS : compte " & LISTE_OTP(0) & " - rien a creer, les " & deja & " tache(s) existent deja. Une ligne vide non enregistree reste dans la fenetre SAP : fermez-la sans enregistrer.", 64
   End If
 
   cree = 0
@@ -1197,7 +1197,7 @@ Sub EcrireTaches()
     cree = cree + 1
     EcrireStatut "EN_COURS", "Saisie " & cree & "/" & aEnvoyer.Count
   Next
-  n = ScannerEcran("zca-taches-ecran-3.txt")
+  n = ScannerEcran("zca-tasks-ecran-3.txt")
 
   session.findById("wnd[0]").sendVKey 11
   WScript.Sleep 1800
@@ -1208,7 +1208,7 @@ Sub EcrireTaches()
     Err.Clear
     On Error GoTo 0
   End If
-  n = ScannerEcran("zca-taches-ecran-4.txt")
+  n = ScannerEcran("zca-tasks-ecran-4.txt")
   barre = ""
   On Error Resume Next
   barre = session.findById("wnd[0]/sbar").Text
@@ -1216,7 +1216,7 @@ Sub EcrireTaches()
   On Error GoTo 0
   RetourAccueil
   SESSION_CREEE = False
-  Fin "ZCA_TACHES : compte " & LISTE_OTP(0) & ", " & cree & " tache(s) saisie(s) et enregistree(s)" & IIf2(deja > 0, ", " & deja & " deja presente(s)", "") & ". Message SAP : " & barre & msgFenetre, 64
+  Fin "ZCA_TASKS : compte " & LISTE_OTP(0) & ", " & cree & " tache(s) saisie(s) et enregistree(s)" & IIf2(deja > 0, ", " & deja & " deja presente(s)", "") & ". Message SAP : " & barre & msgFenetre, 64
 End Sub
 
 Function IIf2(c, a, b)
@@ -1328,7 +1328,7 @@ End Function
 ' Charge et VALIDE les parametres du lien (liste blanche de caracteres) :
 ' une page quelconque peut ouvrir ce lien, rien d'autre que ces valeurs
 ' ne doit pouvoir atteindre SAP ou le disque.
-' Lot de taches a envoyer dans ZCA_TACHES : fichier taches-entree.txt (Unicode)
+' Lot de taches a envoyer dans ZCA_TASKS : fichier taches-entree.txt (Unicode)
 ' ecrit par l'application dans le dossier d'export. 1re ligne : compte ;
 ' ensuite une tache par ligne : code <tab> libelle.
 Function ChargerLot()
@@ -1453,7 +1453,7 @@ Function ChargerDepuisUrl(url)
       Exit Function
     End If
     If Not (d.Exists("o") And d.Exists("c") And d.Exists("l")) Then
-      ChargerDepuisUrl = "Parametres ZCA_TACHES manquants."
+      ChargerDepuisUrl = "Parametres ZCA_TASKS manquants."
       Exit Function
     End If
     If Not Valide("^[A-Z0-9._-]{4,24}$", d("o")) Then
