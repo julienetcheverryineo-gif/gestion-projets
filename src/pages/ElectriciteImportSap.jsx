@@ -630,8 +630,17 @@ function MontantsZonePanel({ peutModifier }) {
 
 const LIBELLE_SEUL = (c) => libelleTypeActivite(c).replace(/ \([^)]*\)$/, "").replace(c, "");
 
+const ONGLETS = [
+  { id: "import", label: "📥 Import" },
+  { id: "consultation", label: "🔎 Consultation" },
+  { id: "taux", label: "💶 Taux horaires" },
+  { id: "foa", label: "📐 Paramètres FOA" },
+  { id: "zones", label: "🚐 Zones" },
+];
+
 export default function ElectriciteImportSap() {
   const { isAdmin, profile } = useAuth();
+  const [onglet, setOnglet] = useState("import");
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
 
   if (!peutGerer) {
@@ -659,20 +668,30 @@ export default function ElectriciteImportSap() {
         </div>
       </header>
 
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {ONGLETS.map((o) => (
+          <button key={o.id} className={onglet === o.id ? "btn-primary" : "btn-ghost"} onClick={() => setOnglet(o.id)}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+
       <div className="page-sections" style={{ display: "grid", gap: 20 }}>
-        <ScriptsSapPanel
-          importManuel={
-            <>
-              <BlocImport type="fo" config={TYPES.fo} />
-              <BlocImport type="mo" config={TYPES.mo} />
-            </>
-          }
-          historique={<HistoriqueImports />}
-        />
-        <TauxHorairesPanel peutModifier={Boolean(isAdmin)} />
-        <ParametresFoaPanel peutModifier={Boolean(isAdmin)} />
-        <MontantsZonePanel peutModifier={Boolean(isAdmin)} />
-        <VueConsultation />
+        {onglet === "import" && (
+          <ScriptsSapPanel
+            importManuel={
+              <>
+                <BlocImport type="fo" config={TYPES.fo} />
+                <BlocImport type="mo" config={TYPES.mo} />
+              </>
+            }
+            historique={<HistoriqueImports />}
+          />
+        )}
+        {onglet === "consultation" && <VueConsultation />}
+        {onglet === "taux" && <TauxHorairesPanel peutModifier={Boolean(isAdmin)} />}
+        {onglet === "foa" && <ParametresFoaPanel peutModifier={Boolean(isAdmin)} />}
+        {onglet === "zones" && <MontantsZonePanel peutModifier={Boolean(isAdmin)} />}
       </div>
     </div>
   );
