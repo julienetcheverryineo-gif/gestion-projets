@@ -4411,3 +4411,24 @@ table.af-table.table-recap {
   font-size: 1.1rem;
   letter-spacing: 0.05em;
 }
+
+/* Fenêtre « Nouvelle commande sans minute » : grille épurée */
+.nc-modal { max-width: 780px; width: 94vw; max-height: 92vh; overflow-y: auto; }
+.nc-modal h2 { margin: 0 0 16px; }
+.nc-titre { margin: 22px 0 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted, #667); font-weight: 600; }
+.nc-grid { display: grid; gap: 8px 10px; align-items: center; }
+.nc-entete { grid-template-columns: 1fr 170px; }
+.nc-heures { grid-template-columns: 150px 80px minmax(0, 1fr) minmax(0, 1fr); }
+.nc-materiel { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 120px 28px; }
+.nc-grid input, .nc-grid select { width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 7px 9px; font-size: 0.9rem; height: auto; }
+.nc-th { font-size: 0.72rem; color: var(--text-muted, #667); }
+.nc-lib { font-size: 0.9rem; font-weight: 500; }
+.nc-fixe { font-size: 0.9rem; padding: 7px 9px; color: var(--text-muted, #667); }
+.nc-x { border: none; background: transparent; font-size: 1.2rem; cursor: pointer; color: var(--danger, #c0392b); padding: 0; }
+.nc-ajout { margin-top: 8px; font-size: 0.85rem; padding: 4px 10px; }
+.nc-modal .modal-actions { margin-top: 22px; }
+@media (max-width: 640px) {
+  .nc-heures { grid-template-columns: 1fr 80px; }
+  .nc-materiel { grid-template-columns: 1fr 100px 28px; }
+  .nc-materiel > :nth-child(2), .nc-materiel > select { grid-column: 1 / -1; }
+}

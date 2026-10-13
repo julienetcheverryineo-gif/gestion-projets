@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { doc, FieldPath, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { ecrireDevisElec } from "../lib/importCroise";
@@ -87,9 +87,6 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
     }
   };
 
-  const carte = { border: "1px solid var(--border, #d8dee4)", borderRadius: 10, padding: 14, marginTop: 14 };
-  const champ = { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--text-muted, #667)" };
-  const ligne = { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", padding: "10px 0", borderTop: "1px solid var(--border, #e6eaee)" };
   const options = (liste) =>
     liste.map((t) => (
       <option key={t.code} value={t.code}>
@@ -99,89 +96,74 @@ export default function NouvelleCommandeModal({ chantierId, nbDevisExistants, on
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 860, width: "94vw", maxHeight: "92vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ marginTop: 0 }}>Nouvelle commande sans minute</h2>
+      <div className="modal nc-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Nouvelle commande sans minute</h2>
 
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-          <label style={{ ...champ, flex: "1 1 320px" }}>
-            Nom de la commande
-            <input value={nom} onChange={(e) => setNom(e.target.value)} autoFocus />
-          </label>
-          <label style={{ ...champ, flex: "0 0 200px" }}>
-            Montant vendu total (€ HT)
-            <input inputMode="decimal" value={pvTotal} onChange={(e) => setPvTotal(e.target.value)} />
-          </label>
+        <div className="nc-grid nc-entete">
+          <span className="nc-th">Nom de la commande</span>
+          <span className="nc-th">Vendu total (€ HT)</span>
+          <input value={nom} onChange={(e) => setNom(e.target.value)} autoFocus placeholder="Ex. JE604-005 – Ychoux" />
+          <input inputMode="decimal" value={pvTotal} onChange={(e) => setPvTotal(e.target.value)} placeholder="0" />
         </div>
 
-        <div style={carte}>
-          <h3 style={{ margin: "0 0 4px" }}>Heures</h3>
+        <h3 className="nc-titre">Heures</h3>
+        <div className="nc-grid nc-heures">
+          <span className="nc-th"></span>
+          <span className="nc-th">Heures</span>
+          <span className="nc-th">Tâche</span>
+          <span className="nc-th">Profil</span>
           {HEURES.map((def) => (
-            <div key={def.cle} style={ligne}>
-              <div style={{ flex: "1 1 150px", fontWeight: 600 }}>{def.libelle}</div>
-              <label style={{ ...champ, flex: "0 0 90px" }}>
-                Heures
-                <input
-                  inputMode="decimal"
-                  value={heures[def.cle].h}
-                  onChange={(e) => majHeures(def.cle, "h", e.target.value)}
-                />
-              </label>
-              <label style={{ ...champ, flex: "1 1 220px" }}>
-                Tâche (poste)
-                {def.tacheSup ? (
-                  <input disabled value={def.tacheSup === "suivi" ? "Suivi de chantier" : "Étude"} />
-                ) : (
-                  <select value={heures[def.cle].tache} onChange={(e) => majHeures(def.cle, "tache", e.target.value)}>
-                    {options(LISTE_TYPES_FO)}
-                  </select>
-                )}
-              </label>
-              <label style={{ ...champ, flex: "1 1 200px" }}>
-                Profil
-                <select value={heures[def.cle].type} onChange={(e) => majHeures(def.cle, "type", e.target.value)}>
-                  {options(LISTE_TYPES_MO)}
-                </select>
-              </label>
-            </div>
-          ))}
-        </div>
-
-        <div style={carte}>
-          <h3 style={{ margin: "0 0 4px" }}>Matériel</h3>
-          {materiel.map((m, i) => (
-            <div key={i} style={ligne}>
-              <label style={{ ...champ, flex: "2 1 220px" }}>
-                Désignation
-                <input value={m.designation} onChange={(e) => majMat(i, "designation", e.target.value)} />
-              </label>
-              <label style={{ ...champ, flex: "2 1 220px" }}>
-                Type de FO
-                <select value={m.type} onChange={(e) => majMat(i, "type", e.target.value)}>
+            <Fragment key={def.cle}>
+              <span className="nc-lib">{def.libelle}</span>
+              <input
+                inputMode="decimal"
+                placeholder="0"
+                value={heures[def.cle].h}
+                onChange={(e) => majHeures(def.cle, "h", e.target.value)}
+              />
+              {def.tacheSup ? (
+                <span className="nc-fixe">{def.tacheSup === "suivi" ? "Suivi de chantier" : "Étude"}</span>
+              ) : (
+                <select value={heures[def.cle].tache} onChange={(e) => majHeures(def.cle, "tache", e.target.value)}>
                   {options(LISTE_TYPES_FO)}
                 </select>
-              </label>
-              <label style={{ ...champ, flex: "0 0 120px" }}>
-                Coût d'achat (€)
-                <input inputMode="decimal" value={m.cout} onChange={(e) => majMat(i, "cout", e.target.value)} />
-              </label>
-              {materiel.length > 1 && (
-                <button className="btn-ghost btn-danger" title="Retirer cette ligne" onClick={() => setMateriel((p) => p.filter((_, k) => k !== i))}>
-                  ×
-                </button>
               )}
-            </div>
+              <select value={heures[def.cle].type} onChange={(e) => majHeures(def.cle, "type", e.target.value)}>
+                {options(LISTE_TYPES_MO)}
+              </select>
+            </Fragment>
           ))}
-          <button
-            className="btn-ghost"
-            style={{ marginTop: 6 }}
-            onClick={() => setMateriel((p) => [...p, { designation: "", type: "14", cout: "" }])}
-          >
-            + Ajouter une ligne de matériel
-          </button>
         </div>
 
+        <h3 className="nc-titre">Matériel</h3>
+        <div className="nc-grid nc-materiel">
+          <span className="nc-th">Désignation</span>
+          <span className="nc-th">Type de FO</span>
+          <span className="nc-th">Coût d'achat (€)</span>
+          <span></span>
+          {materiel.map((m, i) => (
+            <Fragment key={i}>
+              <input value={m.designation} onChange={(e) => majMat(i, "designation", e.target.value)} />
+              <select value={m.type} onChange={(e) => majMat(i, "type", e.target.value)}>
+                {options(LISTE_TYPES_FO)}
+              </select>
+              <input inputMode="decimal" placeholder="0" value={m.cout} onChange={(e) => majMat(i, "cout", e.target.value)} />
+              {materiel.length > 1 ? (
+                <button className="nc-x" title="Retirer" onClick={() => setMateriel((p) => p.filter((_, k) => k !== i))}>
+                  ×
+                </button>
+              ) : (
+                <span />
+              )}
+            </Fragment>
+          ))}
+        </div>
+        <button className="btn-ghost nc-ajout" onClick={() => setMateriel((p) => [...p, { designation: "", type: "14", cout: "" }])}>
+          + Ligne de matériel
+        </button>
+
         {erreur && <div className="form-error" style={{ marginTop: 10 }}>{erreur}</div>}
-        <div className="modal-actions" style={{ marginTop: 16 }}>
+        <div className="modal-actions">
           <button className="btn-ghost" onClick={onClose}>
             Annuler
           </button>
