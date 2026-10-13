@@ -19,12 +19,13 @@ export async function ecrireParLots(operations) {
 }
 
 // Côté Électricité : nouveau devis (onglet) + lignes + groupes.
-export async function ecrireDevisElec({ chantierId, nomDevis, nomFichier, sequence, ordre }) {
+export async function ecrireDevisElec({ chantierId, nomDevis, nomFichier, sequence, ordre, montantVendu }) {
   const devisRef = await addDoc(collection(db, "elecDevis"), {
     chantierId,
     nom: nomDevis.trim(),
     nomFichier,
     ordre,
+    ...(montantVendu ? { montantVendu } : {}),
     creeLe: serverTimestamp(),
   });
   const refs = sequence.map(() => doc(collection(db, "elecLignes")));

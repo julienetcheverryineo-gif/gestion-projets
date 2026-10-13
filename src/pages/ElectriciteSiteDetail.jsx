@@ -3226,7 +3226,9 @@ export default function ElectriciteSiteDetail() {
                   }
                   caCalcule={lignesB
                     .filter((l) => !estLigneSomme(l))
-                    .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0)}
+                    .reduce((s, l) => s + (l.pvLigne || l.pvTotal || 0), 0) +
+                    // Commandes saisies sans minute : montant vendu porté par le devis.
+                    (dSel ? [dSel] : devis).reduce((s, d) => s + (Number(d.montantVendu) || 0), 0)}
                   caSaisi={dSel ? null : chantier?.caHt ?? null}
                   caNonSoumis={0}
                   margeCibleEat={chantier?.eatMargeCible ?? null}
