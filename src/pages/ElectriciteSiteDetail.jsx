@@ -3254,13 +3254,25 @@ export default function ElectriciteSiteDetail() {
                       : null
                   }
                   foa={paramsFoa}
-                  pctSaisis={chantier?.foaPct || {}}
+                  pctSaisis={
+                    dSel
+                      ? { ...(chantier?.foaPct || {}), ...(chantier?.foaPctDevis?.[dSel.id] || {}) }
+                      : chantier?.foaPct || {}
+                  }
                   onChangerPct={
                     peutGerer
-                      ? (cle, v) =>
-                          updateDoc(doc(db, "sites", chantierId), {
-                            foaPct: { ...(chantier?.foaPct || {}), [cle]: v },
-                          })
+                      ? (cle, v) => {
+                          if (!dSel)
+                            return updateDoc(doc(db, "sites", chantierId), {
+                              foaPct: { ...(chantier?.foaPct || {}), [cle]: v },
+                            });
+                          const maj = { ...(chantier?.foaPctDevis?.[dSel.id] || {}) };
+                          if (typeof v === "number") maj[cle] = v;
+                          else delete maj[cle];
+                          return updateDoc(doc(db, "sites", chantierId), {
+                            foaPctDevis: { ...(chantier?.foaPctDevis || {}), [dSel.id]: maj },
+                          });
+                        }
                       : null
                   }
                   budgetFo={totFo.budget}
