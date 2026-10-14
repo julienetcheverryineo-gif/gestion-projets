@@ -3697,7 +3697,7 @@ export default function ElectriciteSiteDetail() {
                       if (item.kind === "poste") {
                         const l = item.ligne;
                         return (
-                          <tr key={l.id} className="elec-ligne-poste">
+                          <tr key={l.id} className={"elec-ligne-poste elec-poste-niv" + Math.min(l.profondeur || 0, 2)}>
                             <td colSpan={12} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
                               {l.code ? l.code + " — " : ""}
                               {l.designation}

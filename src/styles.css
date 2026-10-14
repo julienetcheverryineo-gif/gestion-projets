@@ -764,6 +764,30 @@ table.table-recap {
   font-weight: 600;
   background: var(--bg);
 }
+/* Chapitres / sous-chapitres hiérarchiques de la minute : bandeau sombre au
+   niveau 1, plus clair aux niveaux suivants. */
+.elec-ligne-poste.elec-poste-niv0 td {
+  background: #2b3d46;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-top: 8px solid var(--panel);
+  border-radius: 8px;
+}
+.elec-ligne-poste.elec-poste-niv1 td {
+  background: #587584;
+  color: #fff;
+  font-weight: 700;
+  border-top: 6px solid var(--panel);
+  border-radius: 8px;
+}
+.elec-ligne-poste.elec-poste-niv2 td {
+  background: color-mix(in srgb, #2b3d46 14%, var(--panel));
+  color: var(--text);
+  font-weight: 700;
+  border-top: 4px solid var(--panel);
+  border-radius: 8px;
+}
 /* Ligne informative « commentaire » (quantité 0 : précision, sous-ligne grise
    de la minute) : discrète. */
 .elec-ligne-informative td {
