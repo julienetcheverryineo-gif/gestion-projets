@@ -1,6 +1,6 @@
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { ETATS_CHANTIER, ETATS_FACTURATION, etatAutoSap } from "../lib/suiviFacturation";
+import { ETATS_FACTURATION, etatAutoSap } from "../lib/suiviFacturation";
 
 const euro = (n) =>
   Number(n || 0)
@@ -81,16 +81,6 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
       </select>
     );
   };
-  const selectEtatChantier = (valeur, onChange) => (
-    <select className="fsap-etat fsap-etat-chantier" value={valeur || ""} disabled={!peutGerer} onChange={(e) => onChange(e.target.value)}>
-      <option value="">—</option>
-      {ETATS_CHANTIER.map((e) => (
-        <option key={e} value={e}>
-          {e}
-        </option>
-      ))}
-    </select>
-  );
   const champTexte = (valeur, onSave, placeholder = "…") => (
     <input
       key={valeur}
@@ -111,8 +101,6 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
         <th>Date cde</th>
         <th>N° devis</th>
         <th className="fsap-col-desig">Désignation</th>
-        <th>État chantier</th>
-        <th className="num">Montant devis</th>
         <th>N° commande</th>
         <th className="num">Montant commande</th>
         <th>Avancement</th>
@@ -192,8 +180,6 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
                           {champTexte(l.designation ?? desigSap, (t) => majLigne(c.cle, { designation: t }))}
                           <div className="fsap-meta">{[c.nomDo, c.docVente].filter(Boolean).join(" · ")}</div>
                         </td>
-                        <td>{selectEtatChantier(l.etatChantier, (v) => majLigne(c.cle, { etatChantier: v }))}</td>
-                        <td className="num">{euro(c.montantHt)}</td>
                         <td className="nowrap">{c.reference || l.cmdClient || "—"}</td>
                         <td className="num">
                           {euro(c.montantHt)}
@@ -231,6 +217,7 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
                                       .join(" · ")}
                                   >
                                     {f.numero || dateFr(f.date)}
+                                    {" · " + euro(f.montantHt) + " €"}
                                     {c.montantHt ? " (" + pct((f.montantHt / c.montantHt) * 100) + " %)" : ""}
                                   </span>
                                 );
@@ -246,8 +233,7 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
                   })}
                   {commandes.length > 0 && (
                     <tr className="fsap-total">
-                      <td colSpan={4}>Total SAP</td>
-                      <td className="num">{euro(totalMontant)}</td>
+                      <td colSpan={3}>Total SAP</td>
                       <td></td>
                       <td className="num">{euro(totalMontant)}</td>
                       <td colSpan={3}>
@@ -257,7 +243,7 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
                   )}
                   {libres.length > 0 && (
                     <tr className="fsap-sep">
-                      <td colSpan={10}>Autres devis du fichier de suivi (sans commande SAP rattachée)</td>
+                      <td colSpan={8}>Autres devis du fichier de suivi (sans commande SAP rattachée)</td>
                     </tr>
                   )}
                   {libres.map((l, i) => (
@@ -265,8 +251,6 @@ export default function FacturationSap({ chantierId, chantier, peutGerer, factur
                       <td className="nowrap">{dateIsoFr(l.date) || "—"}</td>
                       <td className="fsap-col-devis">{champTexte(l.devis || "", (t) => majLibre(i, { devis: t }), "N° devis")}</td>
                       <td className="fsap-col-desig">{champTexte(l.designation || "", (t) => majLibre(i, { designation: t }))}</td>
-                      <td>{selectEtatChantier(l.etatChantier, (v) => majLibre(i, { etatChantier: v }))}</td>
-                      <td className="num">{l.montantDevis ? euro(l.montantDevis) : "—"}</td>
                       <td className="nowrap">{champTexte(l.commande || "", (t) => majLibre(i, { commande: t }), "N° cde")}</td>
                       <td className="num">{l.montantCommande ? euro(l.montantCommande) : "—"}</td>
                       <td>{selectAvancement(l.etat, "", (v) => majLibre(i, { etat: v }))}</td>
