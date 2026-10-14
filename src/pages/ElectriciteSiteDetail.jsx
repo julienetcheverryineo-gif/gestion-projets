@@ -924,8 +924,12 @@ function TableauRecap({
                           {g.lignes.length > 0 ? (
                             <button
                               type="button"
-                              className="btn-ghost recap-sap-toggle"
-                              title="Afficher les lignes d'achat SAP de ce type de FO"
+                              className={"btn-ghost recap-sap-toggle" + (g.lignes.some((a) => !valeurAffectationAchat(cleLigneAchat(a))) ? " recap-reel-auto" : "")}
+                              title={
+                                g.lignes.some((a) => !valeurAffectationAchat(cleLigneAchat(a)))
+                                  ? "Des achats sont en affectation automatique (Code SAP), non rattachés à un devis. Afficher les lignes d'achat SAP de ce type de FO"
+                                  : "Afficher les lignes d'achat SAP de ce type de FO"
+                              }
                               onClick={() => basculer(l.cle)}
                             >
                               {ouverts.has(l.cle) ? "▾" : "▸"} {formatEuro(g.reel)} €
