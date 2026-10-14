@@ -788,11 +788,13 @@ table.table-recap {
   border-top: 4px solid var(--panel);
   border-radius: 8px;
 }
-/* Ligne informative « commentaire » (quantité 0 : précision, sous-ligne grise
-   de la minute) : discrète. */
-.elec-ligne-informative td {
-  color: var(--text-muted);
-  font-style: italic;
+/* Ligne d'info (quantité 0 : « Barattage : », précision…) : gras surligné. */
+.elec-ligne-informative td,
+.elec-ligne-informative td.elec-td-figee {
+  color: var(--text);
+  font-weight: 700;
+  font-style: normal;
+  background: color-mix(in srgb, #ffe45c 28%, var(--panel)) !important;
 }
 /* Titres de chapitre / sous-postes du devis (lignes informatives de quantité
    ≥ 1, lignes de titre de la minute) : bien lisibles, en gras, sur fond teinté. */
