@@ -76,8 +76,8 @@ const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNIT
 // doivent rester assez généreuses pour loger une saisie (nombre + unité
 // €/h) sans chevaucher la colonne suivante.
 const LARGEUR_MIN_TYPE_LIGNE = 56;
-const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 110, 120, 120];
-const LARGEURS_COLONNES_MO_FIXES = [100, 90, 110, 120];
+const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 120, 120];
+const LARGEURS_COLONNES_MO_FIXES = [100, 110, 120];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
@@ -124,6 +124,11 @@ function formatNombre(n) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+// Quantité : sans décimales quand c'est un entier, sinon jusqu'à 2.
+function formatQte(n) {
+  return (Math.round((n || 0) * 100) / 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 }
 
 // Montants en euros : toujours 2 chiffres après la virgule.
@@ -1732,7 +1737,7 @@ function LigneDevisRow({
         </div>
       </td>
       <td className="elec-col-etroite">{l.unite || "—"}</td>
-      <td className="elec-col-etroite">{formatNombre(l.quantite)}</td>
+      <td className="elec-col-etroite" style={{ textAlign: "center" }}>{formatQte(l.quantite)}</td>
       <td className="elec-col-materiel elec-col-saisie">
         {l.informative || !coutTotalFoAffiche ? (
           "—"
@@ -1758,7 +1763,6 @@ function LigneDevisRow({
           </div>
         )}
       </td>
-      <td className="elec-col-materiel">{l.coutUnitaireFo ? formatEuro(l.coutUnitaireFo) + " €" : "—"}</td>
       <td className="elec-col-materiel elec-type-code">
         <select
           className="elec-type-select"
@@ -1808,7 +1812,6 @@ function LigneDevisRow({
           </div>
         )}
       </td>
-      <td className="elec-col-mo">{formatNombre(l.tempsUnitaire)} h</td>
       <td className="elec-col-mo elec-type-code">
         <select
           className="elec-type-select"
@@ -1929,7 +1932,6 @@ function GroupeEnteteRow({
           <span>%</span>
         </div>
       </td>
-      <td className="elec-col-materiel">—</td>
       <td className="elec-col-materiel elec-type-code">—</td>
       <td className="elec-col-materiel">{formatEuro(sommeCoutTotalFo)} €</td>
       <td className="elec-col-materiel">
@@ -1952,7 +1954,6 @@ function GroupeEnteteRow({
           <span>%</span>
         </div>
       </td>
-      <td className="elec-col-mo">—</td>
       <td className="elec-col-mo elec-type-code">—</td>
       <td className="elec-col-mo elec-type-code">—</td>
       <td className="elec-col-mo">{formatNombre(sommeTempsTotalHeures)} h</td>
@@ -2110,15 +2111,15 @@ export default function ElectriciteSiteDetail() {
   // disponible, donc le tableau rendu dépassait toujours la largeur
   // annoncée par largeurTableLignes, d'où l'ascenseur qui persistait.
   const largeursColonnesMateriel = [
-    ...LARGEURS_COLONNES_MATERIEL_FIXES.slice(0, 2),
+    ...LARGEURS_COLONNES_MATERIEL_FIXES.slice(0, 1),
     largeurTypeLigne,
-    ...LARGEURS_COLONNES_MATERIEL_FIXES.slice(2),
+    ...LARGEURS_COLONNES_MATERIEL_FIXES.slice(1),
   ];
   const largeursColonnesMo = [
-    ...LARGEURS_COLONNES_MO_FIXES.slice(0, 2),
+    ...LARGEURS_COLONNES_MO_FIXES.slice(0, 1),
     largeurTypeLigne,
     largeurTypeLigne,
-    ...LARGEURS_COLONNES_MO_FIXES.slice(2),
+    ...LARGEURS_COLONNES_MO_FIXES.slice(1),
   ];
 
   const { documents: chantiers } = useCollection("sites");
@@ -3636,10 +3637,10 @@ export default function ElectriciteSiteDetail() {
                           width: LARGEUR_ENTETE_FIGEE,
                         }}
                       />
-                      <th colSpan={5} className="elec-groupe elec-groupe-materiel">
+                      <th colSpan={4} className="elec-groupe elec-groupe-materiel">
                         Matériel
                       </th>
-                      <th colSpan={6} className="elec-groupe elec-groupe-mo">
+                      <th colSpan={5} className="elec-groupe elec-groupe-mo">
                         Main d'œuvre
                       </th>
                     </tr>
@@ -3653,7 +3654,7 @@ export default function ElectriciteSiteDetail() {
                       <th className="elec-col-etroite" style={{ width: LARGEUR_UNITE }}>
                         Unité
                       </th>
-                      <th className="elec-col-etroite" style={{ width: LARGEUR_QTE }}>
+                      <th className="elec-col-etroite" style={{ width: LARGEUR_QTE, textAlign: "center" }}>
                         Qté
                       </th>
                       <th
@@ -3662,16 +3663,13 @@ export default function ElectriciteSiteDetail() {
                       >
                         % avanc. FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[1] }}>
-                        Coût unit.
-                      </th>
                       <th className="elec-col-materiel" style={{ width: largeurTypeLigne }}>
                         FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[2] }}>
+                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[1] }}>
                         Coût total FO
                       </th>
-                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[3] }}>
+                      <th className="elec-col-materiel" style={{ width: LARGEURS_COLONNES_MATERIEL_FIXES[2] }}>
                         Matériel avanc.
                       </th>
                       <th
@@ -3680,19 +3678,16 @@ export default function ElectriciteSiteDetail() {
                       >
                         % avanc. MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[1] }}>
-                        Temps unit.
-                      </th>
                       <th className="elec-col-mo" style={{ width: largeurTypeLigne }}>
                         Tâche
                       </th>
                       <th className="elec-col-mo" style={{ width: largeurTypeLigne }}>
                         MO
                       </th>
-                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[2] }}>
+                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[1] }}>
                         Temps total
                       </th>
-                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[3] }}>
+                      <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[2] }}>
                         Heure avanc.
                       </th>
                     </tr>
@@ -3703,7 +3698,7 @@ export default function ElectriciteSiteDetail() {
                         const l = item.ligne;
                         return (
                           <tr key={l.id} className="elec-ligne-poste">
-                            <td colSpan={14} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
+                            <td colSpan={12} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
                               {l.code ? l.code + " — " : ""}
                               {l.designation}
                             </td>
