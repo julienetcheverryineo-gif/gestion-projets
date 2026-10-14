@@ -2251,6 +2251,26 @@ export default function ElectriciteSiteDetail() {
   // les % d'avancement et le type FO/MO le restent) — évite les incohérences
   // entre Qté × PU et PT que la ressaisie manuelle pouvait introduire.
 
+  // Passe tout le devis à 100 % : lignes FO et MO, étude chiffrage, tâches MO complémentaires.
+  const avancementA100 = async (d) => {
+    if (!confirm("Mettre tout l'avancement (FO et MO) du devis « " + d.nom + " » à 100 % ?")) return;
+    const ids = toutesLignes.filter((l) => l.devisId === d.id && !l.estPoste).map((l) => l.id);
+    for (let i = 0; i < ids.length; i += 400) {
+      const batch = writeBatch(db);
+      ids.slice(i, i + 400).forEach((id) => batch.update(doc(db, "elecLignes", id), { avancementFo: 100, avancementMo: 100 }));
+      await batch.commit();
+    }
+    const maj = {};
+    const etude = chantier?.etudeChiffrage?.[d.id];
+    if (etude) maj.etudeChiffrage = { ...chantier.etudeChiffrage, [d.id]: { ...etude, av: 100 } };
+    const av = { ...(chantier?.avancementsMoSup || {}) };
+    tachesMoChantier(chantier).forEach((t) => {
+      if (t.portee === "tous" || t.portee === d.id) av[d.id + "||" + t.id] = 100;
+    });
+    maj.avancementsMoSup = av;
+    await updateDoc(doc(db, "sites", chantierId), maj);
+  };
+
   const supprimerDevis = async (d) => {
     if (!confirm('Supprimer le devis « ' + d.nom + ' » et toutes ses lignes ?')) return;
     setSuppressionEnCours(true);
@@ -3450,6 +3470,9 @@ export default function ElectriciteSiteDetail() {
                   <h2>Synthèse — {devisOuvert.nom}</h2>
                   {peutGerer && (
                     <span style={{ display: "flex", gap: 8 }}>
+                    <button className="btn-ghost" onClick={() => avancementA100(devisOuvert)}>
+                      Avancement à 100 %
+                    </button>
                     <button
                       className="btn-ghost"
                       onClick={async () => {
