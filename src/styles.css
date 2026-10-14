@@ -774,21 +774,27 @@ table.table-recap {
    ≥ 1, lignes de titre de la minute) : bien lisibles, en gras, sur fond teinté. */
 .elec-ligne-titre td,
 .elec-ligne-titre td.elec-td-figee {
-  color: var(--text);
+  color: #fff;
   font-weight: 700;
   font-style: normal;
-  background: var(--panel) !important;
-  border-top: 2px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  background: #2b3d46 !important;
+  border-top: 8px solid var(--panel);
+  border-bottom: 0;
 }
 .elec-ligne-titre td:first-child {
-  box-shadow: inset 4px 0 0 var(--accent);
   font-size: 0.95rem;
   letter-spacing: 0.01em;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.elec-ligne-titre td:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 .elec-ligne-titre td select,
 .elec-ligne-titre td input {
-  opacity: 0.6;
+  opacity: 0.55;
+  color: #fff;
 }
 /* Groupement de lignes de devis : le groupe s'affiche sur sa ligne de
    tête (existante ou synthétique), avec un petit bouton +/- à droite du
