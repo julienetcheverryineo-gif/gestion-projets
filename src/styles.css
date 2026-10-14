@@ -771,13 +771,16 @@ table.table-recap {
   font-style: italic;
 }
 /* Titres de chapitre / sous-postes du devis (lignes informatives de quantité
-   ≥ 1, lignes saumon de la minute) : bien lisibles, en gras, sur fond teinté. */
+   ≥ 1, lignes de titre de la minute) : bien lisibles, en gras, sur fond teinté. */
 .elec-ligne-titre td,
 .elec-ligne-titre td.elec-td-figee {
   color: var(--text);
   font-weight: 700;
   font-style: normal;
-  background: color-mix(in srgb, #f5a67a 30%, var(--panel)) !important;
+  background: color-mix(in srgb, #4f6288 11%, var(--panel)) !important;
+}
+.elec-ligne-titre td:first-child {
+  box-shadow: inset 4px 0 0 #4f6288;
 }
 .elec-ligne-titre td select,
 .elec-ligne-titre td input {
@@ -898,15 +901,9 @@ thead .elec-th-figee {
   background: var(--tache-dim);
   color: var(--tache);
 }
-.elec-col-saisie {
-  background: color-mix(in srgb, var(--warn) 6%, transparent);
-}
 /* La saisie du % d'avancement (désormais intégrée aux groupes Matériel
    et Main d'œuvre) garde sa teinte "saisie" même combinée à ces
    groupes : la spécificité l'emporte sur l'ordre des règles. */
-td.elec-col-saisie {
-  background: color-mix(in srgb, var(--warn) 6%, transparent);
-}
 .elec-col-materiel {
   background: color-mix(in srgb, var(--accent-dim) 45%, transparent);
 }
@@ -955,7 +952,21 @@ th.elec-col-mo {
   border-left-color: var(--warn);
 }
 .elec-avancement-fait {
-  border-left-color: var(--ok);
+  border-color: var(--ok);
+  background: var(--ok);
+  color: #fff;
+  font-weight: 700;
+}
+.elec-avancement-fait input,
+.elec-avancement-fait span {
+  color: #fff;
+  font-weight: 700;
+}
+.elec-avancement-fait::before {
+  content: "✓";
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 /* Qté, PU, PT (coût matériel ou temps MO) : mêmes cases de saisie que les
