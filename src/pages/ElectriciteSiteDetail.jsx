@@ -24,7 +24,7 @@ import EnvoyerTachesSapModal from "../components/EnvoyerTachesSapModal";
 import GererTachesModal from "../components/GererTachesModal";
 import NouvelleCommandeModal from "../components/NouvelleCommandeModal";
 import ImportMinuteElectriciteModal from "../components/ImportMinuteElectriciteModal";
-import { codeTypeFo, codeMo, libelleTypeFo, resumerPoste } from "../lib/exportGoat";
+import { codeTypeFo, codeMo, libelleTypeFo, resumerPoste, tacheMoDe } from "../lib/exportGoat";
 import { LISTE_TYPES_FO, LISTE_TYPES_MO, valeurType } from "../lib/typesElectricite";
 import { lignesFournitureGoat, lignesMainOeuvreGoat } from "../lib/exportGoat";
 import { IconeAccess, IconeSap } from "../components/IconesLogiciels";
@@ -199,7 +199,7 @@ function calculerRecap(lignes, champValeur, champAvancementPct, ordreTypes) {
     if (estLigneSomme(l)) return;
     const valeur = l[champValeur] || 0;
     if (!valeur) return;
-    const cle = (l.typeFo || "").trim();
+    const cle = (champValeur === "tempsTotalHeures" ? tacheMoDe(l) : l.typeFo || "").trim();
     if (!groupes.has(cle)) groupes.set(cle, { cle, budget: 0, realise: 0, pr: 0 });
     const g = groupes.get(cle);
     g.budget += valeur;
@@ -1806,6 +1806,26 @@ function LigneDevisRow({
       <td className="elec-col-mo elec-type-code">
         <select
           className="elec-type-select"
+          title={tacheMoDe(l) ? formatTypeFo(tacheMoDe(l)) : "Sans tâche"}
+          value={tacheMoDe(l)}
+          disabled={!peutGerer}
+          onChange={(e) => onChangerType("tacheMo", e.target.value)}
+        >
+          <option value="">—</option>
+          {tacheMoDe(l) &&
+            !tachesFo.some((o) => valeurType(o.code, o.label) === tacheMoDe(l)) && (
+              <option value={tacheMoDe(l)}>{formatTypeFo(tacheMoDe(l))}</option>
+            )}
+          {tachesFo.map((o) => (
+            <option key={o.code} value={valeurType(o.code, o.label)}>
+              {o.code} · {o.label}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="elec-col-mo elec-type-code">
+        <select
+          className="elec-type-select"
           title={formatTypeFo(l.typeMo)}
           value={l.typeMo || ""}
           disabled={!peutGerer}
@@ -1927,6 +1947,7 @@ function GroupeEnteteRow({
         </div>
       </td>
       <td className="elec-col-mo">—</td>
+      <td className="elec-col-mo elec-type-code">—</td>
       <td className="elec-col-mo elec-type-code">—</td>
       <td className="elec-col-mo">{formatNombre(sommeTempsTotalHeures)} h</td>
       <td className="elec-col-mo">
@@ -2071,10 +2092,10 @@ export default function ElectriciteSiteDetail() {
   // mesuré, donc ça ne fait normalement pas apparaître d'ascenseur.
   const largeurTypeLigne = Math.max(
     LARGEUR_MIN_TYPE_LIGNE,
-    (largeurPage - 40 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 2
+    (largeurPage - 40 - LARGEUR_ENTETE_FIGEE - SOMME_LARGEURS_FIXES_LIGNES) / 3
   );
   const largeurTableLignes =
-    LARGEUR_ENTETE_FIGEE + SOMME_LARGEURS_FIXES_LIGNES + largeurTypeLigne * 2;
+    LARGEUR_ENTETE_FIGEE + SOMME_LARGEURS_FIXES_LIGNES + largeurTypeLigne * 3;
   // Construites à partir des MÊMES constantes que SOMME_LARGEURS_FIXES_LIGNES
   // ci-dessus (et non d'une liste écrite en dur séparément) : un
   // décalage entre les deux avait fait tourner tout le calcul de largeur
@@ -2089,6 +2110,7 @@ export default function ElectriciteSiteDetail() {
   ];
   const largeursColonnesMo = [
     ...LARGEURS_COLONNES_MO_FIXES.slice(0, 2),
+    largeurTypeLigne,
     largeurTypeLigne,
     ...LARGEURS_COLONNES_MO_FIXES.slice(2),
   ];
@@ -2407,12 +2429,13 @@ export default function ElectriciteSiteDetail() {
     const masqueesIds = new Set((chantier?.tachesMoMasquees || []).map((t) => t.id));
     const vusType = new Set();
     lignesChantier.forEach((l) => {
-      const cleType = codeTypeFo(l.typeFo);
+      const tacheL = tacheMoDe(l);
+      const cleType = codeTypeFo(tacheL);
       if (!cleType || vusType.has(cleType) || masqueesIds.has("t:" + cleType)) return;
       vusType.add(cleType);
       const connue = tachesFo.find((t) => t.code === cleType);
-      const lib = (connue?.label || libelleTypeFo(l.typeFo) || cleType).trim();
-      ajoute(codeMo(chantier?.codesMo?.[cleType], resumerPoste(libelleTypeFo(l.typeFo)) || cleType.slice(0, 8)), lib);
+      const lib = (connue?.label || libelleTypeFo(tacheL) || cleType).trim();
+      ajoute(codeMo(chantier?.codesMo?.[cleType], resumerPoste(libelleTypeFo(tacheL)) || cleType.slice(0, 8)), lib);
     });
     // Tâches complémentaires (suivi, étude, levée de réserve + ajoutées).
     tachesMoChantier(chantier).filter((t) => !masqueesIds.has(t.id)).forEach((t) =>
@@ -2830,7 +2853,7 @@ export default function ElectriciteSiteDetail() {
     const champ = champAvancementRecap;
     const lignesCible = lignesChantier.filter(
       (l) =>
-        (l.typeFo || "").trim() === cle &&
+        (recapActif === "mo" ? tacheMoDe(l) : l.typeFo || "").trim() === cle &&
         (l[champRecap] || 0) > 0 &&
         (!devisId || l.devisId === devisId)
     );
@@ -3602,7 +3625,7 @@ export default function ElectriciteSiteDetail() {
                       <th colSpan={5} className="elec-groupe elec-groupe-materiel">
                         Matériel
                       </th>
-                      <th colSpan={5} className="elec-groupe elec-groupe-mo">
+                      <th colSpan={6} className="elec-groupe elec-groupe-mo">
                         Main d'œuvre
                       </th>
                     </tr>
@@ -3647,6 +3670,9 @@ export default function ElectriciteSiteDetail() {
                         Temps unit.
                       </th>
                       <th className="elec-col-mo" style={{ width: largeurTypeLigne }}>
+                        Tâche
+                      </th>
+                      <th className="elec-col-mo" style={{ width: largeurTypeLigne }}>
                         MO
                       </th>
                       <th className="elec-col-mo" style={{ width: LARGEURS_COLONNES_MO_FIXES[2] }}>
@@ -3663,7 +3689,7 @@ export default function ElectriciteSiteDetail() {
                         const l = item.ligne;
                         return (
                           <tr key={l.id} className="elec-ligne-poste">
-                            <td colSpan={13} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
+                            <td colSpan={14} style={{ paddingLeft: 8 + (l.profondeur || 0) * 16 }}>
                               {l.code ? l.code + " — " : ""}
                               {l.designation}
                             </td>

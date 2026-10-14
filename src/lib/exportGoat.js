@@ -20,6 +20,11 @@ export function codeTypeFo(typeFo) {
   const m = typeFo.match(/^(.*?)\s*\[/);
   return (m ? m[1] : typeFo).trim();
 }
+// Tâche MO d'une ligne : champ propre `tacheMo` (modifiable dans le suivi) ;
+// tant qu'il n'a pas été saisi, la tâche reprend le Type de FO (anciens devis).
+export function tacheMoDe(l) {
+  return (l?.tacheMo != null ? l.tacheMo : l?.typeFo) || "";
+}
 export function libelleTypeFo(typeFo) {
   if (!typeFo) return "";
   const m = typeFo.match(/\[([^\]]*)\]/);

@@ -50,11 +50,19 @@ export default function GererTachesModal({ chantierId, chantier, taches, lignesC
       const ancienVersNouveau = new Map();
       const operations = [];
       lignesChantier.forEach((l) => {
+        const maj = {};
         const nv = renommees.get(codeTypeFo(l.typeFo));
         if (nv && l.typeFo !== nv) {
           ancienVersNouveau.set(l.typeFo, nv);
-          operations.push((batch) => batch.update(doc(db, "elecLignes", l.id), { typeFo: nv }));
+          maj.typeFo = nv;
         }
+        // Tâche MO saisie à part : elle suit aussi le renommage.
+        const nvMo = l.tacheMo ? renommees.get(codeTypeFo(l.tacheMo)) : null;
+        if (nvMo && l.tacheMo !== nvMo) {
+          ancienVersNouveau.set(l.tacheMo, nvMo);
+          maj.tacheMo = nvMo;
+        }
+        if (Object.keys(maj).length) operations.push((batch) => batch.update(doc(db, "elecLignes", l.id), maj));
       });
       for (let i = 0; i < operations.length; i += 400) {
         const batch = writeBatch(db);
