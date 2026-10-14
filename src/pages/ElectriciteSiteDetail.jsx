@@ -356,6 +356,7 @@ function TableauRecap({
       ))}
     </optgroup>
   ));
+  const plusieursDevisSap = (sap?.options || []).length > 1;
   const optionsAffecterAchat = (
     <>
       <option value="">Automatique (Code SAP)</option>
@@ -924,9 +925,9 @@ function TableauRecap({
                           {g.lignes.length > 0 ? (
                             <button
                               type="button"
-                              className={"btn-ghost recap-sap-toggle" + (g.lignes.some((a) => !valeurAffectationAchat(cleLigneAchat(a))) ? " recap-reel-auto" : "")}
+                              className={"btn-ghost recap-sap-toggle" + (plusieursDevisSap && g.lignes.some((a) => !valeurAffectationAchat(cleLigneAchat(a))) ? " recap-reel-auto" : "")}
                               title={
-                                g.lignes.some((a) => !valeurAffectationAchat(cleLigneAchat(a)))
+                                plusieursDevisSap && g.lignes.some((a) => !valeurAffectationAchat(cleLigneAchat(a)))
                                   ? "Des achats sont en affectation automatique (Code SAP), non rattachés à un devis. Afficher les lignes d'achat SAP de ce type de FO"
                                   : "Afficher les lignes d'achat SAP de ce type de FO"
                               }
