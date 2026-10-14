@@ -2158,6 +2158,7 @@ export default function ElectriciteSiteDetail() {
   const [recapActif, setRecapActif] = useState(null);
   // Bilan affaire : "" = total du chantier, sinon id d'un devis (prévu seul).
   const [devisBilan, setDevisBilan] = useState("");
+  const [devisRecap, setDevisRecap] = useState(""); // "" = synthèse tous devis
 
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [afficherImport, setAfficherImport] = useState(false);
@@ -2382,6 +2383,7 @@ export default function ElectriciteSiteDetail() {
     );
     return [...parCode.values()].sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
   })();
+  const devisRecapSel = devisRecap ? devis.find((d) => d.id === devisRecap) || null : null;
   const champRecap = recapActif === "mo" ? "tempsTotalHeures" : "coutTotalFo";
   const champAvancementRecap = recapActif === "mo" ? "avancementMo" : "avancementFo";
   const uniteRecap = recapActif === "mo" ? "h" : "€";
@@ -3307,34 +3309,39 @@ export default function ElectriciteSiteDetail() {
 
     {(recapActif === "fo" || recapActif === "mo") && (
             <>
-              {recapActif === "fo" && peutGerer && (
-                <div className="panel" style={{ marginBottom: 16 }}>
-                  <div className="panel-header">
-                    <h2>Étude / chiffrage par devis</h2>
-                  </div>
-                  <p className="simple-list-meta" style={{ marginBottom: 8 }}>
-                    Montant saisi à la main, compté dans les fournitures de chaque devis (ligne « 0 · Étude chiffrage »).
-                  </p>
-                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {devis.length > 0 && (
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
+                  <label htmlFor="recap-devis">Vue :</label>
+                  <select id="recap-devis" className="sit-select" value={devisRecapSel?.id || ""} onChange={(e) => setDevisRecap(e.target.value)}>
+                    <option value="">Synthèse — tous les devis</option>
                     {devis.map((d) => (
-                      <label key={d.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <option key={d.id} value={d.id}>
                         {d.nom}
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          key={d.id + ":" + (etudesChiffrage[d.id]?.montant || 0)}
-                          defaultValue={etudesChiffrage[d.id]?.montant ? String(etudesChiffrage[d.id].montant).replace(".", ",") : ""}
-                          placeholder="0"
-                          style={{ width: "7em", textAlign: "right" }}
-                          onBlur={(e) => changerEtudeChiffrage(d.id, e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                        />
-                        €
-                      </label>
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </div>
               )}
+              {recapActif === "fo" && peutGerer && devisRecapSel && (
+                <div className="panel" style={{ marginBottom: 16 }}>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <strong>Étude / chiffrage</strong>
+                    <span className="simple-list-meta">montant saisi à la main, compté dans les fournitures de ce devis (ligne « 0 · Étude chiffrage »)</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      key={devisRecapSel.id + ":" + (etudesChiffrage[devisRecapSel.id]?.montant || 0)}
+                      defaultValue={etudesChiffrage[devisRecapSel.id]?.montant ? String(etudesChiffrage[devisRecapSel.id].montant).replace(".", ",") : ""}
+                      placeholder="0"
+                      style={{ width: "8em", textAlign: "right" }}
+                      onBlur={(e) => changerEtudeChiffrage(devisRecapSel.id, e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                    />
+                    €
+                  </label>
+                </div>
+              )}
+              {!devisRecapSel && (
               <TableauRecap
                 titre={titreRecap}
                 sousTitre="synthèse tous devis"
@@ -3372,7 +3379,8 @@ export default function ElectriciteSiteDetail() {
                     : null
                 }
               />
-              {recapParDevis.map(({ devis: d, recap }) => (
+              )}
+              {recapParDevis.filter(({ devis: d }) => d.id === devisRecapSel?.id).map(({ devis: d, recap }) => (
                 <TableauRecap
                   key={d.id}
                   titre={titreRecap}
