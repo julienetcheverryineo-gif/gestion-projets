@@ -777,10 +777,14 @@ table.table-recap {
   color: var(--text);
   font-weight: 700;
   font-style: normal;
-  background: color-mix(in srgb, #4f6288 11%, var(--panel)) !important;
+  background: var(--panel) !important;
+  border-top: 2px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
 }
 .elec-ligne-titre td:first-child {
-  box-shadow: inset 4px 0 0 #4f6288;
+  box-shadow: inset 4px 0 0 var(--accent);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
 }
 .elec-ligne-titre td select,
 .elec-ligne-titre td input {
