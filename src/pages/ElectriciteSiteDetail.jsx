@@ -1049,7 +1049,8 @@ function TableauRecap({
                     <td className="col-num" data-label={libelleReel}>
                       <button
                         type="button"
-                        className="btn-ghost recap-sap-toggle"
+                        className={"btn-ghost recap-sap-toggle" + (sapMo.nonAffectees.lignes.length > 0 ? " recap-reel-auto" : "")}
+                        title={sapMo.nonAffectees.lignes.length > 0 ? "Heures SAP à affecter à une tâche" : undefined}
                         onClick={() => basculer("__non")}
                       >
                         {ouverts.has("__non") ? "▾" : "▸"} {formatNombre(sapMo.nonAffectees.reel)} h
