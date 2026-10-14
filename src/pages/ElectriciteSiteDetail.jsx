@@ -2401,6 +2401,8 @@ export default function ElectriciteSiteDetail() {
   const exclureTypeFo = async (cle, devisId = null) => {
     const ids = devisId
       ? [devisId]
+      : cle === CLE_ETUDE
+      ? devis.map((d) => d.id)
       : [...new Set(toutesLignes.filter((l) => l.chantierId === chantierId && !l.estPoste && (l.typeFo || "").trim() === cle).map((l) => l.devisId))];
     const maj = new Set(chantier?.typesFoExclus || []);
     ids.forEach((id) => maj.add(id + "||" + cle));
@@ -2421,6 +2423,12 @@ export default function ElectriciteSiteDetail() {
       const e = m.get(cle) || { cle, devisId: l.devisId, libelle: (l.typeFo || "").trim() ? formatTypeFo(l.typeFo.trim()) : "Sans type de FO", montant: 0 };
       e.montant += l.coutTotalFo || 0;
       m.set(cle, e);
+    });
+    // Étude chiffrage : ligne propre au chantier (pas de ligne de devis réelle).
+    devis.forEach((d) => {
+      const cle = d.id + "||" + CLE_ETUDE;
+      if (exclusFo.has(cle) && !m.has(cle))
+        m.set(cle, { cle, devisId: d.id, libelle: formatTypeFo(CLE_ETUDE), montant: etudesChiffrage[d.id]?.montant || 0 });
     });
     return [...m.values()].map((e) => ({ ...e, devisNom: devis.find((d) => d.id === e.devisId)?.nom || "" }));
   })();
@@ -2488,7 +2496,7 @@ export default function ElectriciteSiteDetail() {
           );
           if (!avecSup) {
             // « 0 · Étude chiffrage » : type de FO toujours présent dans un devis, montant saisi dans la ligne.
-            if (recapActif === "fo" && peutGerer && !base.parType.some((l) => l.cle === CLE_ETUDE)) {
+            if (recapActif === "fo" && peutGerer && !exclusFo.has(d.id + "||" + CLE_ETUDE) && !base.parType.some((l) => l.cle === CLE_ETUDE)) {
               base.parType.unshift({
                 cle: CLE_ETUDE,
                 libelle: formatTypeFo(CLE_ETUDE),
