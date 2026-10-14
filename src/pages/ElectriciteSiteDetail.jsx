@@ -293,6 +293,7 @@ function TableauRecap({
   onChangerK,
   tauxHoraire,
   fo,
+  etude,
 }) {
   const [nouveauLibelle, setNouveauLibelle] = useState("");
   // Pointages SAP cochés pour une affectation en masse.
@@ -880,7 +881,22 @@ function TableauRecap({
                     </td>
                   )}
                   <td className="col-num" data-label={libelleValeur}>
-                    {formatMontant(l.budget, uniteValeur)}
+                    {etude && l.cle === CLE_ETUDE ? (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        key={"e" + l.budget}
+                        defaultValue={l.budget ? String(l.budget).replace(".", ",") : ""}
+                        placeholder="0"
+                        title="Montant saisi à la main (€)"
+                        className="elec-heures-input"
+                        style={{ width: "7em" }}
+                        onBlur={(e) => etude.onChanger(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                      />
+                    ) : (
+                      formatMontant(l.budget, uniteValeur)
+                    )}
                   </td>
                   <td className="col-num" data-label="Réalisé">
                     {formatMontant(l.realise, uniteValeur)}
@@ -2420,7 +2436,22 @@ export default function ElectriciteSiteDetail() {
             champAvancementRecap,
             ordreTypesChantier
           );
-          if (!avecSup) return { devis: d, recap: base };
+          if (!avecSup) {
+            // « 0 · Étude chiffrage » : type de FO toujours présent dans un devis, montant saisi dans la ligne.
+            if (recapActif === "fo" && peutGerer && !base.parType.some((l) => l.cle === CLE_ETUDE)) {
+              base.parType.unshift({
+                cle: CLE_ETUDE,
+                libelle: formatTypeFo(CLE_ETUDE),
+                numero: 0,
+                budget: 0,
+                montantPr: 0,
+                realise: 0,
+                restant: 0,
+                pctAvancement: 0,
+              });
+            }
+            return { devis: d, recap: base };
+          }
           const r = construireRecapMo(base, chantier, d.id, devis);
           sansTacheBase[d.id] = r.sansTacheBrut;
           return { devis: d, recap: r };
@@ -3322,25 +3353,6 @@ export default function ElectriciteSiteDetail() {
                   </select>
                 </div>
               )}
-              {recapActif === "fo" && peutGerer && devisRecapSel && (
-                <div className="panel" style={{ marginBottom: 16 }}>
-                  <label style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <strong>Étude / chiffrage</strong>
-                    <span className="simple-list-meta">montant saisi à la main, compté dans les fournitures de ce devis (ligne « 0 · Étude chiffrage »)</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      key={devisRecapSel.id + ":" + (etudesChiffrage[devisRecapSel.id]?.montant || 0)}
-                      defaultValue={etudesChiffrage[devisRecapSel.id]?.montant ? String(etudesChiffrage[devisRecapSel.id].montant).replace(".", ",") : ""}
-                      placeholder="0"
-                      style={{ width: "8em", textAlign: "right" }}
-                      onBlur={(e) => changerEtudeChiffrage(devisRecapSel.id, e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-                    />
-                    €
-                  </label>
-                </div>
-              )}
               {!devisRecapSel && (
               <TableauRecap
                 titre={titreRecap}
@@ -3396,6 +3408,7 @@ export default function ElectriciteSiteDetail() {
                   ordreTypes={ordreTypesChantier}
                   onModifierOrdre={peutGerer ? modifierOrdreType : null}
                   sap={sapRecapDevis(d, recap)}
+                  etude={recapActif === "fo" && peutGerer ? { onChanger: (v) => changerEtudeChiffrage(d.id, v) } : null}
                   fo={recapActif === "fo" && peutGerer ? { onExclure: (cle) => exclureTypeFo(cle, d.id), onRetablir: retablirTypeFo, retires: typesFoRetires.filter((r) => r.devisId === d.id) } : null}
                   codesMo={avecSup ? codesMoChantier : null}
                   onChangerCodeMo={avecSup && peutGerer ? changerCodeMo : null}
