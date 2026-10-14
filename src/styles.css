@@ -764,17 +764,23 @@ table.table-recap {
   font-weight: 600;
   background: var(--bg);
 }
-/* Titres de chapitre / sous-postes du devis (lignes informatives, comme les
-   lignes saumon de la minute) : bien lisibles, en gras, sur fond teinté. */
-.elec-ligne-informative td,
-.elec-ligne-informative td.elec-td-figee {
+/* Ligne informative « commentaire » (quantité 0 : précision, sous-ligne grise
+   de la minute) : discrète. */
+.elec-ligne-informative td {
+  color: var(--text-muted);
+  font-style: italic;
+}
+/* Titres de chapitre / sous-postes du devis (lignes informatives de quantité
+   ≥ 1, lignes saumon de la minute) : bien lisibles, en gras, sur fond teinté. */
+.elec-ligne-titre td,
+.elec-ligne-titre td.elec-td-figee {
   color: var(--text);
   font-weight: 700;
   font-style: normal;
   background: color-mix(in srgb, #f5a67a 30%, var(--panel)) !important;
 }
-.elec-ligne-informative td select,
-.elec-ligne-informative td input {
+.elec-ligne-titre td select,
+.elec-ligne-titre td input {
   opacity: 0.6;
 }
 /* Groupement de lignes de devis : le groupe s'affiche sur sa ligne de

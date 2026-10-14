@@ -1696,7 +1696,7 @@ function LigneDevisRow({
   return (
     <tr
       className={
-        (l.informative ? "elec-ligne-informative " : "") +
+        (l.informative ? ((l.quantite || 0) > 0 ? "elec-ligne-titre " : "elec-ligne-informative ") : "") +
         (imbriquee ? "elec-ligne-membre-groupe" : "")
       }
     >
