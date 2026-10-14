@@ -132,7 +132,7 @@ export function construireRecapMo(base, chantier, scope, devis) {
         lignesMinute.push(habiller(l, id, l.budget, false, null));
       }
     });
-  const lignesSup = tachesMoChantier(chantier)
+  const lignesSupBrutes = tachesMoChantier(chantier)
     .filter((t) => !masquees.has(t.id))
     .filter((t) => estSynthese || t.portee === PORTEE_TOUS || t.portee === scope)
     .map((t) =>
@@ -142,7 +142,10 @@ export function construireRecapMo(base, chantier, scope, devis) {
   const baseSans = base.parType.find((l) => !l.cle);
   const sansBrut = (baseSans?.budget || 0) + retourBudget;
   const sansRealiseBrut = (baseSans?.realise || 0) + retourRealise;
-  const demande = [...lignesMinute, ...lignesSup].reduce((s, l) => s + l.preleve, 0);
+  const demande = [...lignesMinute, ...lignesSupBrutes].reduce((s, l) => s + l.preleve, 0);
+  // Synthèse : une tâche ajoutée à la main sous le même nom dans plusieurs devis
+  // n'apparaît qu'une fois (heures et avancement cumulés).
+  const lignesSup = estSynthese ? fusionnerMemeNom(lignesSupBrutes) : lignesSupBrutes;
   const preleveEffectif = Math.min(Math.max(demande, 0), sansBrut);
   const sansBudget = sansBrut - preleveEffectif;
   const sansRealise = sansBrut > 0 ? sansRealiseBrut * (sansBudget / sansBrut) : 0;
@@ -180,4 +183,46 @@ export function tachesGenerales(chantier) {
 
 export function nouvelIdTache() {
   return "t" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+}
+
+export const normaliserNomTache = (n) =>
+  String(n || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+// Fusionne les tâches complémentaires de même nom : sommes des heures et
+// avancement pondéré. `alias` liste les clés absorbées (pour rapprocher les
+// heures SAP déjà affectées à l'une d'elles).
+function fusionnerMemeNom(lignes) {
+  const groupes = new Map();
+  lignes.forEach((l) => {
+    const k = normaliserNomTache(l.libelle);
+    if (!groupes.has(k)) groupes.set(k, []);
+    groupes.get(k).push(l);
+  });
+  return [...groupes.values()].map((g) => {
+    if (g.length === 1) return g[0];
+    const somme = (champ) => g.reduce((t, l) => t + (l[champ] || 0), 0);
+    const budget = somme("budget");
+    const realise = somme("realise");
+    return {
+      ...g[0],
+      budget,
+      realise,
+      restant: budget - realise,
+      pctAvancement: budget > 0 ? realise / budget : 0,
+      ajustable: false,
+      fusion: true,
+      alias: g.slice(1).map((l) => l.cle),
+      saisie: somme("saisie"),
+      prelevePropreSaisi: somme("prelevePropreSaisi"),
+      dansDevis: somme("dansDevis"),
+      ajoute: somme("ajoute"),
+      preleve: somme("preleve"),
+      vendu: somme("vendu"),
+      deroge: g.some((l) => l.deroge),
+    };
+  });
 }

@@ -110,6 +110,8 @@ export function lireAffectationHeure(valeur) {
 // devis (tableau d'un devis).
 export function rapprocherHeures(parType, heuresSap, affectations = {}, devisId = null) {
   const parCle = new Map(parType.map((t) => [t.cle, { reel: 0, lignes: [] }]));
+  // Tâches fusionnées (même nom dans plusieurs devis) : les clés absorbées pointent sur la même ligne.
+  parType.forEach((t) => (t.alias || []).forEach((a) => parCle.set(a, parCle.get(t.cle))));
   const nonAffectees = { reel: 0, lignes: [] };
   const retenues = [];
   heuresSap.forEach((h) => {

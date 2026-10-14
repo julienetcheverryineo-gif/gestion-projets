@@ -39,6 +39,7 @@ import {
   nouvelIdTache,
   tachesGenerales,
   tachesMoChantier,
+  normaliserNomTache,
 } from "../lib/tachesMoSup";
 import { otpDepuisCompte } from "../lib/parseSapExports";
 import {
@@ -2805,8 +2806,15 @@ export default function ElectriciteSiteDetail() {
       const maj = { ...(chantier?.avancementsMoSup || {}) };
       if (devisId) maj[devisId + "||" + id] = v;
       else {
-        maj[GENERAL + "||" + id] = v;
-        devis.forEach((d) => (maj[d.id + "||" + id] = v));
+        // Synthèse : toutes les tâches de même nom (fusionnées dans la ligne) sont mises à jour.
+        const tache = tachesMoChantier(chantier).find((t) => t.id === id);
+        const ids = tachesMoChantier(chantier)
+          .filter((t) => t.id === id || (tache && normaliserNomTache(t.libelle) === normaliserNomTache(tache.libelle)))
+          .map((t) => t.id);
+        ids.forEach((i) => {
+          maj[GENERAL + "||" + i] = v;
+          devis.forEach((d) => (maj[d.id + "||" + i] = v));
+        });
       }
       await updateDoc(doc(db, "sites", chantierId), { avancementsMoSup: maj });
       return;
