@@ -1852,7 +1852,7 @@ function LigneDevisRow({
           ))}
         </select>
       </td>
-      <td className="elec-col-mo">{formatNombre(tempsTotalAffiche)} h</td>
+      <td className="elec-col-mo">{tempsTotalAffiche ? formatNombre(tempsTotalAffiche) + " h" : "—"}</td>
       <td className="elec-col-mo">
         {tempsTotalAffiche ? formatNombre((tempsTotalAffiche * pctMo) / 100) + " h" : "—"}
       </td>
