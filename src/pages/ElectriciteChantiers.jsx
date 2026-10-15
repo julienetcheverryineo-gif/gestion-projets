@@ -18,10 +18,26 @@ const euroInd = (n) =>
 
 // Colonnes d'indicateurs, recalculés à chaque affichage de la liste à partir
 // des données du chantier (devis, suivi, situations, imports SAP).
+function CelluleIcone({ label, info, vide }) {
+  return (
+    <td data-label={label} style={{ textAlign: "center" }}>
+      {info ? (
+        <span className={"ind-icone ind-" + info.etat} title={info.texte} aria-label={info.texte}>
+          {info.etat === "retard" ? "↘" : info.etat === "avance" ? "↗" : "✓"}
+        </span>
+      ) : (
+        <span className="ind-vide" title={vide}>
+          —
+        </span>
+      )}
+    </td>
+  );
+}
+
 function CellulesIndicateurs({ ind }) {
   if (!ind) {
     const vide = "Pas de devis importé : rien à calculer";
-    return [1, 2, 3, 4].map((k) => (
+    return [1, 2, 3, 4, 5].map((k) => (
       <td key={k} className="ind-vide" title={vide}>
         —
       </td>
@@ -48,21 +64,10 @@ function CellulesIndicateurs({ ind }) {
   if (e.paiement === "retard") puces.push({ t: "Paiement en retard", c: "danger", titre: e.nbRetard + " facture(s) échue(s) non réglée(s)" });
   else if (e.paiement === "attente") puces.push({ t: "Paiement en attente", c: "alerte", titre: e.nbAttente + " facture(s) à régler" });
   else if (e.paiement === "ok") puces.push({ t: "Réglé", c: "ok", titre: "Toutes les factures SAP sont réglées" });
-  if (e.aJour === true) puces.push({ t: "À jour", c: "ok", titre: "Facturation à jour par rapport à l'avancement suivi" });
-  else if (e.aJour === false) puces.push({ t: "Retard fact.", c: "alerte", titre: "Retard de facturation par rapport à l'avancement : " + euroInd(e.retardHt) + " € HT" });
   return (
     <>
-      <td data-label="Fact. vs dépense réelle" style={{ textAlign: "center" }}>
-        {f ? (
-          <span className={"ind-icone ind-" + f.etat} title={f.texte + maj} aria-label={f.texte}>
-            {f.etat === "retard" ? "↘" : f.etat === "avance" ? "↗" : "✓"}
-          </span>
-        ) : (
-          <span className="ind-vide" title="Pas de budget chiffré ou de marché">
-            —
-          </span>
-        )}
-      </td>
+      <CelluleIcone label="Fact. vs dépense réelle" info={f} vide="Pas de budget chiffré ou de marché" />
+      <CelluleIcone label="Fact. vs avancement" info={ind.factVsAvancement} vide="Pas de situation saisie" />
       <td data-label="État de facturation">
         {puces.length === 0 ? (
           <span className="ind-vide">—</span>
@@ -212,6 +217,7 @@ export default function ElectriciteChantiers() {
                 <th>Statut</th>
                 <th>Devis importés</th>
                 <th title="Facturation face à l'avancement réel et aux dépenses SAP">Fact. vs dépense réelle</th>
+                <th title="Facturation face à l'avancement suivi (situations)">Fact. vs avancement</th>
                 <th>État de facturation</th>
                 <th title="Heures SAP pas encore affectées à une tâche">Heures SAP non aff.</th>
                 <th title="Achats SAP pas encore affectés à un devis (chantiers à plusieurs devis)">Fourn. non aff.</th>

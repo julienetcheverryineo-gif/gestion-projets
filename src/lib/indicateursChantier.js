@@ -94,8 +94,20 @@ export function calculerFacturation({ chantier, devis, toutesLignes, groupes, sa
   const paiement = factures.length === 0 ? null : nbRetard > 0 ? "retard" : nbAttente > 0 ? "attente" : "ok";
   const retardHt = Math.round((logique - cumulSituations) * 100) / 100;
   const aJour = aSituations ? retardHt <= 0.5 : null;
+  // Facturation face à l'avancement suivi (situations cumulées vs avancement logique).
+  let factVsAvancement = null;
+  if (aSituations) {
+    if (retardHt > 0.5) {
+      factVsAvancement = { etat: "retard", texte: "Sous-facturé d'environ " + euro(retardHt) + " € HT par rapport à l'avancement suivi" };
+    } else if (retardHt < -0.5) {
+      factVsAvancement = { etat: "avance", texte: "Sur-facturé d'environ " + euro(-retardHt) + " € HT par rapport à l'avancement suivi" };
+    } else {
+      factVsAvancement = { etat: "ok", texte: "Facturation cohérente avec l'avancement suivi" };
+    }
+  }
   return {
     factVsReel,
+    factVsAvancement,
     etat: {
       coherence,
       paiement,
