@@ -1451,6 +1451,120 @@ function tsDateSap(texte) {
   return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0;
 }
 
+// Indicateurs de synthèse d'un chantier (liste des chantiers), recalculés à
+// partir des données brutes — mêmes règles que la fiche chantier (budget
+// chiffré avec k achat et exclusions, réel SAP avec sous-traitance, tâches MO,
+// affectations) mais sans ouvrir le chantier.
+export function calculerIndicateursChantier(chantier, { tousDevis, toutesLignes, tousGroupes, sapLignesFo, sapLignesMo, tauxHoraire }) {
+  const chantierId = chantier?.id;
+  const devis = tousDevis.filter((d) => d.chantierId === chantierId).sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
+  if (!chantierId || devis.length === 0) return null;
+
+  const otpSap = otpDepuisCompte(chantier.compte);
+  const achatsSapBrut = otpSap ? sapLignesFo.filter((l) => memeOtp(l.otp, otpSap)) : [];
+  const heuresSapBrut = otpSap ? sapLignesMo.filter((l) => memeOtp(l.otp, otpSap) && !estLigneMoIgnoree(l)) : [];
+
+  // Lignes chiffrées : étude de chiffrage, types de FO retirés, k achat.
+  const exclusFo = new Set(chantier.typesFoExclus || []);
+  const etudes = chantier.etudeChiffrage || {};
+  const lignesEtude = devis
+    .filter((d) => (etudes[d.id]?.montant || 0) > 0)
+    .map((d) => ({
+      id: "__etude_" + d.id,
+      chantierId,
+      devisId: d.id,
+      typeFo: CLE_ETUDE,
+      quantite: 1,
+      coutTotalFo: etudes[d.id].montant,
+      coutTotalFoPr: etudes[d.id].montant,
+      avancementFo: etudes[d.id].av || 0,
+    }));
+  const kAchatsDevis = (devisId) => chantier.kAchatDevis?.[devisId] || chantier.kAchatFo || {};
+  const lignesChantier = toutesLignes
+    .filter((l) => l.chantierId === chantierId && !l.estPoste)
+    .concat(lignesEtude)
+    .map((l) => (exclusFo.size > 0 && exclusFo.has(l.devisId + "||" + (l.typeFo || "").trim()) ? { ...l, coutTotalFo: 0, coutTotalFoPr: 0 } : l))
+    .map((l) => {
+      const k = kAchatsDevis(l.devisId)[(l.typeFo || "").trim()];
+      return typeof k === "number" && k > 0 && k !== 1 ? { ...l, coutTotalFoPr: l.coutTotalFo || 0, coutTotalFo: (l.coutTotalFo || 0) * k } : l;
+    });
+
+  // Sous-traitance : part MO d'une commande convertie en heures.
+  const profilsMo = chantier.profilsMo || {};
+  const sousTraitance = chantier.sousTraitance || {};
+  const tauxDefaut = totalTauxDefaut(chantier, tauxHoraire);
+  const tauxTache = (tacheValeur) => {
+    const { cle } = lireAffectationHeure(tacheValeur);
+    const profil = cle ? profilsMo[estCleSup(cle) ? cle : codeTypeFo(cle)] : "";
+    return (profil ? tauxHoraire(profil) : null) ?? tauxDefaut ?? 49;
+  };
+  const heuresSousTraitance = [];
+  const affectationsHeuresSt = {};
+  const achatsSap = achatsSapBrut.map((a) => {
+    const cleA = cleLigneAchat(a);
+    const r = sousTraitance[cleA];
+    const p = r && r.tache ? Math.min(100, Math.max(0, Number(r.pctMo) || 0)) / 100 : 0;
+    if (!p) return a;
+    const brut = Number(a.valNette) || 0;
+    const h = {
+      id: "st_" + cleA,
+      nomPrenom: "Sous-traitance · " + (a.nomFournisseur || "") + " (" + (a.docAchat || "") + ")",
+      date: a.dateDoc,
+      tache: "",
+      typAct: "I205",
+      heures: (brut * p) / (tauxTache(r.tache) || 49),
+      imputation: a.docAchat,
+      sousTraitance: true,
+    };
+    heuresSousTraitance.push(h);
+    affectationsHeuresSt[cleLigneHeure(h)] = r.tache;
+    return { ...a, valNette: brut * (1 - p) };
+  });
+  const heuresSap = heuresSousTraitance.length ? [...heuresSapBrut, ...heuresSousTraitance] : heuresSapBrut;
+  const affectationsHeuresEff = { ...(chantier.affectationsSapHeures || {}), ...affectationsHeuresSt };
+  const affectationsSap = chantier.affectationsSapLignes || {};
+
+  // Budget chiffré et réel SAP.
+  const totFo = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
+  const recapMo = construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", {}), chantier, GENERAL, devis);
+  let budgetMo = 0;
+  recapMo.parType.forEach((l) => {
+    const profil = l.cle ? profilsMo[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
+    budgetMo += (l.budget || 0) * (profil ? tauxHoraire(profil) ?? tauxDefaut : tauxDefaut);
+  });
+  const budgetFo = totFo.budget || 0;
+  const budget = budgetFo + budgetMo;
+  const reelFo = achatsSap.reduce((s, a) => s + (Number(a.valNette) || 0), 0);
+  const reelMo = heuresSap.reduce((s, h) => s + (Number(h.heures) || 0) * (tauxHoraire(normaliserTypeActivite(h.typAct) || "I205") ?? tauxDefaut), 0);
+  const sap =
+    budget > 0
+      ? {
+          budget,
+          reel: reelFo + reelMo,
+          disponible: achatsSap.length > 0 || heuresSap.length > 0,
+          avancementPct: ((budgetFo * (totFo.pctAvancement || 0) + budgetMo * (recapMo.total.pctAvancement || 0)) / budget) * 100,
+        }
+      : null;
+
+  const fact = calculerFacturation({
+    chantier,
+    devis,
+    toutesLignes,
+    groupes: tousGroupes,
+    sap,
+    tauxMo: tauxHoraire ? tauxHoraire("I205") ?? 0 : 0,
+  });
+  const nonAff = rapprocherHeures(recapMo.parType, heuresSap, affectationsHeuresEff).nonAffectees;
+  const fournNonAff =
+    devis.length > 1 ? achatsSap.filter((a) => !affectationsSap[cleLigneAchat(a)]).reduce((t, a) => t + (Number(a.valNette) || 0), 0) : 0;
+  return {
+    ...fact,
+    heuresNonAffectees: nonAff.lignes.length > 0 ? Math.round(nonAff.reel * 100) / 100 : 0,
+    fournituresNonAffectees: Math.round(fournNonAff * 100) / 100,
+    nbDevis: devis.length,
+  };
+}
+
 // Tri + filtre par colonne des tableaux de lignes SAP (en-têtes cliquables).
 function texteCelluleSap(l, c) {
   if (c.champ === "typAct") return libelleTypeActivite(l.typAct);
@@ -3030,47 +3144,6 @@ export default function ElectriciteSiteDetail() {
         : null;
     return { sap, recapMoS };
   })();
-
-  // Indicateurs de synthèse (liste des chantiers) : calculés ici, enregistrés
-  // dans le document chantier (champ `indicateurs`) quand ils changent.
-  const indicateursJson = (() => {
-    if (!sapSituationsCalc) return "";
-    const fact = calculerFacturation({
-      chantier,
-      devis,
-      toutesLignes,
-      groupes: tousGroupes,
-      sap: sapSituationsCalc.sap,
-      tauxMo: tauxHoraire ? tauxHoraire("I205") ?? 0 : 0,
-    });
-    const nonAff = rapprocherHeures(sapSituationsCalc.recapMoS.parType, heuresSap, affectationsHeuresEff).nonAffectees;
-    const fournNonAff =
-      devis.length > 1
-        ? achatsSap.filter((a) => !affectationsSap[cleLigneAchat(a)]).reduce((t, a) => t + (Number(a.valNette) || 0), 0)
-        : 0;
-    return JSON.stringify({
-      ...fact,
-      heuresNonAffectees: nonAff.lignes.length > 0 ? Math.round(nonAff.reel * 100) / 100 : 0,
-      fournituresNonAffectees: Math.round(fournNonAff * 100) / 100,
-      nbDevis: devis.length,
-    });
-  })();
-  useEffect(() => {
-    if (!peutGerer || !indicateursJson || !chantierId) return;
-    const stable = (v) =>
-      JSON.stringify(v, (_k, x) =>
-        x && typeof x === "object" && !Array.isArray(x)
-          ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]]))
-          : x
-      );
-    const calcule = JSON.parse(indicateursJson);
-    const { maj: _maj, ...actuel } = chantier?.indicateurs || {};
-    if (chantier?.indicateurs && stable(actuel) === stable(calcule)) return;
-    const t = setTimeout(() => {
-      updateDoc(doc(db, "sites", chantierId), { indicateurs: { ...calcule, maj: new Date().toISOString() } }).catch(() => {});
-    }, 3000);
-    return () => clearTimeout(t);
-  }, [indicateursJson, peutGerer, chantierId, chantier?.indicateurs]);
 
   if (!chantier) {
     return <div className="page-loading">Chargement…</div>;

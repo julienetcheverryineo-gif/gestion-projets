@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { doc, query, collection, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useCollection } from "../lib/firestoreHooks";
+import { useTauxHoraires } from "../lib/tauxHoraires";
+import { calculerIndicateursChantier } from "./ElectriciteSiteDetail";
 import SiteFormModal, {
   formatStatutChantier,
   estChantierElectricite,
@@ -14,18 +16,18 @@ const euroInd = (n) =>
     .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     .replace(/[\u202f\u00a0]/g, " ");
 
-// Colonnes d'indicateurs (calculés dans la fiche chantier, enregistrés dans
-// le chantier : ils se mettent à jour à chaque ouverture du chantier).
+// Colonnes d'indicateurs, recalculés à chaque affichage de la liste à partir
+// des données du chantier (devis, suivi, situations, imports SAP).
 function CellulesIndicateurs({ ind }) {
   if (!ind) {
-    const vide = "Pas encore calculé : ouvrez le chantier une fois pour l'initialiser.";
+    const vide = "Pas de devis importé : rien à calculer";
     return [1, 2, 3, 4].map((k) => (
       <td key={k} className="ind-vide" title={vide}>
         —
       </td>
     ));
   }
-  const maj = ind.maj ? " (calculé le " + new Date(ind.maj).toLocaleString("fr-FR") + ")" : "";
+  const maj = "";
   const f = ind.factVsReel;
   const e = ind.etat || {};
   const puces = [];
@@ -105,6 +107,11 @@ export default function ElectriciteChantiers() {
   const peutGerer = isAdmin || profile?.role === "ra_electricite";
   const { documents: tousChantiers, chargement } = useCollection("sites");
   const { documents: tousDevis } = useCollection("elecDevis");
+  const { documents: toutesLignes } = useCollection("elecLignes");
+  const { documents: tousGroupes } = useCollection("elecGroupes");
+  const { documents: sapLignesFo } = useCollection("sapLignesFo");
+  const { documents: sapLignesMo } = useCollection("sapLignesMo");
+  const { taux: tauxHoraire } = useTauxHoraires();
   const { documents: utilisateurs } = useCollection("users", "email");
   const [tous, setTous] = useState(false);
   const chantiersElec = tousChantiers.filter(estChantierElectricite);
@@ -116,6 +123,19 @@ export default function ElectriciteChantiers() {
     if (!ca !== !cb) return ca ? -1 : 1;
     return ca.localeCompare(cb, "fr", { numeric: true, sensitivity: "base" }) || String(a.nom || "").localeCompare(String(b.nom || ""), "fr");
   });
+  const indicateurs = useMemo(() => {
+    const out = {};
+    chantiers.forEach((c) => {
+      try {
+        out[c.id] = calculerIndicateursChantier(c, { tousDevis, toutesLignes, tousGroupes, sapLignesFo, sapLignesMo, tauxHoraire });
+      } catch (err) {
+        console.error("Indicateurs " + c.nom, err);
+        out[c.id] = null;
+      }
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tousChantiers, tous, profile?.nom, tousDevis, toutesLignes, tousGroupes, sapLignesFo, sapLignesMo, tauxHoraire]);
   const [chantierEnEdition, setChantierEnEdition] = useState(null);
   const [afficherFormulaire, setAfficherFormulaire] = useState(false);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
@@ -226,7 +246,7 @@ export default function ElectriciteChantiers() {
                   <td data-label="Devis importés">
                     {nbDevis(chantier.id) > 0 ? nbDevis(chantier.id) : "—"}
                   </td>
-                  <CellulesIndicateurs ind={chantier.indicateurs} />
+                  <CellulesIndicateurs ind={indicateurs[chantier.id]} />
                   <td
                     data-label="Responsable d'affaire"
                     style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
