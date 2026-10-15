@@ -4524,3 +4524,10 @@ table.af-table.table-recap {
   border-color: var(--ok);
   color: #fff;
 }
+
+.elec-lignes-table td.elec-col-saisie {
+  white-space: nowrap;
+}
+.elec-lignes-table .elec-avancement-input input {
+  width: 42px;
+}

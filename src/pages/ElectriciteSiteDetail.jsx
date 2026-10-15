@@ -76,8 +76,8 @@ const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNIT
 // doivent rester assez généreuses pour loger une saisie (nombre + unité
 // €/h) sans chevaucher la colonne suivante.
 const LARGEUR_MIN_TYPE_LIGNE = 56;
-const LARGEURS_COLONNES_MATERIEL_FIXES = [132, 120, 120];
-const LARGEURS_COLONNES_MO_FIXES = [132, 110, 120];
+const LARGEURS_COLONNES_MATERIEL_FIXES = [150, 120, 120];
+const LARGEURS_COLONNES_MO_FIXES = [150, 110, 120];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
