@@ -43,7 +43,6 @@ function CellulesIndicateurs({ ind }) {
       </td>
     ));
   }
-  const maj = "";
   const f = ind.factVsReel;
   const e = ind.etat || {};
   const puces = [];
