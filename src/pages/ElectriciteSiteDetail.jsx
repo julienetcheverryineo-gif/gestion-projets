@@ -42,6 +42,7 @@ import {
   normaliserNomTache,
 } from "../lib/tachesMoSup";
 import { otpDepuisCompte } from "../lib/parseSapExports";
+import { calculerFacturation } from "../lib/indicateursChantier";
 import {
   AFFECTATION_HORS_BUDGET,
   cleLigneAchat,
@@ -2997,6 +2998,80 @@ export default function ElectriciteSiteDetail() {
     });
   };
 
+  // Réel SAP du chantier (achats nets + heures × taux) face au budget chiffré,
+  // et avancement réel moyen pondéré : sert à vérifier que la facturation est
+  // cohérente avec le terrain (onglet Situations) et alimente les indicateurs
+  // de la liste des chantiers.
+  const sapSituationsCalc = (() => {
+    if (!chantier || devis.length === 0) return null;
+    const totFoS = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
+    const recapMoS = construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", {}), chantier, GENERAL, devis);
+    const tauxDefautS = totalTauxDefaut(chantier, tauxHoraire);
+    let budgetMoS = 0;
+    recapMoS.parType.forEach((l) => {
+      const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
+      budgetMoS += (l.budget || 0) * (profil ? tauxHoraire(profil) ?? tauxDefautS : tauxDefautS);
+    });
+    const budgetFoS = totFoS.budget || 0;
+    const budgetS = budgetFoS + budgetMoS;
+    const reelFoS = achatsSap.reduce((sm, a) => sm + (Number(a.valNette) || 0), 0);
+    const reelMoS = heuresSap.reduce((sm, h) => {
+      const tx = tauxHoraire(normaliserTypeActivite(h.typAct) || "I205");
+      return sm + (Number(h.heures) || 0) * (tx ?? tauxDefautS);
+    }, 0);
+    const sap =
+      budgetS > 0
+        ? {
+            budget: budgetS,
+            reel: reelFoS + reelMoS,
+            disponible: achatsSap.length > 0 || heuresSap.length > 0,
+            avancementPct: ((budgetFoS * (totFoS.pctAvancement || 0) + budgetMoS * (recapMoS.total.pctAvancement || 0)) / budgetS) * 100,
+          }
+        : null;
+    return { sap, recapMoS };
+  })();
+
+  // Indicateurs de synthèse (liste des chantiers) : calculés ici, enregistrés
+  // dans le document chantier (champ `indicateurs`) quand ils changent.
+  const indicateursJson = (() => {
+    if (!sapSituationsCalc) return "";
+    const fact = calculerFacturation({
+      chantier,
+      devis,
+      toutesLignes,
+      groupes: tousGroupes,
+      sap: sapSituationsCalc.sap,
+      tauxMo: tauxHoraire ? tauxHoraire("I205") ?? 0 : 0,
+    });
+    const nonAff = rapprocherHeures(sapSituationsCalc.recapMoS.parType, heuresSap, affectationsHeuresEff).nonAffectees;
+    const fournNonAff =
+      devis.length > 1
+        ? achatsSap.filter((a) => !affectationsSap[cleLigneAchat(a)]).reduce((t, a) => t + (Number(a.valNette) || 0), 0)
+        : 0;
+    return JSON.stringify({
+      ...fact,
+      heuresNonAffectees: nonAff.lignes.length > 0 ? Math.round(nonAff.reel * 100) / 100 : 0,
+      fournituresNonAffectees: Math.round(fournNonAff * 100) / 100,
+      nbDevis: devis.length,
+    });
+  })();
+  useEffect(() => {
+    if (!peutGerer || !indicateursJson || !chantierId) return;
+    const stable = (v) =>
+      JSON.stringify(v, (_k, x) =>
+        x && typeof x === "object" && !Array.isArray(x)
+          ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]]))
+          : x
+      );
+    const calcule = JSON.parse(indicateursJson);
+    const { maj: _maj, ...actuel } = chantier?.indicateurs || {};
+    if (chantier?.indicateurs && stable(actuel) === stable(calcule)) return;
+    const t = setTimeout(() => {
+      updateDoc(doc(db, "sites", chantierId), { indicateurs: { ...calcule, maj: new Date().toISOString() } }).catch(() => {});
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [indicateursJson, peutGerer, chantierId, chantier?.indicateurs]);
+
   if (!chantier) {
     return <div className="page-loading">Chargement…</div>;
   }
@@ -3153,30 +3228,7 @@ export default function ElectriciteSiteDetail() {
               // Réel SAP du chantier (achats nets + heures × taux) face au budget
               // chiffré, et avancement réel moyen pondéré : sert à vérifier que la
               // facturation est cohérente avec le terrain.
-              const totFoS = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {}).total;
-              const recapMoS = construireRecapMo(calculerRecap(lignesChantier, "tempsTotalHeures", "avancementMo", {}), chantier, GENERAL, devis);
-              const tauxDefautS = totalTauxDefaut(chantier, tauxHoraire);
-              let budgetMoS = 0;
-              recapMoS.parType.forEach((l) => {
-                const profil = l.cle ? profilsMoChantier[l.sup ? l.cle : codeTypeFo(l.cle)] : "";
-                budgetMoS += (l.budget || 0) * (profil ? tauxHoraire(profil) ?? tauxDefautS : tauxDefautS);
-              });
-              const budgetFoS = totFoS.budget || 0;
-              const budgetS = budgetFoS + budgetMoS;
-              const reelFoS = achatsSap.reduce((sm, a) => sm + (Number(a.valNette) || 0), 0);
-              const reelMoS = heuresSap.reduce((sm, h) => {
-                const tx = tauxHoraire(normaliserTypeActivite(h.typAct) || "I205");
-                return sm + (Number(h.heures) || 0) * (tx ?? tauxDefautS);
-              }, 0);
-              const sap =
-                budgetS > 0
-                  ? {
-                      budget: budgetS,
-                      reel: reelFoS + reelMoS,
-                      disponible: achatsSap.length > 0 || heuresSap.length > 0,
-                      avancementPct: ((budgetFoS * (totFoS.pctAvancement || 0) + budgetMoS * (recapMoS.total.pctAvancement || 0)) / budgetS) * 100,
-                    }
-                  : null;
+              const sap = sapSituationsCalc?.sap ?? null;
               return (
             <SituationsFacturation
               sap={sap}

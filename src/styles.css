@@ -4566,3 +4566,25 @@ table.af-table.table-recap {
 .sit-desc-detail {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+
+/* Liste des chantiers : indicateurs de facturation / affectation SAP */
+.ind-vide { color: var(--text-muted); }
+.ind-icone {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border-radius: 50%; font-weight: 800; font-size: 0.9rem; cursor: help;
+}
+.ind-icone.ind-ok { background: color-mix(in srgb, var(--ok) 18%, var(--panel)); color: var(--ok); }
+.ind-icone.ind-retard { background: color-mix(in srgb, var(--warn) 20%, var(--panel)); color: var(--warn); }
+.ind-icone.ind-avance { background: color-mix(in srgb, #3b6fd4 18%, var(--panel)); color: #3b6fd4; }
+.ind-puces { display: flex; flex-wrap: wrap; gap: 4px; }
+.ind-puce {
+  padding: 2px 8px; border-radius: 999px; font-size: 0.74rem; font-weight: 600; white-space: nowrap; cursor: help;
+  border: 1px solid transparent;
+}
+.ind-puce.ind-ok { background: color-mix(in srgb, var(--ok) 15%, var(--panel)); color: #12805a; border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.ind-puce.ind-alerte { background: color-mix(in srgb, var(--warn) 16%, var(--panel)); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.ind-puce.ind-danger { background: color-mix(in srgb, #d23b3b 14%, var(--panel)); color: #b32626; border-color: color-mix(in srgb, #d23b3b 40%, transparent); }
+.ind-violet {
+  display: inline-block; padding: 2px 8px; color: #6d28d9; font-weight: 700; border: 2px solid #7c3aed; border-radius: 999px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; cursor: help;
+}

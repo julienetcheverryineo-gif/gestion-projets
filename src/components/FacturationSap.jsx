@@ -1,6 +1,7 @@
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { ETATS_FACTURATION, etatAutoSap } from "../lib/suiviFacturation";
+import { statutFactureSap } from "../lib/indicateursChantier";
 
 const euro = (n) =>
   Number(n || 0)
@@ -15,20 +16,7 @@ const classeEtat = (e) =>
     .toLowerCase()
     .replace(/[^a-z]+/g, "-");
 const dateFr = (d) => String(d || "").replace(/\./g, "/"); // "12.06.2026" -> "12/06/2026"
-const dateObj = (d) => {
-  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(d || "").trim());
-  return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
-};
-// Statut d'une facture SAP : payee (vert), attente (orange), retard (rouge), annulee (gris).
-function statutFacture(f) {
-  if (f.annulee) return "annulee";
-  if (f.payee) return "payee";
-  const ech = dateObj(f.echeance);
-  const finJour = new Date();
-  finJour.setHours(0, 0, 0, 0);
-  if (f.retardJours > 0 || (ech && ech < finJour)) return "retard";
-  return "attente";
-}
+const statutFacture = statutFactureSap;
 const LIBELLE_STATUT = { payee: "payée", attente: "à régler", retard: "échéance dépassée", annulee: "annulée (avoir)" };
 const dateIsoFr = (d) => (d ? new Date(d).toLocaleDateString("fr-FR") : "");
 const dateTri = (d) => String(d).split(".").reverse().join("");

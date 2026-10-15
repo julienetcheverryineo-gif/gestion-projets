@@ -9,6 +9,93 @@ import SiteFormModal, {
   estChantierElectricite,
 } from "../components/SiteFormModal";
 
+const euroInd = (n) =>
+  Number(n || 0)
+    .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .replace(/[\u202f\u00a0]/g, " ");
+
+// Colonnes d'indicateurs (calculés dans la fiche chantier, enregistrés dans
+// le chantier : ils se mettent à jour à chaque ouverture du chantier).
+function CellulesIndicateurs({ ind }) {
+  if (!ind) {
+    const vide = "Pas encore calculé : ouvrez le chantier une fois pour l'initialiser.";
+    return [1, 2, 3, 4].map((k) => (
+      <td key={k} className="ind-vide" title={vide}>
+        —
+      </td>
+    ));
+  }
+  const maj = ind.maj ? " (calculé le " + new Date(ind.maj).toLocaleString("fr-FR") + ")" : "";
+  const f = ind.factVsReel;
+  const e = ind.etat || {};
+  const puces = [];
+  if (e.coherence) {
+    puces.push(
+      e.coherence.ok
+        ? { t: "Cohérente", c: "ok", titre: "Facturé SAP = situations saisies" }
+        : {
+            t: "Écart SAP",
+            c: "alerte",
+            titre:
+              e.coherence.ecart > 0
+                ? "SAP a facturé " + euroInd(e.coherence.ecart) + " € de plus que les situations"
+                : "Situations en avance de " + euroInd(-e.coherence.ecart) + " € sur SAP",
+          }
+    );
+  }
+  if (e.paiement === "retard") puces.push({ t: "Paiement en retard", c: "danger", titre: e.nbRetard + " facture(s) échue(s) non réglée(s)" });
+  else if (e.paiement === "attente") puces.push({ t: "Paiement en attente", c: "alerte", titre: e.nbAttente + " facture(s) à régler" });
+  else if (e.paiement === "ok") puces.push({ t: "Réglé", c: "ok", titre: "Toutes les factures SAP sont réglées" });
+  if (e.aJour === true) puces.push({ t: "À jour", c: "ok", titre: "Facturation à jour par rapport à l'avancement suivi" });
+  else if (e.aJour === false) puces.push({ t: "Retard fact.", c: "alerte", titre: "Retard de facturation par rapport à l'avancement : " + euroInd(e.retardHt) + " € HT" });
+  return (
+    <>
+      <td data-label="Fact. vs réel" style={{ textAlign: "center" }}>
+        {f ? (
+          <span className={"ind-icone ind-" + f.etat} title={f.texte + maj} aria-label={f.texte}>
+            {f.etat === "retard" ? "⚠" : f.etat === "avance" ? "↗" : "✓"}
+          </span>
+        ) : (
+          <span className="ind-vide" title="Pas de budget chiffré ou de marché">
+            —
+          </span>
+        )}
+      </td>
+      <td data-label="État de facturation">
+        {puces.length === 0 ? (
+          <span className="ind-vide">—</span>
+        ) : (
+          <div className="ind-puces">
+            {puces.map((p) => (
+              <span key={p.t} className={"ind-puce ind-" + p.c} title={p.titre}>
+                {p.t}
+              </span>
+            ))}
+          </div>
+        )}
+      </td>
+      <td data-label="Heures SAP non aff." className="col-num">
+        {ind.heuresNonAffectees > 0 ? (
+          <span className="ind-violet" title="Heures SAP à affecter à une tâche">
+            {euroInd(ind.heuresNonAffectees)} h
+          </span>
+        ) : (
+          <span className="ind-vide">—</span>
+        )}
+      </td>
+      <td data-label="Fourn. non aff." className="col-num">
+        {ind.fournituresNonAffectees > 0.005 ? (
+          <span className="ind-violet" title="Achats SAP en affectation automatique, non rattachés à un devis">
+            {euroInd(ind.fournituresNonAffectees)} €
+          </span>
+        ) : (
+          <span className="ind-vide">—</span>
+        )}
+      </td>
+    </>
+  );
+}
+
 // Liste des chantiers du service Électricité — même principe que la page
 // Chantiers de l'Automatisme, mais son propre périmètre : seuls les
 // chantiers rattachés à l'espace Électricité (case à cocher du formulaire)
@@ -104,6 +191,10 @@ export default function ElectriciteChantiers() {
                 <th>Chantier</th>
                 <th>Statut</th>
                 <th>Devis importés</th>
+                <th title="Facturation face à l'avancement réel et aux dépenses SAP">Fact. vs réel</th>
+                <th>État de facturation</th>
+                <th title="Heures SAP pas encore affectées à une tâche">Heures SAP non aff.</th>
+                <th title="Achats SAP pas encore affectés à un devis (chantiers à plusieurs devis)">Fourn. non aff.</th>
                 <th>Responsable d'affaire</th>
                 <th></th>
               </tr>
@@ -135,6 +226,7 @@ export default function ElectriciteChantiers() {
                   <td data-label="Devis importés">
                     {nbDevis(chantier.id) > 0 ? nbDevis(chantier.id) : "—"}
                   </td>
+                  <CellulesIndicateurs ind={chantier.indicateurs} />
                   <td
                     data-label="Responsable d'affaire"
                     style={{ fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}
