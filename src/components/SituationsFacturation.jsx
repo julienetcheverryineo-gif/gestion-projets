@@ -165,7 +165,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
       onChange={(e) => setSaisies((p) => ({ ...p, [cle]: e.target.value }))}
       onBlur={() => valider(ligneIds, cle)}
       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-      className="sit-pct"
+      className={"sit-pct" + (saisies[cle] === undefined && Number(String(valeurAffichee).replace(",", ".")) >= 100 ? " fait" : "")}
     />
   );
 
@@ -658,7 +658,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                           })()}
                           <div className="sit-saisie">
                             {champ(r.id, [r.id], pctTexte(pctCumule(situations, indexOuvert, r.id)))}
-                            {modifiable && (
+                            {modifiable && pctCumule(situations, indexOuvert, r.id) < 100 && (
                               <button type="button" className="sit-cent" title="Mettre à 100 %" onClick={() => fixerPct([r.id], 100)}>
                                 100
                               </button>

@@ -4531,3 +4531,27 @@ table.af-table.table-recap {
 .elec-lignes-table .elec-avancement-input input {
   width: 42px;
 }
+
+/* Situations : même langage visuel que le suivi d'avancement */
+.sit-chap { border: 0; border-radius: 8px; margin: 14px 0; background: var(--panel); }
+.sit-chap-tete {
+  background: #2b3d46; color: #fff; border-bottom: 0; border-radius: 8px; padding: 10px 14px;
+}
+.sit-chap-nom { font-size: 0.95rem; letter-spacing: 0.01em; }
+.sit-chap-prog { color: rgba(255, 255, 255, 0.75); }
+.sit-chap-prog .sit-barre { background: rgba(255, 255, 255, 0.22); }
+.sit-chap-prog .sit-barre i { background: #5fd3a0; }
+.sit-chap-tout { color: rgba(255, 255, 255, 0.8); }
+.sit-chap-tete .sit-cent { color: #fff; border-color: rgba(255, 255, 255, 0.45); }
+.sit-chap-tete .sit-cent:hover { background: rgba(255, 255, 255, 0.14); border-color: #fff; color: #fff; }
+.sit-chap-tete .sit-pct { background: #fff; color: var(--text); }
+.sit-sous-titre {
+  padding: 10px 14px 4px; font-weight: 700; font-size: 0.9rem; color: var(--text);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.sit-pct.fait {
+  background: var(--ok); border-color: var(--ok); color: #fff; font-weight: 700;
+}
+.sit-pct.fait:disabled { background: var(--ok); color: #fff; }
+.sit-cent { font-family: var(--font-mono); font-weight: 700; }
+.sit-cent:hover { background: var(--ok); border-color: var(--ok); color: #fff; }
