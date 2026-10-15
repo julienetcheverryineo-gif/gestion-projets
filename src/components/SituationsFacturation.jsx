@@ -625,7 +625,7 @@ export default function SituationsFacturation({ chantierId, chantier, devis, tou
                     )}
                     {ch.items.map((r) =>
                       r.type === "titre" ? (
-                        <div key={r.id} className="sit-sous-titre">
+                        <div key={r.id} className={"sit-sous-titre" + (r.niveau !== undefined ? " sit-niv" + Math.min(r.niveau, 2) : "")}>
                           {r.texte}
                         </div>
                       ) : (

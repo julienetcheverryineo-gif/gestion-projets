@@ -109,17 +109,20 @@ export function construireLignesSituation(devisList, toutesLignes, chantierId, g
         return;
       }
       if (l.estPoste) {
-        if (texte) rows.push({ type: "titre", id: l.id, texte });
+        // niveau : profondeur du poste dans la minute (bandeaux hiérarchiques, comme le suivi).
+        if (texte) rows.push({ type: "titre", id: l.id, texte, niveau: l.profondeur || 0 });
         return;
       }
       if (estLigneSomme(l)) {
         if (RE_CHAPITRE.test(texte)) rows.push({ type: "chapitre", id: l.id, texte });
-        else if (texte) rows.push({ type: "titre", id: l.id, texte });
+        else if (texte) rows.push({ type: "titre", id: l.id, texte, niveau: 1 });
         return;
       }
       if (l.informative) {
         if (RE_CHAPITRE.test(texte)) rows.push({ type: "chapitre", id: l.id, texte });
         else if (/:\s*$/.test(texte)) rows.push({ type: "titre", id: l.id, texte });
+        // Titre de chapitre de la minute (info de quantité ≥ 1) : bandeau, comme dans le suivi.
+        else if (texte && (Number(l.quantite) || 0) > 0) rows.push({ type: "titre", id: l.id, texte, niveau: 0 });
         return;
       }
       const pv = Number(l.pvLigne) || 0;

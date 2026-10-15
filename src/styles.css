@@ -4555,3 +4555,14 @@ table.af-table.table-recap {
 .sit-pct.fait:disabled { background: var(--ok); color: #fff; }
 .sit-cent { font-family: var(--font-mono); font-weight: 700; }
 .sit-cent:hover { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+/* Postes hiérarchiques / titres de la minute : mêmes bandeaux que le suivi d'avancement */
+.sit-sous-titre.sit-niv0, .sit-sous-titre.sit-niv1, .sit-sous-titre.sit-niv2 {
+  text-decoration: none; border-radius: 8px; margin: 8px 6px 2px; padding: 8px 12px; font-weight: 700;
+}
+.sit-sous-titre.sit-niv0 { background: #2b3d46; color: #fff; }
+.sit-sous-titre.sit-niv1 { background: #587584; color: #fff; }
+.sit-sous-titre.sit-niv2 { background: color-mix(in srgb, #2b3d46 14%, var(--panel)); color: var(--text); }
+.sit-desc-detail {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
