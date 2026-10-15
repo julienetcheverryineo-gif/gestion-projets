@@ -52,10 +52,10 @@ function CellulesIndicateurs({ ind }) {
   else if (e.aJour === false) puces.push({ t: "Retard fact.", c: "alerte", titre: "Retard de facturation par rapport à l'avancement : " + euroInd(e.retardHt) + " € HT" });
   return (
     <>
-      <td data-label="Fact. vs réel" style={{ textAlign: "center" }}>
+      <td data-label="Fact. vs dépense réelle" style={{ textAlign: "center" }}>
         {f ? (
           <span className={"ind-icone ind-" + f.etat} title={f.texte + maj} aria-label={f.texte}>
-            {f.etat === "retard" ? "⚠" : f.etat === "avance" ? "↗" : "✓"}
+            {f.etat === "retard" ? "↘" : f.etat === "avance" ? "↗" : "✓"}
           </span>
         ) : (
           <span className="ind-vide" title="Pas de budget chiffré ou de marché">
@@ -211,7 +211,7 @@ export default function ElectriciteChantiers() {
                 <th>Chantier</th>
                 <th>Statut</th>
                 <th>Devis importés</th>
-                <th title="Facturation face à l'avancement réel et aux dépenses SAP">Fact. vs réel</th>
+                <th title="Facturation face à l'avancement réel et aux dépenses SAP">Fact. vs dépense réelle</th>
                 <th>État de facturation</th>
                 <th title="Heures SAP pas encore affectées à une tâche">Heures SAP non aff.</th>
                 <th title="Achats SAP pas encore affectés à un devis (chantiers à plusieurs devis)">Fourn. non aff.</th>
