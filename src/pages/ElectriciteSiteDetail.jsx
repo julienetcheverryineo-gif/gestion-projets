@@ -76,8 +76,8 @@ const LARGEUR_ENTETE_FIGEE = LARGEUR_NUMERO + LARGEUR_DESIGNATION + LARGEUR_UNIT
 // doivent rester assez généreuses pour loger une saisie (nombre + unité
 // €/h) sans chevaucher la colonne suivante.
 const LARGEUR_MIN_TYPE_LIGNE = 56;
-const LARGEURS_COLONNES_MATERIEL_FIXES = [100, 120, 120];
-const LARGEURS_COLONNES_MO_FIXES = [100, 110, 120];
+const LARGEURS_COLONNES_MATERIEL_FIXES = [132, 120, 120];
+const LARGEURS_COLONNES_MO_FIXES = [132, 110, 120];
 // Avec un en-tête sur 2 lignes (ligne de groupes Matériel/Main d'œuvre +
 // ligne des colonnes), table-layout:fixed ne retient QUE les largeurs de
 // la 1ère ligne pour fixer chaque colonne (spec CSS2.1 §17.5.2) : une
@@ -1742,6 +1742,7 @@ function LigneDevisRow({
         {l.informative || !coutTotalFoAffiche ? (
           "—"
         ) : (
+          <>
           <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
             <input
               key={pctFo}
@@ -1761,6 +1762,12 @@ function LigneDevisRow({
             />
             <span>%</span>
           </div>
+          <BoutonA100
+            pct={pctFo}
+            disabled={!peutGerer}
+            onClick={() => (entete ? entete.onChangerAvancementGroupe("avancementFo", "100") : onChangerAvancement("avancementFo", "100"))}
+          />
+          </>
         )}
       </td>
       <td className="elec-col-materiel elec-type-code">
@@ -1791,6 +1798,7 @@ function LigneDevisRow({
         {l.informative || !tempsTotalAffiche ? (
           "—"
         ) : (
+          <>
           <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
             <input
               key={pctMo}
@@ -1810,6 +1818,12 @@ function LigneDevisRow({
             />
             <span>%</span>
           </div>
+          <BoutonA100
+            pct={pctMo}
+            disabled={!peutGerer}
+            onClick={() => (entete ? entete.onChangerAvancementGroupe("avancementMo", "100") : onChangerAvancement("avancementMo", "100"))}
+          />
+          </>
         )}
       </td>
       <td className="elec-col-mo elec-type-code">
@@ -1857,6 +1871,16 @@ function LigneDevisRow({
         {tempsTotalAffiche ? formatNombre((tempsTotalAffiche * pctMo) / 100) + " h" : "—"}
       </td>
     </tr>
+  );
+}
+
+// Petit bouton « passer à 100 % » à côté d'un champ de % d'avancement.
+function BoutonA100({ pct, disabled, onClick }) {
+  if (disabled || pct >= 100) return null;
+  return (
+    <button type="button" className="btn-100" title="Passer à 100 %" onClick={onClick}>
+      100
+    </button>
   );
 }
 
@@ -1916,6 +1940,7 @@ function GroupeEnteteRow({
       <td className="elec-col-etroite">—</td>
       <td className="elec-col-etroite">—</td>
       <td className="elec-col-materiel elec-col-saisie">
+        <>
         <div className={"elec-avancement-input " + classeAvancement(pctFo)}>
           <input
             key={pctFo}
@@ -1931,6 +1956,8 @@ function GroupeEnteteRow({
           />
           <span>%</span>
         </div>
+        <BoutonA100 pct={pctFo} disabled={!peutGerer} onClick={() => onChangerAvancementGroupe("avancementFo", "100")} />
+        </>
       </td>
       <td className="elec-col-materiel elec-type-code">—</td>
       <td className="elec-col-materiel">{formatEuro(sommeCoutTotalFo)} €</td>
@@ -1938,6 +1965,7 @@ function GroupeEnteteRow({
         {sommeCoutTotalFo ? formatEuro((sommeCoutTotalFo * pctFo) / 100) + " €" : "—"}
       </td>
       <td className="elec-col-mo elec-col-saisie">
+        <>
         <div className={"elec-avancement-input " + classeAvancement(pctMo)}>
           <input
             key={pctMo}
@@ -1953,6 +1981,8 @@ function GroupeEnteteRow({
           />
           <span>%</span>
         </div>
+        <BoutonA100 pct={pctMo} disabled={!peutGerer} onClick={() => onChangerAvancementGroupe("avancementMo", "100")} />
+        </>
       </td>
       <td className="elec-col-mo elec-type-code">—</td>
       <td className="elec-col-mo elec-type-code">—</td>
