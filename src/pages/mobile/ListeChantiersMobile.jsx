@@ -23,7 +23,7 @@ export default function ListeChantiersMobile() {
   const { chantiers: tousChantiers, chargement, tousDevis, toutesLignes, tousGroupes, sapLignesFo, sapLignesMo, tauxHoraire } = donnees;
   const [tous, setTous] = useState(false);
   const [recherche, setRecherche] = useState("");
-  const [tri, setTri] = useState("alertes");
+  const [tri, setTri] = useState("compte");
   const [feuilleSynchro, setFeuilleSynchro] = useState(false);
 
   const cartes = useMemo(() => {
