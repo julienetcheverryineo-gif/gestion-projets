@@ -1750,3 +1750,20 @@
 .m-ancien .person-multiselect, .m-ancien .person-multiselect-btn { width: 100% !important; box-sizing: border-box; }
 .m-ancien .person-multiselect-btn { min-height: 44px; border: 1px solid var(--m-trait); border-radius: 12px; background: #fff; text-align: left; font-size: 1rem; }
 .m-ancien .card { border: 0; border-radius: var(--m-rayon); background: var(--m-carte); box-shadow: var(--m-ombre); }
+
+/* ----- bilan prévu / réel ----- */
+.m-bilan .m-segments { margin: 0 0 14px; }
+.m-bilan-chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 14px; }
+.m-bilan-chiffres div { padding: 10px; border-radius: 14px; background: #f3f7f9; }
+.m-bilan-chiffres dt { font-size: 0.72rem; font-weight: 700; color: var(--m-doux); }
+.m-bilan-chiffres dd { margin: 2px 0 0; font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.m-bilan-chiffres dd.neg, .m-bilan-liste b.neg { color: var(--m-rouge); }
+.m-bilan .m-comp { margin-bottom: 10px; }
+.m-sous-titre-bilan { margin: 18px 0 10px; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--m-doux); }
+.m-bilan-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.m-bilan-liste li { display: grid; gap: 5px; }
+.m-bilan-ligne-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.85rem; }
+.m-bilan-ligne-tete strong { min-width: 0; overflow-wrap: anywhere; }
+.m-bilan-ligne-tete span { flex: none; color: var(--m-doux); font-variant-numeric: tabular-nums; }
+.m-bilan-ligne-tete span b { color: var(--m-texte); }
+.m-bilan-liste small { color: var(--m-doux); font-size: 0.74rem; }

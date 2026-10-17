@@ -1557,8 +1557,38 @@ export function calculerIndicateursChantier(chantier, { tousDevis, toutesLignes,
   const nonAff = rapprocherHeures(recapMo.parType, heuresSap, affectationsHeuresEff).nonAffectees;
   const fournNonAff =
     devis.length > 1 ? achatsSap.filter((a) => !affectationsSap[cleLigneAchat(a)]).reduce((t, a) => t + (Number(a.valNette) || 0), 0) : 0;
+  // Bilan Fournitures / Main d'œuvre (synthèse mobile) : prévu, réel SAP, avancement, détail par poste.
+  const recapFoBilan = calculerRecap(lignesChantier, "coutTotalFo", "avancementFo", {});
+  const rapproFo = rapprocherAchats(recapFoBilan.parType, achatsSap, affectationsSap);
+  const detailFo = recapFoBilan.parType.map((l) => ({
+    libelle: l.libelle,
+    prevu: Math.round(l.budget || 0),
+    reel: Math.round(rapproFo.parCle.get(l.cle)?.reel || 0),
+    av: Math.round((l.pctAvancement || 0) * 1000) / 10,
+  }));
+  if (rapproFo.horsBudget.reel > 0.005) detailFo.push({ libelle: "Achats hors budget", prevu: 0, reel: Math.round(rapproFo.horsBudget.reel), av: 0 });
+  const rapproMo = rapprocherHeures(recapMo.parType, heuresSap, affectationsHeuresEff);
+  const heuresBudget = recapMo.parType.reduce((t, l) => t + (l.budget || 0), 0);
+  const bilan = {
+    fo: { budget: Math.round(budgetFo), reel: Math.round(reelFo), av: Math.round((totFo.pctAvancement || 0) * 1000) / 10, detail: detailFo, nbAchats: achatsSap.length },
+    mo: {
+      heuresBudget: Math.round(heuresBudget * 10) / 10,
+      heuresReel: Math.round(rapproMo.totalReel * 10) / 10,
+      budgetEuro: Math.round(budgetMo),
+      reelEuro: Math.round(reelMo),
+      av: Math.round((recapMo.total.pctAvancement || 0) * 1000) / 10,
+      personnes: rapproMo.personnes.slice(0, 8).map((p) => ({ nom: p.nom, heures: Math.round(p.heures * 10) / 10, nbJours: p.nbJours })),
+      detail: recapMo.parType.filter((l) => (l.budget || 0) > 0).map((l) => ({ libelle: l.libelle, prevu: Math.round((l.budget || 0) * 10) / 10, av: Math.round((l.pctAvancement || 0) * 1000) / 10 })),
+    },
+    achats: achatsSap
+      .slice()
+      .sort((a, b) => tsDateSap(b.dateDoc) - tsDateSap(a.dateDoc))
+      .slice(0, 6)
+      .map((a) => ({ fournisseur: a.nomFournisseur || "—", doc: a.docAchat || "", designation: a.designation || "", date: a.dateDoc, montant: Number(a.valNette) || 0 })),
+  };
   return {
     ...fact,
+    bilan,
     heuresNonAffectees: nonAff.lignes.length > 0 ? Math.round(nonAff.reel * 100) / 100 : 0,
     fournituresNonAffectees: Math.round(fournNonAff * 100) / 100,
     nbDevis: devis.length,
