@@ -31,3 +31,7 @@ export const IcNote = I(<><path d="M4 4h16v12H9l-5 4z" /></>);
 export const IcEclair = I(<path d="M13 2L4 14h7l-1 8 9-12h-7z" />);
 export const IcPlus = I(<path d="M12 5v14M5 12h14" />);
 export const IcMoins = I(<path d="M5 12h14" />);
+export const IcAccueil = I(<><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>);
+export const IcTaches = I(<><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></>);
+export const IcReserve = I(<><path d="M5 21V4" /><path d="M5 4h13l-2.5 4.5L18 13H5" /></>);
+export const IcTest = I(<><path d="M9 3h6" /><path d="M10 3v6L5 19a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 19l-5-10V3" /><path d="M7.5 15h9" /></>);

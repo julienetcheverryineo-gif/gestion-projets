@@ -11,3 +11,25 @@ export function ListeChantiersElec() {
 export function FicheChantierElec() {
   return useTelephone() ? <FicheChantierMobile /> : <ElectriciteSiteDetail />;
 }
+
+import Dashboard from "../Dashboard";
+import Sites from "../Sites";
+import SiteDetail from "../SiteDetail";
+import Tasks from "../Tasks";
+import AccueilAuto from "./AccueilAuto";
+import ChantiersAuto from "./ChantiersAuto";
+import FicheChantierAuto from "./FicheChantierAuto";
+import TachesAuto from "./TachesAuto";
+
+export function AccueilAutomatisme() {
+  return useTelephone() ? <AccueilAuto /> : <Dashboard />;
+}
+export function ListeChantiersAutomatisme() {
+  return useTelephone() ? <ChantiersAuto /> : <Sites />;
+}
+export function FicheChantierAutomatisme() {
+  return useTelephone() ? <FicheChantierAuto /> : <SiteDetail />;
+}
+export function TachesAutomatisme() {
+  return useTelephone() ? <TachesAuto /> : <Tasks />;
+}

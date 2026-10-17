@@ -7,6 +7,7 @@ import NotificationsBell from "./NotificationsBell";
 import ImportSapAuto from "./ImportSapAuto";
 import logoIneo from "../assets/logo-ineo.png";
 import ShellMobileElec from "./mobile/ShellMobileElec";
+import ShellMobileAuto from "./mobile/ShellMobileAuto";
 import { forcerVueComplete, useTelephone, vueCompleteForcee } from "../lib/telephone";
 
 const NAV_ITEMS_AUTOMATISME = [
@@ -152,6 +153,7 @@ export default function Layout() {
   // Téléphone dans l'espace Électricité : interface dédiée (onglets en bas,
   // synthèse et tour de chantier), utilisable sans réseau.
   if (enEspaceElectricite && telephone) return <ShellMobileElec onDeconnexion={handleLogout} />;
+  if (!enEspaceElectricite && telephone) return <ShellMobileAuto onDeconnexion={handleLogout} peutBasculer={peutBasculerEspaces} />;
 
   return (
     <div className={"app-shell" + (reduite ? " app-shell-sidebar-reduite" : "")}>
@@ -322,7 +324,7 @@ export default function Layout() {
               →
             </button>
             <NotificationsBell />
-            {enEspaceElectricite && vueCompleteForcee() && (
+            {vueCompleteForcee() && (
               <button className="btn-ghost" onClick={() => forcerVueComplete(false)} aria-label="Revenir à la vue mobile">
                 📱 Vue mobile
               </button>
