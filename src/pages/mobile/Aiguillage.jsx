@@ -33,3 +33,18 @@ export function FicheChantierAutomatisme() {
 export function TachesAutomatisme() {
   return useTelephone() ? <TachesAuto /> : <Tasks />;
 }
+
+import ReservesGlobal from "../ReservesGlobal";
+import Notes from "../Notes";
+import ElectriciteNotes from "../ElectriciteNotes";
+import { ReservesGlobalMobile, NotesGlobalMobile, ProblemesElecMobile } from "./PagesGlobalesAuto";
+
+export function ReservesGlobalAutomatisme() {
+  return useTelephone() ? <ReservesGlobalMobile /> : <ReservesGlobal />;
+}
+export function NotesAutomatisme() {
+  return useTelephone() ? <NotesGlobalMobile /> : <Notes />;
+}
+export function ProblemesElec() {
+  return useTelephone() ? <ProblemesElecMobile /> : <ElectriciteNotes />;
+}

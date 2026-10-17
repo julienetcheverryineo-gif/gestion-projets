@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { useCollection } from "../lib/firestoreHooks";
 import { estChantierElectricite } from "../components/SiteFormModal";
 import { heuresJournalieres, capaciteSemaine } from "../lib/joursOuvres";
+import { useTelephone } from "../lib/telephone";
+import PlanDeChargeMobile from "./mobile/PlanDeChargeMobile";
 
 // Plan de charge Électricité — "option simple" : une seule date de fin
 // prévue par chantier (fiche chantier), pas de saisie par électricien ni
@@ -91,6 +93,7 @@ export default function ElectricitePlanDeCharge() {
   const { documents: tousChantiers, chargement: chargementChantiers } = useCollection("sites");
   const { documents: toutesLignes, chargement: chargementLignes } = useCollection("elecLignes");
   const [vue, setVue] = useState("semaine"); // "semaine" | "mois"
+  const telephone = useTelephone();
 
   const chargement = chargementChantiers || chargementLignes;
 
@@ -228,6 +231,30 @@ export default function ElectricitePlanDeCharge() {
     const capacite = capacitesColonnes[i];
     return capacite > 0 ? total / capacite : null;
   });
+
+  if (telephone) {
+    const vide =
+      chantiersPlan.length === 0
+        ? { titre: "Aucun chantier à planifier", texte: "Renseignez une date de fin prévue dans la fiche d'un chantier électricité pour qu'il apparaisse ici." }
+        : lignesPersonnes.length === 0
+        ? { titre: "Rien à planifier pour l'instant", texte: "Plus de reste à faire en main d'œuvre sur les chantiers avec une date de fin prévue." }
+        : null;
+    return (
+      <PlanDeChargeMobile
+        vue={vue}
+        setVue={setVue}
+        chargement={chargement}
+        vide={vide}
+        colonnes={colonnesAffichees}
+        libelle={libelleColonne}
+        cle={cleColonne}
+        lignes={lignesPersonnes}
+        totaux={totauxParColonne}
+        effectifs={effectifParColonne}
+        detail={detailChantiers}
+      />
+    );
+  }
 
   return (
     <div className="page">

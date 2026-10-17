@@ -4,13 +4,17 @@ import { db } from "../../firebase";
 import { formatDateCourte, reserveEnRetard } from "../../lib/useDonneesAuto";
 import { ecrire } from "../../lib/ecritureMobile";
 import { afficherToast } from "../../components/mobile/Ui";
-import { IcReserve } from "../../components/mobile/Icones";
+import { correspondARecherche } from "../../lib/recherche";
+import { IcRecherche, IcReserve } from "../../components/mobile/Icones";
 
 // Réserves d'un chantier : lever d'un geste (annulable).
-export default function ReservesAuto({ reserves }) {
+export default function ReservesAuto({ reserves, nomChantier = null }) {
   const [filtre, setFiltre] = useState("ouvertes");
   const ouvertes = reserves.filter((r) => r.statut !== "levee");
+  const [recherche, setRecherche] = useState("");
+  const q = recherche.trim();
   const liste = (filtre === "ouvertes" ? ouvertes : filtre === "levees" ? reserves.filter((r) => r.statut === "levee") : reserves)
+    .filter((r) => !q || correspondARecherche(q, [r.designation, r.responsable, r.remarque, nomChantier ? nomChantier(r.chantierId) : ""]))
     .slice()
     .sort((a, b) => String(a.dateEcheance || "0000").localeCompare(String(b.dateEcheance || "0000")));
 
@@ -26,6 +30,12 @@ export default function ReservesAuto({ reserves }) {
 
   return (
     <div>
+      {nomChantier && (
+        <label className="m-recherche">
+          <IcRecherche taille={18} />
+          <input type="search" placeholder="Réserve, responsable, chantier…" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
+        </label>
+      )}
       <div className="m-filtres">
         {[
           ["ouvertes", "Ouvertes (" + ouvertes.length + ")"],
@@ -49,6 +59,7 @@ export default function ReservesAuto({ reserves }) {
             const levee = r.statut === "levee";
             return (
               <li key={r.id} className={"m-reserve" + (retard ? " retard" : "") + (levee ? " levee" : "")}>
+                {nomChantier && <span className="m-reserve-chantier">{nomChantier(r.chantierId)}</span>}
                 <strong>{r.designation}</strong>
                 <span className="m-ligne-auto-sous">
                   {r.responsable ? r.responsable + " · " : ""}

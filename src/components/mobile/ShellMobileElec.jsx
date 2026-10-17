@@ -14,8 +14,6 @@ const ROLES = {
   ra_electricite: "RA Électricité",
 };
 const TITRES = {
-  "/electricite/plan-de-charge": "Plan de charge",
-  "/electricite/notes": "Problèmes rencontrés",
   "/electricite/import-sap": "Import SAP",
 };
 
@@ -36,7 +34,7 @@ export default function ShellMobileElec({ onDeconnexion }) {
   const [synchro, setSynchro] = useState(false);
 
   const surFiche = pathname.startsWith("/electricite/chantiers/");
-  const natif = pathname === "/electricite" || surFiche;
+  const natif = pathname === "/electricite" || pathname === "/electricite/notes" || pathname === "/electricite/plan-de-charge" || surFiche;
 
   return (
     <div className="m-app">

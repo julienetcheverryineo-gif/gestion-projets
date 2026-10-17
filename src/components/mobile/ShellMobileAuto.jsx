@@ -14,8 +14,6 @@ const ROLES = {
 };
 const TITRES = {
   "/planning": "Planning",
-  "/reserves": "Réserves",
-  "/notes": "Notes",
   "/aide": "Aide",
   "/utilisateurs": "Utilisateurs",
   "/statistiques": "Statistiques",
@@ -38,7 +36,7 @@ export default function ShellMobileAuto({ onDeconnexion, peutBasculer }) {
   const [synchro, setSynchro] = useState(false);
 
   const surFiche = pathname.startsWith("/chantiers/");
-  const natif = pathname === "/" || pathname === "/chantiers" || pathname === "/taches" || surFiche;
+  const natif = pathname === "/" || pathname === "/chantiers" || pathname === "/taches" || pathname === "/reserves" || pathname === "/notes" || surFiche;
   const aller = (to) => {
     setMenu(false);
     navigate(to);

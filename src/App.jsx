@@ -4,12 +4,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Planning from "./pages/Planning";
-import ReservesGlobal from "./pages/ReservesGlobal";
-import Notes from "./pages/Notes";
-import ElectriciteNotes from "./pages/ElectriciteNotes";
 import Users from "./pages/Users";
 import Statistiques from "./pages/Statistiques";
-import { ListeChantiersElec, FicheChantierElec, AccueilAutomatisme, ListeChantiersAutomatisme, FicheChantierAutomatisme, TachesAutomatisme } from "./pages/mobile/Aiguillage";
+import { ListeChantiersElec, FicheChantierElec, AccueilAutomatisme, ListeChantiersAutomatisme, FicheChantierAutomatisme, TachesAutomatisme, ReservesGlobalAutomatisme, NotesAutomatisme, ProblemesElec } from "./pages/mobile/Aiguillage";
 import ElectricitePlanDeCharge from "./pages/ElectricitePlanDeCharge";
 import ElectriciteImportSap from "./pages/ElectriciteImportSap";
 import EspaceClient from "./pages/EspaceClient";
@@ -42,14 +39,14 @@ export default function App() {
             <Route path="chantiers/:chantierId" element={<FicheChantierAutomatisme />} />
             <Route path="taches" element={<TachesAutomatisme />} />
             <Route path="planning" element={<Planning />} />
-            <Route path="reserves" element={<ReservesGlobal />} />
-            <Route path="notes" element={<Notes />} />
+            <Route path="reserves" element={<ReservesGlobalAutomatisme />} />
+            <Route path="notes" element={<NotesAutomatisme />} />
             <Route path="aide" element={<Aide />} />
             <Route path="electricite" element={<ListeChantiersElec />} />
             <Route path="electricite/chantiers/:chantierId" element={<FicheChantierElec />} />
             <Route path="electricite/plan-de-charge" element={<ElectricitePlanDeCharge />} />
             <Route path="electricite/import-sap" element={<ElectriciteImportSap />} />
-            <Route path="electricite/notes" element={<ElectriciteNotes />} />
+            <Route path="electricite/notes" element={<ProblemesElec />} />
             <Route
               path="utilisateurs"
               element={

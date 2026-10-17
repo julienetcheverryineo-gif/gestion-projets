@@ -16,11 +16,11 @@ function dateHeure(ts) {
 }
 
 // Notes de visite d'un chantier : on tape, on envoie, même sans réseau.
-export default function NotesAuto({ chantierId }) {
+export default function NotesAuto({ chantierId = null, portee = null, vide = "Aucune note" }) {
   const { user, profile } = useAuth();
   const { documents: toutes } = useCollection("notes");
   const [texte, setTexte] = useState("");
-  const notes = toutes.filter((n) => (n.chantierId || null) === chantierId && !n.portee);
+  const notes = toutes.filter((n) => (n.chantierId || null) === chantierId && (n.portee || null) === portee);
 
   const ajouter = () => {
     const brut = texte.trim();
@@ -29,6 +29,7 @@ export default function NotesAuto({ chantierId }) {
     ecrire(
       addDoc(collection(db, "notes"), {
         chantierId,
+        ...(portee ? { portee } : {}),
         texte: nettoyerHtmlNote(html),
         userId: user?.uid || null,
         auteur: profile?.nom || "?",
@@ -51,7 +52,7 @@ export default function NotesAuto({ chantierId }) {
       {notes.length === 0 ? (
         <div className="m-vide">
           <IcNote taille={34} />
-          <strong>Aucune note</strong>
+          <strong>{vide}</strong>
         </div>
       ) : (
         <ul className="m-liste-simple">
