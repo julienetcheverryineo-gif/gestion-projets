@@ -15,6 +15,8 @@ const STATUTS_TASK = [
   { value: "suspendu", label: "Suspendu" },
 ];
 
+const tacheTerminee = (t) => t.statut === "termine" || t.statut === "fait" || Number(t.avancement) >= 100;
+
 const STATUTS_REGITEM = [
   { value: "a_faire", label: "À faire" },
   { value: "fait", label: "Fait" },
@@ -129,7 +131,9 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
     } else {
       copie.sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
     }
-    return copie;
+    // Les tâches terminées (statut « terminé » ou 100 %) descendent tout en
+    // bas, quel que soit le tri (ordre relatif conservé).
+    return [...copie.filter((t) => !tacheTerminee(t)), ...copie.filter(tacheTerminee)];
   }, [tachesFiltrees, tri, nomChantier]);
 
   useEffect(() => {
@@ -367,7 +371,7 @@ export default function TaskTable({ taches, peutGerer, utilisateurs, electricien
                   if (Number.isNaN(indexDepart)) return;
                   deplacerTache(indexDepart, index);
                 }}
-                className={reorganisable && !estTactile ? "reg-equip-draggable" : undefined}
+                className={[reorganisable && !estTactile ? "reg-equip-draggable" : "", tacheTerminee(t) ? "tache-terminee" : ""].filter(Boolean).join(" ") || undefined}
               >
                 {peutGerer && (
                   <td>

@@ -4588,3 +4588,8 @@ table.af-table.table-recap {
   display: inline-block; padding: 2px 8px; color: #6d28d9; font-weight: 700; border: 2px solid #7c3aed; border-radius: 999px;
   font-variant-numeric: tabular-nums; white-space: nowrap; cursor: help;
 }
+
+/* Tâche terminée (statut « terminé » ou 100 %) : grisée et barrée, rangée en bas. */
+tr.tache-terminee td { opacity: 0.55; background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(128, 140, 150, 0.1) 6px 7px); }
+tr.tache-terminee td:hover, tr.tache-terminee td:focus-within { opacity: 0.9; }
+tr.tache-terminee td input:not([type="checkbox"]), tr.tache-terminee td .tache-titre { text-decoration: line-through; text-decoration-color: rgba(128, 140, 150, 0.8); }
