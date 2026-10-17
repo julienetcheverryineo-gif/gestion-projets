@@ -106,6 +106,8 @@ export function calculerFacturation({ chantier, devis, toutesLignes, groupes, sa
     }
   }
   return {
+    marche: Math.round(marcheTotal * 100) / 100,
+    facture: Math.round(facture * 100) / 100,
     factVsReel,
     factVsAvancement,
     etat: {

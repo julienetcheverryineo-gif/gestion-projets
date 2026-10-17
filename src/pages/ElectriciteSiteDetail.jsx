@@ -1562,6 +1562,14 @@ export function calculerIndicateursChantier(chantier, { tousDevis, toutesLignes,
     heuresNonAffectees: nonAff.lignes.length > 0 ? Math.round(nonAff.reel * 100) / 100 : 0,
     fournituresNonAffectees: Math.round(fournNonAff * 100) / 100,
     nbDevis: devis.length,
+    // Pour la synthèse mobile : avancement suivi, budget chiffré et dépense réelle SAP.
+    avancementPct: sap ? sap.avancementPct : null,
+    avancementFoPct: Math.round((totFo.pctAvancement || 0) * 1000) / 10,
+    avancementMoPct: Math.round((recapMo.total.pctAvancement || 0) * 1000) / 10,
+    budget: sap ? Math.round(sap.budget) : 0,
+    reelSap: sap ? Math.round(sap.reel) : 0,
+    sapDisponible: sap ? sap.disponible : false,
+    sapImporteLe: chantier.sapFacturation?.importeLe || null,
   };
 }
 

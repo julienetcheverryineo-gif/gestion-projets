@@ -1,6 +1,12 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, setPersistence, browserSessionPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, setPersistence, browserSessionPersistence, browserLocalPersistence } from "firebase/auth";
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  CACHE_SIZE_UNLIMITED,
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
 import { getAnalytics, isSupported } from "firebase/analytics";
@@ -21,16 +27,57 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Cache local persistant (IndexedDB) : l'appli s'ouvre et se consulte sans
+// réseau (mode avion, sous-sol, gaines...). Les modifications faites hors
+// ligne sont mises en file d'attente et envoyées toutes seules au retour du
+// réseau. Multi-onglets pour que la PWA et un onglet navigateur partagent
+// le même cache. En cas d'échec (navigation privée, vieux navigateur) on
+// retombe sur le fonctionnement classique, en ligne uniquement.
+function ouvrirFirestore() {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+        cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+      }),
+    });
+  } catch {
+    return getFirestore(app);
+  }
+}
+export const db = ouvrirFirestore();
 export const storage = getStorage(app);
 
-// Persistance de session plutôt que persistance locale (par défaut) :
-// la connexion ne survit qu'à l'onglet/l'application ouverte. Fermer
-// complètement le navigateur ou l'appli (PWA) déconnecte l'utilisateur —
-// il devra ressaisir ses identifiants à la prochaine ouverture. Appelé
-// avant tout login (au chargement du module), donc sans risque de
-// course avec un login déclenché juste après.
-setPersistence(auth, browserSessionPersistence).catch(() => {});
+// Persistance de la connexion. Par défaut : persistance de session (la
+// connexion ne survit qu'à l'onglet/l'application ouverte ; fermer
+// complètement le navigateur ou la PWA déconnecte). Si l'utilisateur coche
+// « Rester connecté sur cet appareil » à la connexion (nécessaire pour le
+// mode hors-ligne : sans réseau on ne peut pas se reconnecter), la
+// connexion est conservée sur l'appareil. Le choix est mémorisé ici.
+const CLE_RESTER_CONNECTE = "resterConnecte";
+export function lireResterConnecte() {
+  try {
+    const v = localStorage.getItem(CLE_RESTER_CONNECTE);
+    if (v === null) {
+      // Premier lancement : activé par défaut sur téléphone/tablette (usage
+      // terrain), désactivé sur poste fixe comme avant.
+      return typeof window !== "undefined" && window.matchMedia?.("(max-width: 860px) and (pointer: coarse)").matches;
+    }
+    return v === "1";
+  } catch {
+    return false;
+  }
+}
+export function appliquerResterConnecte(valeur) {
+  try {
+    localStorage.setItem(CLE_RESTER_CONNECTE, valeur ? "1" : "0");
+  } catch {
+    // stockage indisponible : le choix ne sera juste pas mémorisé
+  }
+  return setPersistence(auth, valeur ? browserLocalPersistence : browserSessionPersistence);
+}
+setPersistence(auth, lireResterConnecte() ? browserLocalPersistence : browserSessionPersistence).catch(() => {});
 
 // Analytics ne fonctionne pas dans tous les environnements (ex: iOS PWA en
 // mode standalone) : on l'active seulement si le navigateur le supporte.

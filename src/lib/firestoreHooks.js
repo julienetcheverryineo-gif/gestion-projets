@@ -8,6 +8,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { noterSynchro } from "./offline";
 
 // Petit hook générique : écoute une collection en temps réel
 export function useCollection(nomCollection, champTri = "creeLe") {
@@ -19,6 +20,7 @@ export function useCollection(nomCollection, champTri = "creeLe") {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        if (!snapshot.metadata.fromCache) noterSynchro();
         setDocuments(
           snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
         );

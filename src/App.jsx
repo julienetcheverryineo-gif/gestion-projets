@@ -13,8 +13,7 @@ import Notes from "./pages/Notes";
 import ElectriciteNotes from "./pages/ElectriciteNotes";
 import Users from "./pages/Users";
 import Statistiques from "./pages/Statistiques";
-import ElectriciteChantiers from "./pages/ElectriciteChantiers";
-import ElectriciteSiteDetail from "./pages/ElectriciteSiteDetail";
+import { ListeChantiersElec, FicheChantierElec } from "./pages/mobile/Aiguillage";
 import ElectricitePlanDeCharge from "./pages/ElectricitePlanDeCharge";
 import ElectriciteImportSap from "./pages/ElectriciteImportSap";
 import EspaceClient from "./pages/EspaceClient";
@@ -50,8 +49,8 @@ export default function App() {
             <Route path="reserves" element={<ReservesGlobal />} />
             <Route path="notes" element={<Notes />} />
             <Route path="aide" element={<Aide />} />
-            <Route path="electricite" element={<ElectriciteChantiers />} />
-            <Route path="electricite/chantiers/:chantierId" element={<ElectriciteSiteDetail />} />
+            <Route path="electricite" element={<ListeChantiersElec />} />
+            <Route path="electricite/chantiers/:chantierId" element={<FicheChantierElec />} />
             <Route path="electricite/plan-de-charge" element={<ElectricitePlanDeCharge />} />
             <Route path="electricite/import-sap" element={<ElectriciteImportSap />} />
             <Route path="electricite/notes" element={<ElectriciteNotes />} />

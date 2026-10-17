@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import logoIneo from "../assets/logo-ineo.png";
+import { lireResterConnecte } from "../firebase";
 
 export default function Login() {
   const { user, profile, login, compteDesactive } = useAuth();
@@ -10,6 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
+  const [rester, setRester] = useState(lireResterConnecte);
 
   // Ne pas naviguer juste après la résolution de login() : à ce moment-là,
   // AuthContext n'a pas encore fini de charger le profil Firestore (c'est
@@ -37,7 +39,7 @@ export default function Login() {
     setErreur("");
     setEnCours(true);
     try {
-      await login(email, password);
+      await login(email, password, rester);
     } catch (err) {
       setErreur("Identifiants incorrects. Vérifiez votre e-mail et votre mot de passe.");
     } finally {
@@ -73,6 +75,14 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+          </label>
+
+          <label className="login-rester">
+            <input type="checkbox" checked={rester} onChange={(e) => setRester(e.target.checked)} />
+            <span>
+              Rester connecté sur cet appareil
+              <small>Nécessaire pour ouvrir l'appli sans réseau (mode avion).</small>
+            </span>
           </label>
 
           {erreur && <div className="form-error">{erreur}</div>}
